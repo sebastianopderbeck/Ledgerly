@@ -172,6 +172,8 @@ volumes:
 node_modules/
 dist/
 .env
+.idea/
+.superpowers/
 /examples
 *.pdf
 ```
