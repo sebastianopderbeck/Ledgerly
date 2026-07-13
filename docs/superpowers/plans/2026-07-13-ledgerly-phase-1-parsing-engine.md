@@ -260,7 +260,7 @@ Expected: `npm install` linkea los workspaces; `typecheck` sin errores; Vitest m
 - [ ] **Step 7: Stage**
 
 ```bash
-git add package.json tsconfig.base.json vitest.config.ts .env.example docker-compose.yml shared server package-lock.json
+git add package.json tsconfig.base.json tsconfig.json vitest.config.ts .env.example docker-compose.yml shared server package-lock.json
 # commit sugerido (lo hace el usuario): "chore: scaffold monorepo (shared + server workspaces)"
 ```
 
