@@ -55,7 +55,7 @@ export function parseInstallment(desc: string): {
 
 export function classifyType(desc: string): TxType {
   const d = desc.toUpperCase();
-  if (/SU\s+PAGO|PAGO\s+TIC/.test(d)) return "payment";
+  if (/SU\s+PAGO/.test(d)) return "payment";
   if (/\b(IVA|IIBB|PERCEP|DB\.RG|DEV\.IMP|RG\s*\d)/.test(d)) return "tax";
   if (/BONIF/.test(d)) return "refund";
   return "purchase";
