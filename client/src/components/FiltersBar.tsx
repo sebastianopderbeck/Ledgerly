@@ -1,10 +1,14 @@
 import { useSearchParams } from "react-router-dom";
 import { Box, MenuItem, TextField } from "@mui/material";
+import { useStatements } from "../api/hooks.js";
 
 interface FiltersBarProps { showCategory?: boolean; }
 
 export const FiltersBar = ({ showCategory = false }: FiltersBarProps) => {
   const [params, setParams] = useSearchParams();
+  const { data } = useStatements();
+  const cards = Array.isArray(data) ? [...new Set(data.map((s) => s.cardLabel))] : [];
+
   const set = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value); else next.delete(key);
@@ -19,6 +23,15 @@ export const FiltersBar = ({ showCategory = false }: FiltersBarProps) => {
       >
         <MenuItem value="ARS">ARS</MenuItem>
         <MenuItem value="USD">USD</MenuItem>
+      </TextField>
+      <TextField
+        select label="Tarjeta" size="small" sx={{ minWidth: 200 }}
+        value={params.get("cardLabel") ?? ""} onChange={(e) => set("cardLabel", e.target.value)}
+      >
+        <MenuItem value="">Todas</MenuItem>
+        {cards.map((card) => (
+          <MenuItem key={card} value={card}>{card}</MenuItem>
+        ))}
       </TextField>
       <TextField
         label="Desde" type="date" size="small" InputLabelProps={{ shrink: true }}

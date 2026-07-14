@@ -58,4 +58,45 @@ describe("stats", () => {
     expect(res.body.statementCount).toBe(1);
     expect(res.body.futureInstallmentTotal).toBe(3000);
   });
+
+  it("by-category filtra por cardLabel", async () => {
+    const other = await StatementModel.create({
+      issuer: "visa_signature", cardLabel: "VISA1", last4: null, closingDate: new Date("2026-07-02"), dueDate: null,
+      totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+        pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
+      sourceFileName: "v.pdf", sourceHash: "h2", pageCount: 1, parserVersion: "1.0.0",
+      needsReview: false, reconciliation: { ok: true, entries: [] },
+    });
+    await TransactionModel.create({
+      statementId: other._id, issuer: "visa_signature", cardLabel: "VISA1", date: new Date("2026-05-04"),
+      descriptionRaw: "X", merchant: "X", category: "Compras", categorySource: "rule", amount: 999, currency: "ARS",
+      direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+      comprobante: "9", fingerprint: "f9",
+    });
+    const res = await request(app).get("/api/stats/by-category?currency=ARS&cardLabel=ICBC");
+    const compras = res.body.find((c: { category: string }) => c.category === "Compras");
+    expect(compras.total).toBe(1500);
+  });
+
+  it("future-installments y summary respetan cardLabel", async () => {
+    const other = await StatementModel.create({
+      issuer: "visa_signature", cardLabel: "VISA1", last4: null, closingDate: new Date("2026-07-02"), dueDate: null,
+      totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+        pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
+      sourceFileName: "v.pdf", sourceHash: "h2", pageCount: 1, parserVersion: "1.0.0",
+      needsReview: false, reconciliation: { ok: true, entries: [] },
+    });
+    await TransactionModel.create({
+      statementId: other._id, issuer: "visa_signature", cardLabel: "VISA1", date: new Date("2026-05-04"),
+      descriptionRaw: "Y", merchant: "Y", category: "Compras", categorySource: "rule", amount: 800, currency: "ARS",
+      direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 1, installmentTotal: 3,
+      comprobante: "8", fingerprint: "f8",
+    });
+    const future = await request(app).get("/api/stats/future-installments?currency=ARS&cardLabel=ICBC");
+    expect(future.body).toEqual([{ month: "2026-06", total: 1500 }, { month: "2026-07", total: 1500 }]);
+    const summary = await request(app).get("/api/stats/summary?currency=ARS&cardLabel=ICBC");
+    expect(summary.body.totalPurchases).toBe(2000);
+    expect(summary.body.statementCount).toBe(1);
+    expect(summary.body.futureInstallmentTotal).toBe(3000);
+  });
 });

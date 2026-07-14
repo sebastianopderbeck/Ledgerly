@@ -13,6 +13,7 @@ export const TransactionsPage = () => {
     to: params.get("to") ?? undefined,
     category: params.get("category") ?? undefined,
     search: params.get("search") ?? undefined,
+    cardLabel: params.get("cardLabel") ?? undefined,
     pageSize: 100,
   };
   const { data, isLoading, isError, error } = useTransactions(filters);
