@@ -1,0 +1,11 @@
+EXCLUSIVE ICBC CLUB
+CIERRE  02 Jul 26       VENCIMIENTO 14 Jul 26
+LIMITES:     COMPRA   $  17.100.000,00
+                        SALDO ANTERIOR                              5.000,00               0,00
+26 Junio   08           SU PAGO EN PESOS                            5.000,00-
+26 Mayo    04 001001 *  COMERCIO TRES               C.02/06           1.500,00
+           07 001002 K  PAYU*AR*COMERCIO CUATRO                        900,00
+           10 001003    BONIF. ALGO                                    100,00-
+                        TOTAL CONSUMOS                                2.400,00
+                        SALDO ACTUAL       $                          2.400,00
+                        PAGO MINIMO        $                            240,00
