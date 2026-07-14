@@ -1,0 +1,13 @@
+VISA SIGNATURE
+CIERRE ACTUAL: 02 Jul 26
+VENCIMIENTO 13 Jul 26
+           FECHA   COMPROBANTE          DETALLE DE TRANSACCION                          PESOS                  DOLARES
+                               SALDO ANTERIOR                              1.000,00             10,00
+       05.06.26                SU PAGO EN PESOS                            1.000,00-
+       10.06.26     111111*    COMERCIO UNO                                 2.500,00
+       11.06.26     222222*    MERPAGO*COMERCIO DOS         Cuota  03/06     1.200,00
+       12.06.26     333333F    SERVICIO EXTERIOR        USD       50,00                          50,00
+       13.06.26     444444K    IVA RG 4240 21%(   1000,00)                    210,00
+       Tarjeta 1234 Total Consumos de TITULAR EJEMPLO                        3.700,00             50,00 _
+                                                 SALDO ACTUAL       $      3.910,00  U$S        50,00
+                                                 PAGO MINIMO        $        500,00
