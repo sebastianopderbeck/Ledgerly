@@ -1,1 +1,2 @@
-export const SHARED_PACKAGE = "@ledgerly/shared";
+export * from "./schemas.js";
+export * from "./types.js";
