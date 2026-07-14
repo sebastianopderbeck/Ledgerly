@@ -34,4 +34,26 @@ describe("ImportPage", () => {
     await userEvent.upload(input as HTMLInputElement, new File(["x"], "r.pdf", { type: "application/pdf" }));
     await waitFor(() => expect(screen.getByText(/importado: 3 movimientos/i)).toBeInTheDocument());
   });
+
+  it("permite reemplazar cuando el resumen ya existe", async () => {
+    let replaceCalled = false;
+    mockFetch((url, init) => {
+      if (url.includes("/statements") && init?.method === "POST") {
+        if (url.includes("replace=true")) {
+          replaceCalled = true;
+          return { status: "imported", transactionCount: 5, statement: { reconciliation: { ok: true, entries: [] } } };
+        }
+        return { status: "duplicate", transactionCount: 0, statement: { reconciliation: { ok: true, entries: [] } } };
+      }
+      return [];
+    });
+    renderWithProviders(<ImportPage />);
+    const input = document.querySelector('input[type="file"]')!;
+    await userEvent.upload(input as HTMLInputElement, new File(["x"], "r.pdf", { type: "application/pdf" }));
+    await waitFor(() => expect(screen.getByText(/ya estaba importado/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: /reemplazar/i }));
+    await waitFor(() => expect(screen.getByText(/importado: 5 movimientos/i)).toBeInTheDocument());
+    expect(replaceCalled).toBe(true);
+  });
 });

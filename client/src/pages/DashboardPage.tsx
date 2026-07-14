@@ -22,6 +22,7 @@ export const DashboardPage = () => {
     currency: (params.get("currency") as "ARS" | "USD") ?? "ARS",
     from: params.get("from") ?? undefined,
     to: params.get("to") ?? undefined,
+    cardLabel: params.get("cardLabel") ?? undefined,
   };
 
   return (

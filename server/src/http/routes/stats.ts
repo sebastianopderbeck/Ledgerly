@@ -8,11 +8,18 @@ import type { Currency } from "@ledgerly/shared";
 function baseMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   const currency = q.currency === "USD" ? "USD" : "ARS";
   const match: FilterQuery<TransactionDoc> = { type: "purchase", currency };
+  if (typeof q.cardLabel === "string") match.cardLabel = q.cardLabel;
   if (typeof q.from === "string" || typeof q.to === "string") {
     match.date = {};
     if (typeof q.from === "string") match.date.$gte = new Date(q.from);
     if (typeof q.to === "string") match.date.$lte = new Date(q.to);
   }
+  return match;
+}
+
+function installmentMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
+  const match: FilterQuery<TransactionDoc> = { type: "purchase", isInstallment: true };
+  if (typeof q.cardLabel === "string") match.cardLabel = q.cardLabel;
   return match;
 }
 
@@ -52,7 +59,7 @@ statsRouter.get("/top-merchants", asyncHandler(async (req, res) => {
 
 statsRouter.get("/future-installments", asyncHandler(async (req, res) => {
   const currency: Currency = req.query.currency === "USD" ? "USD" : "ARS";
-  const txs = await TransactionModel.find({ type: "purchase", isInstallment: true }).lean();
+  const txs = await TransactionModel.find(installmentMatch(req.query as Record<string, unknown>)).lean();
   const mapped = txs.map((t) => ({
     date: t.date.toISOString().slice(0, 10),
     amount: t.amount, currency: t.currency as Currency,
@@ -68,7 +75,7 @@ statsRouter.get("/summary", asyncHandler(async (req, res) => {
     { $match: match },
     { $group: { _id: null, totalPurchases: { $sum: "$amount" }, transactionCount: { $sum: 1 } } },
   ]);
-  const installmentTxs = await TransactionModel.find({ type: "purchase", isInstallment: true }).lean();
+  const installmentTxs = await TransactionModel.find(installmentMatch(req.query as Record<string, unknown>)).lean();
   const future = computeFutureInstallments(
     installmentTxs.map((t) => ({
       date: t.date.toISOString().slice(0, 10), amount: t.amount, currency: t.currency as Currency,
@@ -76,11 +83,12 @@ statsRouter.get("/summary", asyncHandler(async (req, res) => {
     })),
     currency,
   );
+  const cardLabel = req.query.cardLabel;
   res.json({
     currency,
     totalPurchases: agg?.totalPurchases ?? 0,
     transactionCount: agg?.transactionCount ?? 0,
-    statementCount: await StatementModel.countDocuments(),
+    statementCount: await StatementModel.countDocuments(typeof cardLabel === "string" ? { cardLabel } : {}),
     futureInstallmentTotal: future.reduce((acc, f) => acc + f.total, 0),
   });
 }));

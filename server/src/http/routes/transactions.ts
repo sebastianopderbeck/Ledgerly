@@ -8,6 +8,7 @@ function buildFilter(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   const filter: FilterQuery<TransactionDoc> = {};
   if (typeof q.currency === "string") filter.currency = q.currency;
   if (typeof q.issuer === "string") filter.issuer = q.issuer;
+  if (typeof q.cardLabel === "string") filter.cardLabel = q.cardLabel;
   if (typeof q.category === "string") filter.category = q.category;
   if (typeof q.search === "string") filter.merchant = { $regex: q.search, $options: "i" };
   if (typeof q.from === "string" || typeof q.to === "string") {

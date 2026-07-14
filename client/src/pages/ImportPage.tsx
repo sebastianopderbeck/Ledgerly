@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Box, CircularProgress, Typography } from "@mui/material";
+import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material";
 import type { ImportResultDTO } from "@ledgerly/shared";
 import { useDeleteStatement, useStatements, useUploadStatement } from "../api/hooks.js";
 import { FileDropzone } from "../components/FileDropzone.js";
@@ -11,9 +11,15 @@ export const ImportPage = () => {
   const del = useDeleteStatement();
   const statements = useStatements();
   const [last, setLast] = useState<ImportResultDTO | null>(null);
+  const [lastFile, setLastFile] = useState<File | null>(null);
 
   const handleFile = (file: File) => {
+    setLastFile(file);
     upload.mutate({ file }, { onSuccess: setLast });
+  };
+
+  const handleReplace = () => {
+    if (lastFile) upload.mutate({ file: lastFile, replace: true }, { onSuccess: setLast });
   };
 
   return (
@@ -25,7 +31,15 @@ export const ImportPage = () => {
       {upload.isError && <Alert severity="error" sx={{ mb: 2 }}>{upload.error.message}</Alert>}
       {last && (
         <>
-          <Alert severity={last.status === "duplicate" ? "info" : "success"} sx={{ mb: 2 }}>
+          <Alert
+            severity={last.status === "duplicate" ? "info" : "success"}
+            sx={{ mb: 2 }}
+            action={last.status === "duplicate" ? (
+              <Button color="inherit" size="small" onClick={handleReplace} disabled={upload.isPending}>
+                Reemplazar
+              </Button>
+            ) : undefined}
+          >
             {last.status === "duplicate" ? "Ya estaba importado" : `Importado: ${last.transactionCount} movimientos`}
           </Alert>
           <ReconciliationBanner reconciliation={last.statement.reconciliation} />
