@@ -2,7 +2,11 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "paths": { "@ledgerly/shared": ["shared/src/index.ts"] }
+    "paths": { "@ledgerly/shared": ["shared/src/index.ts"] },
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["shared/src", "server/src", "vitest.config.ts"]
+  "include": ["shared/src", "server/src", "client/src", "vitest.config.ts"]
 }
