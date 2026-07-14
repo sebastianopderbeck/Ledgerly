@@ -13,6 +13,7 @@ describe.skipIf(!hasReal)("extractPdfText (PDFs reales)", () => {
     const { text, meta } = await extractPdfText(readFileSync(visaPath));
     expect(text).toContain("VISA SIGNATURE");
     expect(meta.pageCount).toBeGreaterThan(0);
+    expect(meta.encrypted).toBe(false);
   });
 
   it("extrae texto del PDF ICBC (AES, password vacía)", async () => {
@@ -20,5 +21,6 @@ describe.skipIf(!hasReal)("extractPdfText (PDFs reales)", () => {
     expect(text).toContain("ICBC");
     expect(text.length).toBeGreaterThan(500);
     expect(meta.pageCount).toBeGreaterThan(0);
+    expect(meta.encrypted).toBe(true);
   });
 });
