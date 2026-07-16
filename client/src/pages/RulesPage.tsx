@@ -1,7 +1,9 @@
-import { Alert, Button, CircularProgress, IconButton, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
+import { Alert, Button, CircularProgress, IconButton, Stack, Switch, Table, TableCell, TableHead, TableRow, Typography } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useApplyRules, useCategoryRules, useCreateRule, useDeleteRule, useUpdateRule } from "../api/hooks.js";
 import { CategoryRuleForm } from "../components/CategoryRuleForm.js";
+import { MotionTableBody, MotionTableRow } from "../components/motion/motion.js";
+import { fadeItem, staggerContainer } from "../components/motion/variants.js";
 
 export const RulesPage = () => {
   const { data, isLoading, isError, error } = useCategoryRules();
@@ -33,9 +35,9 @@ export const RulesPage = () => {
             <TableCell>Categoría</TableCell><TableCell>Activa</TableCell><TableCell />
           </TableRow>
         </TableHead>
-        <TableBody>
+        <MotionTableBody variants={staggerContainer} initial="hidden" animate="visible">
           {(data ?? []).map((r) => (
-            <TableRow key={r.id}>
+            <MotionTableRow key={r.id} variants={fadeItem}>
               <TableCell>{r.priority}</TableCell>
               <TableCell>{r.matchType}</TableCell>
               <TableCell>{r.pattern}</TableCell>
@@ -46,9 +48,9 @@ export const RulesPage = () => {
               <TableCell>
                 <IconButton aria-label="borrar" onClick={() => del.mutate(r.id)}><DeleteIcon /></IconButton>
               </TableCell>
-            </TableRow>
+            </MotionTableRow>
           ))}
-        </TableBody>
+        </MotionTableBody>
       </Table>
     </>
   );

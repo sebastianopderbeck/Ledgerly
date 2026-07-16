@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { motion } from "framer-motion";
 import { DataGrid, type GridColDef, type GridRowModel } from "@mui/x-data-grid";
 import type { TransactionDTO } from "@ledgerly/shared";
 import { formatMoney } from "../format.js";
@@ -27,7 +28,12 @@ export const TransactionsTable = ({ rows, onCategoryChange }: TransactionsTableP
   };
 
   return (
-    <div style={{ width: "100%" }}>
+    <motion.div
+      style={{ width: "100%" }}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+    >
       <DataGrid
         rows={rows}
         columns={columns}
@@ -38,6 +44,6 @@ export const TransactionsTable = ({ rows, onCategoryChange }: TransactionsTableP
         initialState={{ pagination: { paginationModel: { pageSize: 25, page: 0 } } }}
         pageSizeOptions={[25, 50, 100]}
       />
-    </div>
+    </motion.div>
   );
 };
