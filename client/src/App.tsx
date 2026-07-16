@@ -8,6 +8,7 @@ import { PageTransition } from "./components/motion/PageTransition.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { ImportPage } from "./pages/ImportPage.js";
 import { TransactionsPage } from "./pages/TransactionsPage.js";
+import { InstallmentsPage } from "./pages/InstallmentsPage.js";
 import { RulesPage } from "./pages/RulesPage.js";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -20,6 +21,7 @@ const AnimatedRoutes = () => {
         <Route path="/" element={<PageTransition><DashboardPage /></PageTransition>} />
         <Route path="/import" element={<PageTransition><ImportPage /></PageTransition>} />
         <Route path="/transactions" element={<PageTransition><TransactionsPage /></PageTransition>} />
+        <Route path="/installments" element={<PageTransition><InstallmentsPage /></PageTransition>} />
         <Route path="/rules" element={<PageTransition><RulesPage /></PageTransition>} />
       </Routes>
     </AnimatePresence>

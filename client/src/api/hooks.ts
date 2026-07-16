@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  CategoryRuleDTO, CategoryStat, FutureInstallmentStat, ImportResultDTO,
+  CategoryRuleDTO, CategoryStat, FutureInstallmentStat, FutureInstallmentMonth, ImportResultDTO,
   MerchantStat, MonthlyStat, StatementDTO, SummaryStat, TransactionDTO,
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
@@ -80,6 +80,10 @@ export function useTopMerchants(f: StatFilters & { limit?: number }) {
 }
 export function useFutureInstallments(f: StatFilters) {
   return useQuery({ queryKey: ["future", f], queryFn: () => apiFetch<FutureInstallmentStat[]>(`/stats/future-installments${qs(f)}`) });
+}
+
+export function useFutureInstallmentsDetail(f: StatFilters) {
+  return useQuery({ queryKey: ["future-detail", f], queryFn: () => apiFetch<FutureInstallmentMonth[]>(`/stats/future-installments/detail${qs(f)}`) });
 }
 export function useSummary(f: StatFilters) {
   return useQuery({ queryKey: ["summary", f], queryFn: () => apiFetch<SummaryStat>(`/stats/summary${qs(f)}`) });

@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { FilterQuery } from "mongoose";
 import { asyncHandler } from "../errors.js";
 import { StatementModel, TransactionModel, type TransactionDoc } from "../../db/models.js";
-import { computeFutureInstallments } from "../../stats/futureInstallments.js";
+import { computeFutureInstallments, computeFutureInstallmentsDetail } from "../../stats/futureInstallments.js";
 import type { Currency } from "@ledgerly/shared";
 
 function baseMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
@@ -66,6 +66,18 @@ statsRouter.get("/future-installments", asyncHandler(async (req, res) => {
     isInstallment: t.isInstallment, installmentCurrent: t.installmentCurrent ?? null, installmentTotal: t.installmentTotal ?? null,
   }));
   res.json(computeFutureInstallments(mapped, currency));
+}));
+
+statsRouter.get("/future-installments/detail", asyncHandler(async (req, res) => {
+  const currency: Currency = req.query.currency === "USD" ? "USD" : "ARS";
+  const txs = await TransactionModel.find(installmentMatch(req.query as Record<string, unknown>)).lean();
+  const mapped = txs.map((t) => ({
+    date: t.date.toISOString().slice(0, 10),
+    amount: t.amount, currency: t.currency as Currency,
+    isInstallment: t.isInstallment, installmentCurrent: t.installmentCurrent ?? null, installmentTotal: t.installmentTotal ?? null,
+    merchant: t.merchant, category: t.category,
+  }));
+  res.json(computeFutureInstallmentsDetail(mapped, currency));
 }));
 
 statsRouter.get("/summary", asyncHandler(async (req, res) => {

@@ -63,6 +63,20 @@ export const categoryStatSchema = z.object({ category: z.string(), total: z.numb
 export const monthlyStatSchema = z.object({ month: z.string(), total: z.number(), count: z.number() });
 export const merchantStatSchema = z.object({ merchant: z.string(), total: z.number(), count: z.number() });
 export const futureInstallmentStatSchema = z.object({ month: z.string(), total: z.number() });
+export const futureInstallmentItemSchema = z.object({
+  merchant: z.string(),
+  category: z.string(),
+  amount: z.number(),
+  installmentNumber: z.number().int().positive(),
+  installmentTotal: z.number().int().positive(),
+  purchaseDate: z.string(),
+});
+export const futureInstallmentMonthSchema = z.object({
+  month: z.string(),
+  total: z.number(),
+  count: z.number(),
+  items: z.array(futureInstallmentItemSchema),
+});
 export const summaryStatSchema = z.object({
   currency: currencySchema,
   totalPurchases: z.number(),
@@ -79,4 +93,6 @@ export type CategoryStat = z.infer<typeof categoryStatSchema>;
 export type MonthlyStat = z.infer<typeof monthlyStatSchema>;
 export type MerchantStat = z.infer<typeof merchantStatSchema>;
 export type FutureInstallmentStat = z.infer<typeof futureInstallmentStatSchema>;
+export type FutureInstallmentItem = z.infer<typeof futureInstallmentItemSchema>;
+export type FutureInstallmentMonth = z.infer<typeof futureInstallmentMonthSchema>;
 export type SummaryStat = z.infer<typeof summaryStatSchema>;

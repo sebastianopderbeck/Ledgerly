@@ -12,6 +12,7 @@ const NAV = [
   { to: "/", label: "Dashboard" },
   { to: "/import", label: "Importar" },
   { to: "/transactions", label: "Movimientos" },
+  { to: "/installments", label: "Cuotas" },
   { to: "/rules", label: "Reglas" },
 ];
 

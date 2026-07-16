@@ -1,4 +1,4 @@
-import type { Currency, FutureInstallmentStat } from "@ledgerly/shared";
+import type { Currency, FutureInstallmentStat, FutureInstallmentMonth, FutureInstallmentItem } from "@ledgerly/shared";
 
 interface InstallmentTx {
   date: string;
@@ -7,6 +7,11 @@ interface InstallmentTx {
   isInstallment: boolean;
   installmentCurrent: number | null;
   installmentTotal: number | null;
+}
+
+interface InstallmentTxDetail extends InstallmentTx {
+  merchant: string;
+  category: string;
 }
 
 function addMonths(iso: string, months: number): string {
@@ -30,5 +35,36 @@ export function computeFutureInstallments(txns: InstallmentTx[], currency: Curre
   }
   return [...buckets.entries()]
     .map(([month, total]) => ({ month, total }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+}
+
+export function computeFutureInstallmentsDetail(txns: InstallmentTxDetail[], currency: Currency): FutureInstallmentMonth[] {
+  const buckets = new Map<string, FutureInstallmentItem[]>();
+  for (const tx of txns) {
+    if (tx.currency !== currency) continue;
+    if (!tx.isInstallment || tx.installmentCurrent === null || tx.installmentTotal === null) continue;
+    const remaining = tx.installmentTotal - tx.installmentCurrent;
+    for (let k = 1; k <= remaining; k += 1) {
+      const month = addMonths(tx.date, k);
+      const item: FutureInstallmentItem = {
+        merchant: tx.merchant,
+        category: tx.category,
+        amount: tx.amount,
+        installmentNumber: tx.installmentCurrent + k,
+        installmentTotal: tx.installmentTotal,
+        purchaseDate: tx.date,
+      };
+      const items = buckets.get(month) ?? [];
+      items.push(item);
+      buckets.set(month, items);
+    }
+  }
+  return [...buckets.entries()]
+    .map(([month, items]) => ({
+      month,
+      total: items.reduce((acc, i) => acc + i.amount, 0),
+      count: items.length,
+      items: [...items].sort((a, b) => b.amount - a.amount),
+    }))
     .sort((a, b) => a.month.localeCompare(b.month));
 }

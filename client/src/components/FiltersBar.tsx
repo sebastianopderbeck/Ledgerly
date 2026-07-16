@@ -1,16 +1,11 @@
 import { useSearchParams } from "react-router-dom";
 import { Box, MenuItem, TextField } from "@mui/material";
 import { useMonthly, useStatements } from "../api/hooks.js";
+import { formatMonthLabel } from "../format.js";
 
-interface FiltersBarProps { showCategory?: boolean; }
+interface FiltersBarProps { showCategory?: boolean; showMonth?: boolean; }
 
-const formatMonthLabel = (value: string) => {
-  const [year, monthNumber] = value.split("-").map(Number);
-  const label = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(new Date(year, monthNumber - 1, 1));
-  return label.charAt(0).toUpperCase() + label.slice(1);
-};
-
-export const FiltersBar = ({ showCategory = false }: FiltersBarProps) => {
+export const FiltersBar = ({ showCategory = false, showMonth = true }: FiltersBarProps) => {
   const [params, setParams] = useSearchParams();
   const { data } = useStatements();
   const cards = Array.isArray(data) ? [...new Set(data.map((s) => s.cardLabel))] : [];
@@ -18,8 +13,9 @@ export const FiltersBar = ({ showCategory = false }: FiltersBarProps) => {
   const currency = params.get("currency") === "USD" ? "USD" : "ARS";
   const cardLabel = params.get("cardLabel") ?? undefined;
   const { data: monthly } = useMonthly({ currency, cardLabel });
+  const availableMonths = Array.isArray(monthly) ? monthly.map((m) => m.month) : [];
   const month = params.get("from")?.slice(0, 7) ?? "";
-  const monthOptions = [...new Set([...(month ? [month] : []), ...(monthly ?? []).map((m) => m.month)])].sort().reverse();
+  const monthOptions = [...new Set([...(month ? [month] : []), ...availableMonths])].sort().reverse();
 
   const set = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -59,15 +55,17 @@ export const FiltersBar = ({ showCategory = false }: FiltersBarProps) => {
           <MenuItem key={card} value={card}>{card}</MenuItem>
         ))}
       </TextField>
-      <TextField
-        select label="Mes" size="small" sx={{ minWidth: 180 }}
-        value={month} onChange={(e) => setMonth(e.target.value)}
-      >
-        <MenuItem value="">Todos</MenuItem>
-        {monthOptions.map((m) => (
-          <MenuItem key={m} value={m}>{formatMonthLabel(m)}</MenuItem>
-        ))}
-      </TextField>
+      {showMonth && (
+        <TextField
+          select label="Mes" size="small" sx={{ minWidth: 180 }}
+          value={month} onChange={(e) => setMonth(e.target.value)}
+        >
+          <MenuItem value="">Todos</MenuItem>
+          {monthOptions.map((m) => (
+            <MenuItem key={m} value={m}>{formatMonthLabel(m)}</MenuItem>
+          ))}
+        </TextField>
+      )}
       {showCategory && (
         <TextField
           label="Buscar comercio" size="small"
