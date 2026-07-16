@@ -1,24 +1,15 @@
-import { type ReactNode } from "react";
-import { Box, Card, CardContent, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
 import { type StatFilters } from "../api/hooks.js";
 import { FiltersBar } from "../components/FiltersBar.js";
 import { KpiCards } from "../components/KpiCards.js";
 import { MotionBox } from "../components/motion/motion.js";
-import { fadeUpItem, staggerContainer } from "../components/motion/variants.js";
+import { staggerContainer } from "../components/motion/variants.js";
+import { ChartCard } from "../components/charts/ChartCard.js";
 import { CategoryBreakdownChart } from "../components/charts/CategoryBreakdownChart.js";
 import { MonthlyTrendChart } from "../components/charts/MonthlyTrendChart.js";
 import { FutureInstallmentsChart } from "../components/charts/FutureInstallmentsChart.js";
 import { TopMerchantsChart } from "../components/charts/TopMerchantsChart.js";
-
-const ChartCard = ({ title, children }: { title: string; children: ReactNode }) => (
-  <MotionBox variants={fadeUpItem}>
-    <Card><CardContent>
-      <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
-      {children}
-    </CardContent></Card>
-  </MotionBox>
-);
 
 export const DashboardPage = () => {
   const [params] = useSearchParams();

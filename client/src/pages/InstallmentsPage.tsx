@@ -6,6 +6,11 @@ import { FiltersBar } from "../components/FiltersBar.js";
 import { formatMoney, formatMonthLabel } from "../format.js";
 import { MotionBox } from "../components/motion/motion.js";
 import { fadeUpItem, staggerContainer } from "../components/motion/variants.js";
+import { ChartCard } from "../components/charts/ChartCard.js";
+import { FutureInstallmentsChart } from "../components/charts/FutureInstallmentsChart.js";
+import { RemainingDebtChart } from "../components/charts/RemainingDebtChart.js";
+import { InstallmentsByCategoryChart } from "../components/charts/InstallmentsByCategoryChart.js";
+import { InstallmentsByMerchantChart } from "../components/charts/InstallmentsByMerchantChart.js";
 
 export const InstallmentsPage = () => {
   const [params] = useSearchParams();
@@ -30,6 +35,18 @@ export const InstallmentsPage = () => {
 
       {!isLoading && months.length > 0 && (
         <>
+          <MotionBox
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2, mb: 3 }}
+          >
+            <ChartCard title="Total por mes"><FutureInstallmentsChart {...filters} /></ChartCard>
+            <ChartCard title="Deuda restante"><RemainingDebtChart {...filters} /></ChartCard>
+            <ChartCard title="Por categoría"><InstallmentsByCategoryChart {...filters} /></ChartCard>
+            <ChartCard title="Por comercio"><InstallmentsByMerchantChart {...filters} /></ChartCard>
+          </MotionBox>
+
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             {plural(totalCuotas, "cuota")} por {formatMoney(totalFuturo, filters.currency)} en {mesesLabel}
           </Typography>
