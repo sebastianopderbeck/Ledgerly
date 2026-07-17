@@ -18,3 +18,10 @@ export class NoTransactionsError extends Error {
     this.name = "NoTransactionsError";
   }
 }
+
+export class InvalidCouponError extends Error {
+  constructor() {
+    super("El cupón tiene un formato inesperado");
+    this.name = "InvalidCouponError";
+  }
+}
