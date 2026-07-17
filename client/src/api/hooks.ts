@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  CategoryRuleDTO, CategoryStat, FutureInstallmentStat, FutureInstallmentMonth, ImportResultDTO,
-  MerchantStat, MonthlyStat, StatementDTO, SummaryStat, TransactionDTO,
+  CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
+  ImportResultUnionDTO, MerchantStat, MonthlyStat, MortgageCouponDTO, StatementDTO, SummaryStat, TransactionDTO,
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
 
@@ -28,13 +28,13 @@ export function useStatementDetail(id: string | null) {
   });
 }
 
-export function useUploadStatement() {
+export function useImportFile() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ file, replace }: { file: File; replace?: boolean }) => {
       const form = new FormData();
       form.append("file", file);
-      return apiFetch<ImportResultDTO>(`/statements${replace ? "?replace=true" : ""}`, { method: "POST", body: form });
+      return apiFetch<ImportResultUnionDTO>(`/import${replace ? "?replace=true" : ""}`, { method: "POST", body: form });
     },
     onSuccess: () => qc.invalidateQueries(),
   });
@@ -121,4 +121,11 @@ export function useApplyRules() {
     mutationFn: () => apiFetch<{ updated: number }>("/category-rules/apply", { method: "POST" }),
     onSuccess: () => qc.invalidateQueries(),
   });
+}
+
+export function useCreditCoupons() {
+  return useQuery({ queryKey: ["credit-coupons"], queryFn: () => apiFetch<MortgageCouponDTO[]>("/credits/coupons") });
+}
+export function useCreditSummary() {
+  return useQuery({ queryKey: ["credit-summary"], queryFn: () => apiFetch<CreditSummaryDTO>("/credits/summary") });
 }

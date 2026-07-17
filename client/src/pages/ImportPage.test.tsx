@@ -23,8 +23,8 @@ describe("ImportPage", () => {
 
   it("sube un archivo y muestra el resultado", async () => {
     mockFetch((url, init) => {
-      if (url.includes("/statements") && init?.method === "POST") {
-        return { status: "imported", transactionCount: 3,
+      if (url.includes("/import") && init?.method === "POST") {
+        return { kind: "statement", status: "imported", transactionCount: 3,
           statement: { reconciliation: { ok: true, entries: [] } } };
       }
       return [];
@@ -38,12 +38,14 @@ describe("ImportPage", () => {
   it("permite reemplazar cuando el resumen ya existe", async () => {
     let replaceCalled = false;
     mockFetch((url, init) => {
-      if (url.includes("/statements") && init?.method === "POST") {
+      if (url.includes("/import") && init?.method === "POST") {
         if (url.includes("replace=true")) {
           replaceCalled = true;
-          return { status: "imported", transactionCount: 5, statement: { reconciliation: { ok: true, entries: [] } } };
+          return { kind: "statement", status: "imported", transactionCount: 5,
+            statement: { reconciliation: { ok: true, entries: [] } } };
         }
-        return { status: "duplicate", transactionCount: 0, statement: { reconciliation: { ok: true, entries: [] } } };
+        return { kind: "statement", status: "duplicate", transactionCount: 0,
+          statement: { reconciliation: { ok: true, entries: [] } } };
       }
       return [];
     });
@@ -55,5 +57,18 @@ describe("ImportPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /reemplazar/i }));
     await waitFor(() => expect(screen.getByText(/importado: 5 movimientos/i)).toBeInTheDocument());
     expect(replaceCalled).toBe(true);
+  });
+
+  it("muestra el resultado de un cupón de crédito", async () => {
+    mockFetch((url, init) => {
+      if (url.includes("/import") && init?.method === "POST") {
+        return { kind: "coupon", status: "imported", coupon: { cuotaNro: 7 } };
+      }
+      return [];
+    });
+    renderWithProviders(<ImportPage />);
+    const input = document.querySelector('input[type="file"]')!;
+    await userEvent.upload(input as HTMLInputElement, new File(["x"], "c.pdf", { type: "application/pdf" }));
+    await waitFor(() => expect(screen.getByText(/cuota 7 del crédito/i)).toBeInTheDocument());
   });
 });
