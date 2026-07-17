@@ -17,3 +17,23 @@ export interface StatementParser {
   detect(text: string, meta: PdfMeta): boolean;
   parse(text: string, meta: PdfMeta): ParsedStatement;
 }
+
+export interface ParsedCoupon {
+  prestamoNro: string;
+  cuotaNro: number;
+  fechaDebito: string;
+  capital: number;
+  intereses: number;
+  seguroIncendio: number;
+  totalDebitado: number;
+  cuotaPuraUva: number;
+  cotizacionUva: number;
+  tea: number;
+  tna: number;
+  cft: number;
+}
+
+export interface MortgageCouponParser {
+  detect(text: string, meta: PdfMeta): boolean;
+  parse(text: string, meta: PdfMeta): ParsedCoupon;
+}

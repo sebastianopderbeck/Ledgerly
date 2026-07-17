@@ -85,6 +85,58 @@ export const summaryStatSchema = z.object({
   futureInstallmentTotal: z.number(),
 });
 
+export const mortgageCouponDtoSchema = z.object({
+  id: z.string(),
+  prestamoNro: z.string(),
+  cuotaNro: z.number().int().positive(),
+  fechaDebito: z.string(),
+  capital: z.number(),
+  intereses: z.number(),
+  seguroIncendio: z.number(),
+  totalDebitado: z.number(),
+  cuotaPuraUva: z.number(),
+  cotizacionUva: z.number(),
+  capitalUva: z.number(),
+  interesUva: z.number(),
+  tea: z.number(),
+  tna: z.number(),
+  cft: z.number(),
+});
+
+export const creditSummaryDtoSchema = z.object({
+  prestamoNro: z.string(),
+  cuotasPagadas: z.number().int(),
+  cuotasTotales: z.number().int(),
+  totalPagado: z.number(),
+  capitalPagado: z.number(),
+  interesPagado: z.number(),
+  seguroPagado: z.number(),
+  capitalOriginalUva: z.number(),
+  capitalAmortizadoUva: z.number(),
+  capitalPendienteUva: z.number(),
+  capitalPendientePesos: z.number(),
+  porcentajeAvanceCapital: z.number(),
+  cotizacionUvaActual: z.number(),
+  cuotaPuraUva: z.number(),
+  tna: z.number(),
+});
+
+export const couponImportResultSchema = z.object({
+  kind: z.literal("coupon"),
+  status: z.enum(["imported", "duplicate"]),
+  coupon: mortgageCouponDtoSchema,
+});
+export const statementImportResultSchema = z.object({
+  kind: z.literal("statement"),
+  status: z.enum(["imported", "duplicate"]),
+  statement: statementDtoSchema,
+  transactionCount: z.number(),
+});
+export const importResultUnionSchema = z.discriminatedUnion("kind", [
+  couponImportResultSchema,
+  statementImportResultSchema,
+]);
+
 export type TransactionDTO = z.infer<typeof transactionDtoSchema>;
 export type StatementDTO = z.infer<typeof statementDtoSchema>;
 export type CategoryRuleDTO = z.infer<typeof categoryRuleDtoSchema>;
@@ -96,3 +148,6 @@ export type FutureInstallmentStat = z.infer<typeof futureInstallmentStatSchema>;
 export type FutureInstallmentItem = z.infer<typeof futureInstallmentItemSchema>;
 export type FutureInstallmentMonth = z.infer<typeof futureInstallmentMonthSchema>;
 export type SummaryStat = z.infer<typeof summaryStatSchema>;
+export type MortgageCouponDTO = z.infer<typeof mortgageCouponDtoSchema>;
+export type CreditSummaryDTO = z.infer<typeof creditSummaryDtoSchema>;
+export type ImportResultUnionDTO = z.infer<typeof importResultUnionSchema>;
