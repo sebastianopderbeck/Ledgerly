@@ -3,6 +3,7 @@ import {
   parseArAmount,
   extractAmounts,
   parseVisaDate,
+  parseSlashDate,
   parseSpanishDate,
   parseInstallment,
   classifyType,
@@ -76,5 +77,12 @@ describe("shortDate", () => {
   it("extrae una fecha corta tras una etiqueta", () => {
     expect(shortDate("CIERRE ACTUAL: 02 Jul 26", "CIERRE ACTUAL:")).toBe("2026-07-02");
     expect(shortDate("sin fecha", "CIERRE")).toBeNull();
+  });
+});
+
+describe("parseSlashDate", () => {
+  it("DD/MM/YYYY → ISO", () => {
+    expect(parseSlashDate("17/06/2026")).toBe("2026-06-17");
+    expect(parseSlashDate("18/08/2025")).toBe("2025-08-18");
   });
 });

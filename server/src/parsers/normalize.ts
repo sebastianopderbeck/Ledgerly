@@ -17,6 +17,11 @@ export function parseVisaDate(raw: string): string {
   return `20${yy}-${mm}-${dd}`;
 }
 
+export function parseSlashDate(raw: string): string {
+  const [dd, mm, yyyy] = raw.trim().split("/");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export const MONTHS_ES: Record<string, number> = {
   enero: 1, ene: 1,
   febrero: 2, feb: 2,
