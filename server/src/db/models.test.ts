@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { withDb } from "../testing/withDb.js";
-import { StatementModel, TransactionModel } from "./models.js";
+import { StatementModel, TransactionModel, MortgageCouponModel } from "./models.js";
 
 withDb();
 
@@ -49,5 +49,25 @@ describe("modelos", () => {
       fingerprint: "fp1",
     });
     expect(tx.category).toBe("Otros");
+  });
+});
+
+describe("MortgageCoupon", () => {
+  const base = {
+    prestamoNro: "0405727408", cuotaNro: 1, fechaDebito: new Date("2025-08-18"),
+    capital: 184689.39, intereses: 903304.93, seguroIncendio: 9693.61, totalDebitado: 1097687.93,
+    cuotaPuraUva: 699.6, cotizacionUva: 1555.16, tea: 9.27, tna: 8.9, cft: 0,
+    sourceFileName: "08-2025.pdf", sourceHash: "h1",
+  };
+
+  it("persiste un cupón", async () => {
+    const c = await MortgageCouponModel.create(base);
+    expect(c._id).toBeDefined();
+  });
+
+  it("rechaza (prestamoNro, cuotaNro) duplicado", async () => {
+    await MortgageCouponModel.init();
+    await MortgageCouponModel.create(base);
+    await expect(MortgageCouponModel.create({ ...base, sourceHash: "h2" })).rejects.toThrow();
   });
 });

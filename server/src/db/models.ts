@@ -54,9 +54,31 @@ const categoryRuleSchema = new Schema({
   enabled: { type: Boolean, default: true },
 });
 
+const mortgageCouponSchema = new Schema(
+  {
+    prestamoNro: { type: String, required: true, index: true },
+    cuotaNro: { type: Number, required: true },
+    fechaDebito: { type: Date, required: true },
+    capital: { type: Number, required: true },
+    intereses: { type: Number, required: true },
+    seguroIncendio: { type: Number, required: true },
+    totalDebitado: { type: Number, required: true },
+    cuotaPuraUva: { type: Number, required: true },
+    cotizacionUva: { type: Number, required: true },
+    tea: { type: Number, required: true },
+    tna: { type: Number, required: true },
+    cft: { type: Number, required: true },
+    sourceFileName: { type: String, required: true },
+    sourceHash: { type: String, required: true },
+  },
+  { timestamps: { createdAt: "uploadedAt", updatedAt: false } },
+);
+mortgageCouponSchema.index({ prestamoNro: 1, cuotaNro: 1 }, { unique: true });
+
 export type StatementDoc = InferSchemaType<typeof statementSchema>;
 export type TransactionDoc = InferSchemaType<typeof transactionSchema>;
 export type CategoryRuleDoc = InferSchemaType<typeof categoryRuleSchema>;
+export type MortgageCouponDoc = InferSchemaType<typeof mortgageCouponSchema>;
 
 export const StatementModel: Model<StatementDoc> =
   mongoose.models.Statement ?? mongoose.model("Statement", statementSchema);
@@ -64,3 +86,5 @@ export const TransactionModel: Model<TransactionDoc> =
   mongoose.models.Transaction ?? mongoose.model("Transaction", transactionSchema);
 export const CategoryRuleModel: Model<CategoryRuleDoc> =
   mongoose.models.CategoryRule ?? mongoose.model("CategoryRule", categoryRuleSchema);
+export const MortgageCouponModel: Model<MortgageCouponDoc> =
+  mongoose.models.MortgageCoupon ?? mongoose.model("MortgageCoupon", mortgageCouponSchema);
