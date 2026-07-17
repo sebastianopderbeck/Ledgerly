@@ -1,5 +1,5 @@
-import type { CategoryRuleDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
-import type { CategoryRuleDoc, StatementDoc, TransactionDoc } from "../db/models.js";
+import type { CategoryRuleDTO, MortgageCouponDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
+import type { CategoryRuleDoc, MortgageCouponDoc, StatementDoc, TransactionDoc } from "../db/models.js";
 import type { HydratedDocument } from "mongoose";
 
 const isoDate = (d: Date | null): string | null => (d ? d.toISOString().slice(0, 10) : null);
@@ -52,5 +52,25 @@ export function toCategoryRuleDTO(doc: HydratedDocument<CategoryRuleDoc>): Categ
     category: doc.category,
     source: doc.source as CategoryRuleDTO["source"],
     enabled: doc.enabled,
+  };
+}
+
+export function toMortgageCouponDTO(doc: HydratedDocument<MortgageCouponDoc>): MortgageCouponDTO {
+  return {
+    id: doc._id.toString(),
+    prestamoNro: doc.prestamoNro,
+    cuotaNro: doc.cuotaNro,
+    fechaDebito: doc.fechaDebito.toISOString().slice(0, 10),
+    capital: doc.capital,
+    intereses: doc.intereses,
+    seguroIncendio: doc.seguroIncendio,
+    totalDebitado: doc.totalDebitado,
+    cuotaPuraUva: doc.cuotaPuraUva,
+    cotizacionUva: doc.cotizacionUva,
+    capitalUva: doc.capital / doc.cotizacionUva,
+    interesUva: doc.intereses / doc.cotizacionUva,
+    tea: doc.tea,
+    tna: doc.tna,
+    cft: doc.cft,
   };
 }
