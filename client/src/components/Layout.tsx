@@ -13,6 +13,7 @@ const NAV = [
   { to: "/import", label: "Importar" },
   { to: "/transactions", label: "Movimientos" },
   { to: "/installments", label: "Cuotas" },
+  { to: "/credits", label: "Créditos" },
   { to: "/rules", label: "Reglas" },
 ];
 
