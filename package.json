@@ -11,7 +11,8 @@
     "dev:server": "tsx watch server/src/index.ts",
     "dev:client": "bun run --filter '@ledgerly/client' dev",
     "dev": "concurrently -n server,client -c blue,green \"bun run dev:server\" \"bun run dev:client\"",
-    "seed": "tsx server/src/rules/seedRules.ts"
+    "seed": "tsx server/src/rules/seedRules.ts",
+    "seed:coupons": "tsx server/src/import/seedCoupons.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
