@@ -13,3 +13,11 @@ export function formatMonthLabel(value: string): string {
   const label = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(new Date(year, monthNumber - 1, 1));
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
+
+export function formatUva(value: number): string {
+  const formatted = new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+  return `${formatted} UVA`;
+}
