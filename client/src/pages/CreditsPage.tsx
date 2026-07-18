@@ -9,6 +9,7 @@ import { CapitalVsInterestChart } from "../components/charts/CapitalVsInterestCh
 import { TotalPaidByMonthChart } from "../components/charts/TotalPaidByMonthChart.js";
 import { UvaEvolutionChart } from "../components/charts/UvaEvolutionChart.js";
 import { AmortizationDonutChart } from "../components/charts/AmortizationDonutChart.js";
+import { CouponUsdChart } from "../components/charts/CouponUsdChart.js";
 
 export const CreditsPage = () => {
   const { data, isLoading } = useCreditCoupons();
@@ -38,6 +39,7 @@ export const CreditsPage = () => {
             <ChartCard title="Total pagado por mes"><TotalPaidByMonthChart /></ChartCard>
             <ChartCard title="Evolución de la UVA"><UvaEvolutionChart /></ChartCard>
             <ChartCard title="Amortizado vs pendiente"><AmortizationDonutChart /></ChartCard>
+            <ChartCard title="Valor de la cuota en USD"><CouponUsdChart /></ChartCard>
           </MotionBox>
 
           <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>

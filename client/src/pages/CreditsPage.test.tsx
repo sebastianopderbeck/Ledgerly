@@ -13,7 +13,8 @@ function route(url: string) {
   if (url.includes("/credits/coupons")) {
     return [{ id: "1", prestamoNro: "0405727408", cuotaNro: 1, fechaDebito: "2025-08-18", capital: 184689.39,
       intereses: 903304.93, seguroIncendio: 9693.61, totalDebitado: 1097687.93, cuotaPuraUva: 699.6,
-      cotizacionUva: 1555.16, capitalUva: 118.76, interesUva: 580.84, tea: 9.27, tna: 8.9, cft: 0 }];
+      cotizacionUva: 1555.16, capitalUva: 118.76, interesUva: 580.84, tea: 9.27, tna: 8.9, cft: 0,
+      tipoCambioUsd: 1350, tipoCambioSource: "api", totalUsd: 813.1 }];
   }
   return {};
 }
@@ -30,5 +31,6 @@ describe("CreditsPage", () => {
     await waitFor(() => expect(screen.getByText(/total pagado/i)).toBeInTheDocument());
     expect(screen.getByText(/capital vs interés por mes/i)).toBeInTheDocument();
     expect(screen.getByText(/detalle mes a mes/i)).toBeInTheDocument();
+    expect(screen.getByText(/valor de la cuota en usd/i)).toBeInTheDocument();
   });
 });
