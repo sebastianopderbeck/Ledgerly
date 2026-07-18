@@ -51,4 +51,28 @@ describe("importAutoCoupon", () => {
     expect(doc?.tipoCambioUsd ?? null).toBeNull();
     expect(doc?.tipoCambioSource ?? null).toBeNull();
   });
+
+  it("no consulta el dólar oficial en un duplicado", async () => {
+    await importAutoCoupon({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    mockedFx.mockClear();
+    const r = await importAutoCoupon({ data: new Uint8Array([2]), fileName: "b.pdf" });
+    expect(r.status).toBe("duplicate");
+    expect(mockedFx).not.toHaveBeenCalled();
+  });
+
+  it("replace reemplaza el cupón existente (misma clave natural)", async () => {
+    const first = await importAutoCoupon({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    const r = await importAutoCoupon({ data: new Uint8Array([2]), fileName: "b.pdf", replace: true });
+    expect(r.status).toBe("imported");
+    expect(r.couponId).not.toBe(first.couponId);
+    expect(await AutoCouponModel.countDocuments()).toBe(1);
+  });
+
+  it("importa igual si fetchOficialRate lanza (catch → null)", async () => {
+    mockedFx.mockRejectedValueOnce(new Error("network"));
+    const r = await importAutoCoupon({ data: new Uint8Array([7]), fileName: "d.pdf" });
+    expect(r.status).toBe("imported");
+    const doc = await AutoCouponModel.findOne({ cuotaNro: 2 });
+    expect(doc?.tipoCambioUsd ?? null).toBeNull();
+  });
 });
