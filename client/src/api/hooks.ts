@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
+  AutoCouponDTO, AutoSummaryDTO, CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
   ImportResultUnionDTO, MerchantStat, MonthlyStat, MortgageCouponDTO, StatementDTO, SummaryStat, TransactionDTO,
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
@@ -134,6 +134,21 @@ export function usePatchCouponRate() {
   return useMutation({
     mutationFn: ({ id, tipoCambioUsd }: { id: string; tipoCambioUsd: number }) =>
       apiFetch<MortgageCouponDTO>(`/credits/coupons/${id}`, { method: "PATCH", body: JSON.stringify({ tipoCambioUsd }) }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useAutoCoupons() {
+  return useQuery({ queryKey: ["auto-coupons"], queryFn: () => apiFetch<AutoCouponDTO[]>("/auto/coupons") });
+}
+export function useAutoSummary() {
+  return useQuery({ queryKey: ["auto-summary"], queryFn: () => apiFetch<AutoSummaryDTO>("/auto/summary") });
+}
+export function usePatchAutoRate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tipoCambioUsd }: { id: string; tipoCambioUsd: number }) =>
+      apiFetch<AutoCouponDTO>(`/auto/coupons/${id}`, { method: "PATCH", body: JSON.stringify({ tipoCambioUsd }) }),
     onSuccess: () => qc.invalidateQueries(),
   });
 }
