@@ -25,3 +25,10 @@ export class InvalidCouponError extends Error {
     this.name = "InvalidCouponError";
   }
 }
+
+export class InvalidAutoCouponError extends Error {
+  constructor() {
+    super("El cupón del plan de auto tiene un formato inesperado");
+    this.name = "InvalidAutoCouponError";
+  }
+}
