@@ -20,11 +20,11 @@ const AnimatedRoutes = () => {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<PageTransition><DashboardPage /></PageTransition>} />
+        <Route path="/rules" element={<PageTransition><RulesPage /></PageTransition>} />
         <Route path="/import" element={<PageTransition><ImportPage /></PageTransition>} />
+        <Route path="/credits" element={<PageTransition><CreditsPage /></PageTransition>} />
         <Route path="/transactions" element={<PageTransition><TransactionsPage /></PageTransition>} />
         <Route path="/installments" element={<PageTransition><InstallmentsPage /></PageTransition>} />
-        <Route path="/credits" element={<PageTransition><CreditsPage /></PageTransition>} />
-        <Route path="/rules" element={<PageTransition><RulesPage /></PageTransition>} />
       </Routes>
     </AnimatePresence>
   );

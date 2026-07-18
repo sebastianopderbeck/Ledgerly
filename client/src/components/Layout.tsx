@@ -10,11 +10,11 @@ interface LayoutProps { children: ReactNode; }
 
 const NAV = [
   { to: "/", label: "Dashboard" },
-  { to: "/import", label: "Importar" },
-  { to: "/transactions", label: "Movimientos" },
   { to: "/installments", label: "Cuotas" },
   { to: "/credits", label: "Créditos" },
+  { to: "/transactions", label: "Movimientos" },
   { to: "/rules", label: "Reglas" },
+  { to: "/import", label: "Importar" },
 ];
 
 export const Layout = ({ children }: LayoutProps) => {
