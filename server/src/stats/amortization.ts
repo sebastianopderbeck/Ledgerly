@@ -31,6 +31,8 @@ export function computeCreditProgress(coupons: CouponInput[]): CreditSummaryDTO 
     if (derived > 0) i = derived;
   }
 
+  if (!(i > 0)) return null;
+
   const capitalPendienteUva = last.interesUva / i - last.capitalUva;
   const capitalAmortizadoUva = withUva.reduce((sum, c) => sum + c.capitalUva, 0);
   const capitalOriginalUva = capitalPendienteUva + capitalAmortizadoUva;

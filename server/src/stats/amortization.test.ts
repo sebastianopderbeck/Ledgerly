@@ -32,4 +32,9 @@ describe("computeCreditProgress", () => {
     expect(r.cuotasPagadas).toBe(1);
     expect(r.cuotasTotales).toBe(240);
   });
+
+  it("devuelve null si no se puede establecer una tasa positiva (tna=0, un solo cupón)", () => {
+    const bad = { ...inputs[0], tna: 0 };
+    expect(computeCreditProgress([bad])).toBeNull();
+  });
 });
