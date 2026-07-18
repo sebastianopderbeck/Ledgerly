@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Box, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import type { MortgageCouponDTO } from "@ledgerly/shared";
@@ -11,10 +11,13 @@ const RateCell = ({ coupon }: { coupon: MortgageCouponDTO }) => {
   const patch = usePatchCouponRate();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(coupon.tipoCambioUsd ?? ""));
+  const savingRef = useRef(false);
 
   const save = () => {
-    const parsed = Number(value);
+    if (savingRef.current) return;
+    savingRef.current = true;
     setEditing(false);
+    const parsed = Number(value);
     if (parsed > 0 && parsed !== coupon.tipoCambioUsd) patch.mutate({ id: coupon.id, tipoCambioUsd: parsed });
   };
 
@@ -35,7 +38,7 @@ const RateCell = ({ coupon }: { coupon: MortgageCouponDTO }) => {
   return (
     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
       {coupon.tipoCambioUsd != null ? formatMoney(coupon.tipoCambioUsd, "ARS") : "—"}
-      <IconButton size="small" aria-label={`editar TC cuota ${coupon.cuotaNro}`} onClick={() => { setValue(String(coupon.tipoCambioUsd ?? "")); setEditing(true); }}>
+      <IconButton size="small" aria-label={`editar TC cuota ${coupon.cuotaNro}`} onClick={() => { savingRef.current = false; setValue(String(coupon.tipoCambioUsd ?? "")); setEditing(true); }}>
         <EditIcon fontSize="inherit" />
       </IconButton>
     </Box>
