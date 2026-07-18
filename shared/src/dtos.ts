@@ -101,6 +101,9 @@ export const mortgageCouponDtoSchema = z.object({
   tea: z.number(),
   tna: z.number(),
   cft: z.number(),
+  tipoCambioUsd: z.number().nullable(),
+  tipoCambioSource: z.enum(["api", "manual"]).nullable(),
+  totalUsd: z.number().nullable(),
 });
 
 export const creditSummaryDtoSchema = z.object({

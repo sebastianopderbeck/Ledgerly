@@ -8,6 +8,7 @@ describe("mortgageCouponDtoSchema", () => {
       capital: 184689.39, intereses: 903304.93, seguroIncendio: 9693.61, totalDebitado: 1097687.93,
       cuotaPuraUva: 699.6, cotizacionUva: 1555.16, capitalUva: 118.76, interesUva: 580.84,
       tea: 9.27, tna: 8.9, cft: 0,
+      tipoCambioUsd: 1350.5, tipoCambioSource: "api", totalUsd: 1044.58,
     };
     expect(mortgageCouponDtoSchema.parse(dto)).toEqual(dto);
   });
@@ -30,7 +31,8 @@ describe("importResultUnionSchema", () => {
     const coupon = { kind: "coupon", status: "imported", coupon: {
       id: "x", prestamoNro: "1", cuotaNro: 1, fechaDebito: "2025-08-18", capital: 1, intereses: 1,
       seguroIncendio: 1, totalDebitado: 1, cuotaPuraUva: 1, cotizacionUva: 1, capitalUva: 1, interesUva: 1,
-      tea: 1, tna: 1, cft: 0 } };
+      tea: 1, tna: 1, cft: 0,
+      tipoCambioUsd: null, tipoCambioSource: null, totalUsd: null } };
     expect(importResultUnionSchema.parse(coupon).kind).toBe("coupon");
   });
 });
