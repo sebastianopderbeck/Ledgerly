@@ -20,6 +20,30 @@ describe("GET /api/credits/coupons", () => {
     expect(res.body).toHaveLength(11);
     expect(res.body[0].cuotaNro).toBe(1);
     expect(res.body[0].capitalUva).toBeCloseTo(118.76, 1);
+    expect(res.body[0].totalUsd).toBeNull();
+  });
+});
+
+describe("PATCH /api/credits/coupons/:id", () => {
+  it("setea el TC manual y recalcula totalUsd", async () => {
+    const list = await request(app).get("/api/credits/coupons");
+    const first = list.body[0];
+    const res = await request(app).patch(`/api/credits/coupons/${first.id}`).send({ tipoCambioUsd: 1350 });
+    expect(res.status).toBe(200);
+    expect(res.body.tipoCambioUsd).toBe(1350);
+    expect(res.body.tipoCambioSource).toBe("manual");
+    expect(res.body.totalUsd).toBeCloseTo(first.totalDebitado / 1350, 2);
+  });
+
+  it("rechaza tipoCambioUsd no positivo", async () => {
+    const list = await request(app).get("/api/credits/coupons");
+    const res = await request(app).patch(`/api/credits/coupons/${list.body[0].id}`).send({ tipoCambioUsd: 0 });
+    expect(res.status).toBe(400);
+  });
+
+  it("404 si el cupón no existe", async () => {
+    const res = await request(app).patch("/api/credits/coupons/64b7f9c2a1b2c3d4e5f60718").send({ tipoCambioUsd: 1350 });
+    expect(res.status).toBe(404);
   });
 });
 
