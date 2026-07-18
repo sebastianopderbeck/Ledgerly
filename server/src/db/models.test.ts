@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { withDb } from "../testing/withDb.js";
-import { StatementModel, TransactionModel, MortgageCouponModel } from "./models.js";
+import { StatementModel, TransactionModel, MortgageCouponModel, AutoCouponModel } from "./models.js";
 
 withDb();
 
@@ -78,5 +78,28 @@ describe("MortgageCoupon", () => {
     const withFx = await MortgageCouponModel.create({ ...base, cuotaNro: 2, tipoCambioUsd: 1350.5, tipoCambioSource: "api" });
     expect(withFx.tipoCambioUsd).toBe(1350.5);
     expect(withFx.tipoCambioSource).toBe("api");
+  });
+});
+
+describe("AutoCoupon", () => {
+  const base = {
+    grupo: "3684", orden: "97", cuotaNro: 2, plan: "K",
+    fechaEmision: new Date("2024-10-18"), fechaVencimiento: new Date("2024-11-11"),
+    comprobante: "000062757060", modelo: "C3 AIRCROSS T200 FEEL PK MY24", valorMovil: 28240000.01,
+    conceptos: [{ label: "ANTICIPO ALICUOTA (AL)", amount: 235356.87 }, { label: "DIFERIMIENTO COMERCIAL", amount: -70607.06 }],
+    totalAPagar: 268551.23, sourceFileName: "11-2024.pdf", sourceHash: "h1",
+  };
+
+  it("persiste un cupón de auto con conceptos", async () => {
+    const c = await AutoCouponModel.create(base);
+    expect(c._id).toBeDefined();
+    expect(c.conceptos).toHaveLength(2);
+    expect(c.conceptos[1].amount).toBe(-70607.06);
+  });
+
+  it("rechaza (grupo, orden, cuotaNro) duplicado", async () => {
+    await AutoCouponModel.init();
+    await AutoCouponModel.create(base);
+    await expect(AutoCouponModel.create({ ...base, sourceHash: "h2" })).rejects.toThrow();
   });
 });
