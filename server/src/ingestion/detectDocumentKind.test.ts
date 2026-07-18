@@ -8,7 +8,7 @@ const meta: PdfMeta = { producer: null, creator: null, pageCount: 1, encrypted: 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const coupon = read("../parsers/__fixtures__/icbc-mortgage.sample.txt");
 const statement = read("../parsers/__fixtures__/icbc.sample.txt");
-const autoCoupon = readFileSync(fileURLToPath(new URL("../parsers/__fixtures__/auto-plan.sample.txt", import.meta.url)), "utf8");
+const autoCoupon = read("../parsers/__fixtures__/auto-plan.sample.txt");
 
 describe("detectDocumentKind", () => {
   it("clasifica un cupón (aunque contenga 'ICBC')", () => {
