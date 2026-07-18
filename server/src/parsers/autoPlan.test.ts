@@ -39,3 +39,22 @@ describe("autoPlanParser.parse", () => {
     expect(byLabel["RECUP IMP BANCARIOS LEY 25413"]).toBe(2157.79);
   });
 });
+
+describe("autoPlanParser.parse — normalización de labels", () => {
+  const text = [
+    "Circulo de Inversores S.A.U. de Ahorro para Fines Determinados",
+    "GRUPO 3684 ORDEN 097 CUOTA 017 PLAN K Fecha de Emisión 19/01/2026 VENCIMIENTO 10/02/2026 Comprobante Nro.: 000064824409 RECUP IMP BANCARIOS LEY 25413 $ 3167,56 DIFERIMIENTO COMERCIAL 2 $ - 66856,69 Clave de Acceso para pago redes Link y Banelco: 036840975 TOTAL A PAGAR $ 394224,89",
+    "A fecha emisión de esta cuota $ 40110000,00 $ 0,00",
+    "Modelo de ahorro a fecha de emisión AIRCROSS T200 FEEL PK MY26.",
+  ].join("\n");
+
+  it("colapsa el sufijo numérico de DIFERIMIENTO COMERCIAL y preserva LEY 25413", () => {
+    const c = autoPlanParser.parse(text, meta);
+    const labels = c.conceptos.map((x) => x.label);
+    expect(labels).toContain("DIFERIMIENTO COMERCIAL");
+    expect(labels).not.toContain("DIFERIMIENTO COMERCIAL 2");
+    expect(labels).toContain("RECUP IMP BANCARIOS LEY 25413");
+    const diferimiento = c.conceptos.find((x) => x.label === "DIFERIMIENTO COMERCIAL");
+    expect(diferimiento?.amount).toBe(-66856.69);
+  });
+});
