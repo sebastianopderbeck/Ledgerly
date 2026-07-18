@@ -124,6 +124,41 @@ export const creditSummaryDtoSchema = z.object({
   tna: z.number(),
 });
 
+export const autoConceptSchema = z.object({ label: z.string(), amount: z.number() });
+
+export const autoCouponDtoSchema = z.object({
+  id: z.string(),
+  grupo: z.string(),
+  orden: z.string(),
+  cuotaNro: z.number().int().positive(),
+  plan: z.string(),
+  fechaEmision: z.string(),
+  fechaVencimiento: z.string(),
+  comprobante: z.string(),
+  modelo: z.string(),
+  valorMovil: z.number(),
+  conceptos: z.array(autoConceptSchema),
+  totalAPagar: z.number(),
+  tipoCambioUsd: z.number().nullable(),
+  tipoCambioSource: z.enum(["api", "manual"]).nullable(),
+  totalUsd: z.number().nullable(),
+});
+
+export const autoSummaryDtoSchema = z.object({
+  grupo: z.string(),
+  orden: z.string(),
+  plan: z.string(),
+  modelo: z.string(),
+  cuotasPagadas: z.number().int(),
+  cuotasTotales: z.number().int(),
+  porcentajeAvance: z.number(),
+  totalPagado: z.number(),
+  valorActualAuto: z.number(),
+  totalPagadoUsd: z.number(),
+  ultimaCuota: z.number().int(),
+  fechaUltimoVencimiento: z.string(),
+});
+
 export const couponImportResultSchema = z.object({
   kind: z.literal("coupon"),
   status: z.enum(["imported", "duplicate"]),
@@ -135,9 +170,17 @@ export const statementImportResultSchema = z.object({
   statement: statementDtoSchema,
   transactionCount: z.number(),
 });
+
+export const autoImportResultSchema = z.object({
+  kind: z.literal("auto"),
+  status: z.enum(["imported", "duplicate"]),
+  coupon: autoCouponDtoSchema,
+});
+
 export const importResultUnionSchema = z.discriminatedUnion("kind", [
   couponImportResultSchema,
   statementImportResultSchema,
+  autoImportResultSchema,
 ]);
 
 export type TransactionDTO = z.infer<typeof transactionDtoSchema>;
@@ -154,3 +197,6 @@ export type SummaryStat = z.infer<typeof summaryStatSchema>;
 export type MortgageCouponDTO = z.infer<typeof mortgageCouponDtoSchema>;
 export type CreditSummaryDTO = z.infer<typeof creditSummaryDtoSchema>;
 export type ImportResultUnionDTO = z.infer<typeof importResultUnionSchema>;
+export type AutoConceptDTO = z.infer<typeof autoConceptSchema>;
+export type AutoCouponDTO = z.infer<typeof autoCouponDtoSchema>;
+export type AutoSummaryDTO = z.infer<typeof autoSummaryDtoSchema>;

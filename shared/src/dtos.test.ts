@@ -36,3 +36,29 @@ describe("importResultUnionSchema", () => {
     expect(importResultUnionSchema.parse(coupon).kind).toBe("coupon");
   });
 });
+
+import { autoCouponDtoSchema, autoSummaryDtoSchema } from "./dtos.js";
+
+describe("autoCouponDtoSchema", () => {
+  it("valida un cupón de auto con conceptos", () => {
+    const dto = {
+      id: "x", grupo: "3684", orden: "97", cuotaNro: 2, plan: "K",
+      fechaEmision: "2024-10-18", fechaVencimiento: "2024-11-11", comprobante: "000062757060",
+      modelo: "C3 AIRCROSS T200 FEEL PK MY24", valorMovil: 28240000.01,
+      conceptos: [{ label: "ANTICIPO ALICUOTA (AL)", amount: 235356.87 }, { label: "DIFERIMIENTO COMERCIAL", amount: -70607.06 }],
+      totalAPagar: 268551.23, tipoCambioUsd: 1000, tipoCambioSource: "api", totalUsd: 268.55,
+    };
+    expect(autoCouponDtoSchema.parse(dto)).toEqual(dto);
+  });
+});
+
+describe("autoSummaryDtoSchema", () => {
+  it("valida el resumen del plan", () => {
+    const dto = {
+      grupo: "3684", orden: "97", plan: "K", modelo: "C3 AIRCROSS",
+      cuotasPagadas: 4, cuotasTotales: 120, porcentajeAvance: 0.0333, totalPagado: 1428724.71,
+      valorActualAuto: 41580000, totalPagadoUsd: 1000, ultimaCuota: 22, fechaUltimoVencimiento: "2026-07-10",
+    };
+    expect(autoSummaryDtoSchema.parse(dto)).toEqual(dto);
+  });
+});

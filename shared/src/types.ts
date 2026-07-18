@@ -37,3 +37,27 @@ export interface MortgageCouponParser {
   detect(text: string, meta: PdfMeta): boolean;
   parse(text: string, meta: PdfMeta): ParsedCoupon;
 }
+
+export interface ParsedAutoConcept {
+  label: string;
+  amount: number;
+}
+
+export interface ParsedAutoCoupon {
+  grupo: string;
+  orden: string;
+  cuotaNro: number;
+  plan: string;
+  fechaEmision: string;
+  fechaVencimiento: string;
+  comprobante: string;
+  modelo: string;
+  valorMovil: number;
+  conceptos: ParsedAutoConcept[];
+  totalAPagar: number;
+}
+
+export interface AutoCouponParser {
+  detect(text: string, meta: PdfMeta): boolean;
+  parse(text: string, meta: PdfMeta): ParsedAutoCoupon;
+}
