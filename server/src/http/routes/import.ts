@@ -5,10 +5,11 @@ import { extractPdfText } from "../../pdf/extract.js";
 import { detectDocumentKind } from "../../ingestion/detectDocumentKind.js";
 import { importCoupon } from "../../import/importCoupon.js";
 import { importStatement } from "../../import/importStatement.js";
-import { MortgageCouponModel, StatementModel } from "../../db/models.js";
-import { toMortgageCouponDTO, toStatementDTO } from "../mappers.js";
+import { importAutoCoupon } from "../../import/importAutoCoupon.js";
+import { AutoCouponModel, MortgageCouponModel, StatementModel } from "../../db/models.js";
+import { toAutoCouponDTO, toMortgageCouponDTO, toStatementDTO } from "../mappers.js";
 import {
-  InvalidCouponError, NoTextError, NoTransactionsError, UnsupportedFormatError,
+  InvalidAutoCouponError, InvalidCouponError, NoTextError, NoTransactionsError, UnsupportedFormatError,
 } from "../../ingestion/errors.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -29,6 +30,13 @@ importRouter.post("/", upload.single("file"), asyncHandler(async (req, res) => {
         .json({ kind: "coupon", status: result.status, coupon: toMortgageCouponDTO(doc!) });
       return;
     }
+    if (kind === "auto") {
+      const result = await importAutoCoupon({ data: req.file.buffer, fileName: req.file.originalname, replace });
+      const doc = await AutoCouponModel.findById(result.couponId);
+      res.status(result.status === "duplicate" ? 200 : 201)
+        .json({ kind: "auto", status: result.status, coupon: toAutoCouponDTO(doc!) });
+      return;
+    }
     if (kind === "statement") {
       const result = await importStatement({ data: req.file.buffer, fileName: req.file.originalname, replace });
       const doc = await StatementModel.findById(result.statementId);
@@ -41,7 +49,8 @@ importRouter.post("/", upload.single("file"), asyncHandler(async (req, res) => {
     throw new UnsupportedFormatError();
   } catch (err) {
     if (err instanceof NoTextError || err instanceof UnsupportedFormatError
-      || err instanceof NoTransactionsError || err instanceof InvalidCouponError) {
+      || err instanceof NoTransactionsError || err instanceof InvalidCouponError
+      || err instanceof InvalidAutoCouponError) {
       throw new HttpError(422, err.message);
     }
     throw err;

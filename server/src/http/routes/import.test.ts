@@ -15,6 +15,7 @@ const meta = { producer: null, creator: null, pageCount: 1, encrypted: false };
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const couponText = read("../../parsers/__fixtures__/icbc-mortgage.sample.txt");
 const statementText = read("../../parsers/__fixtures__/icbc.sample.txt");
+const autoText = read("../../parsers/__fixtures__/auto-plan.sample.txt");
 
 describe("POST /api/import", () => {
   it("importa un cupón (kind coupon, 201)", async () => {
@@ -50,5 +51,23 @@ describe("POST /api/import", () => {
   it("sin archivo → 400", async () => {
     const res = await request(app).post("/api/import");
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/import (auto)", () => {
+  it("importa un cupón de auto (kind auto, 201)", async () => {
+    mocked.mockResolvedValue({ text: autoText, meta });
+    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
+    expect(res.status).toBe(201);
+    expect(res.body.kind).toBe("auto");
+    expect(res.body.coupon.cuotaNro).toBe(2);
+  });
+
+  it("reimportar el mismo cupón de auto devuelve duplicate (200)", async () => {
+    mocked.mockResolvedValue({ text: autoText, meta });
+    await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
+    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("duplicate");
   });
 });
