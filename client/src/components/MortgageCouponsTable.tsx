@@ -1,8 +1,46 @@
-import { Table, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
-import { useCreditCoupons } from "../api/hooks.js";
+import { useState } from "react";
+import { Box, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import type { MortgageCouponDTO } from "@ledgerly/shared";
+import { useCreditCoupons, usePatchCouponRate } from "../api/hooks.js";
 import { formatMoney, formatUva } from "../format.js";
 import { MotionTableBody, MotionTableRow } from "./motion/motion.js";
 import { fadeUpItem, staggerContainer } from "./motion/variants.js";
+
+const RateCell = ({ coupon }: { coupon: MortgageCouponDTO }) => {
+  const patch = usePatchCouponRate();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(coupon.tipoCambioUsd ?? ""));
+
+  const save = () => {
+    const parsed = Number(value);
+    setEditing(false);
+    if (parsed > 0 && parsed !== coupon.tipoCambioUsd) patch.mutate({ id: coupon.id, tipoCambioUsd: parsed });
+  };
+
+  if (editing) {
+    return (
+      <TextField
+        size="small"
+        type="number"
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => { if (e.key === "Enter") save(); }}
+        inputProps={{ "aria-label": `TC cuota ${coupon.cuotaNro}`, style: { textAlign: "right", width: 90 } }}
+      />
+    );
+  }
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
+      {coupon.tipoCambioUsd != null ? formatMoney(coupon.tipoCambioUsd, "ARS") : "—"}
+      <IconButton size="small" aria-label={`editar TC cuota ${coupon.cuotaNro}`} onClick={() => { setValue(String(coupon.tipoCambioUsd ?? "")); setEditing(true); }}>
+        <EditIcon fontSize="inherit" />
+      </IconButton>
+    </Box>
+  );
+};
 
 export const MortgageCouponsTable = () => {
   const { data } = useCreditCoupons();
@@ -23,6 +61,8 @@ export const MortgageCouponsTable = () => {
             <TableCell align="right">Total</TableCell>
             <TableCell align="right">Cuota (UVA)</TableCell>
             <TableCell align="right">Cotización</TableCell>
+            <TableCell align="right">TC oficial</TableCell>
+            <TableCell align="right">Pagado (USD)</TableCell>
           </TableRow>
         </TableHead>
         <MotionTableBody variants={staggerContainer} initial="hidden" animate="visible">
@@ -36,6 +76,10 @@ export const MortgageCouponsTable = () => {
               <TableCell align="right">{formatMoney(c.totalDebitado, "ARS")}</TableCell>
               <TableCell align="right">{formatUva(c.cuotaPuraUva)}</TableCell>
               <TableCell align="right">{formatMoney(c.cotizacionUva, "ARS")}</TableCell>
+              <TableCell align="right"><RateCell coupon={c} /></TableCell>
+              <TableCell align="right">
+                {c.totalUsd != null ? formatMoney(c.totalUsd, "USD") : <Typography component="span" color="text.disabled">—</Typography>}
+              </TableCell>
             </MotionTableRow>
           ))}
         </MotionTableBody>

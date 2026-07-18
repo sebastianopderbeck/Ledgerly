@@ -129,3 +129,11 @@ export function useCreditCoupons() {
 export function useCreditSummary() {
   return useQuery({ queryKey: ["credit-summary"], queryFn: () => apiFetch<CreditSummaryDTO>("/credits/summary") });
 }
+export function usePatchCouponRate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tipoCambioUsd }: { id: string; tipoCambioUsd: number }) =>
+      apiFetch<MortgageCouponDTO>(`/credits/coupons/${id}`, { method: "PATCH", body: JSON.stringify({ tipoCambioUsd }) }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
