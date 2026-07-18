@@ -72,5 +72,8 @@ export function toMortgageCouponDTO(doc: HydratedDocument<MortgageCouponDoc>): M
     tea: doc.tea,
     tna: doc.tna,
     cft: doc.cft,
+    tipoCambioUsd: doc.tipoCambioUsd ?? null,
+    tipoCambioSource: (doc.tipoCambioSource ?? null) as MortgageCouponDTO["tipoCambioSource"],
+    totalUsd: doc.tipoCambioUsd ? doc.totalDebitado / doc.tipoCambioUsd : null,
   };
 }

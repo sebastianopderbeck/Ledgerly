@@ -70,4 +70,13 @@ describe("MortgageCoupon", () => {
     await MortgageCouponModel.create(base);
     await expect(MortgageCouponModel.create({ ...base, sourceHash: "h2" })).rejects.toThrow();
   });
+
+  it("tipoCambioUsd/Source default null y aceptan valores", async () => {
+    const withoutFx = await MortgageCouponModel.create(base);
+    expect(withoutFx.tipoCambioUsd ?? null).toBeNull();
+    expect(withoutFx.tipoCambioSource ?? null).toBeNull();
+    const withFx = await MortgageCouponModel.create({ ...base, cuotaNro: 2, tipoCambioUsd: 1350.5, tipoCambioSource: "api" });
+    expect(withFx.tipoCambioUsd).toBe(1350.5);
+    expect(withFx.tipoCambioSource).toBe("api");
+  });
 });

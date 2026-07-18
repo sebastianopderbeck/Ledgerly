@@ -68,6 +68,8 @@ const mortgageCouponSchema = new Schema(
     tea: { type: Number, required: true },
     tna: { type: Number, required: true },
     cft: { type: Number, required: true },
+    tipoCambioUsd: { type: Number, default: null },
+    tipoCambioSource: { type: String, enum: ["api", "manual", null], default: null },
     sourceFileName: { type: String, required: true },
     sourceHash: { type: String, required: true },
   },
