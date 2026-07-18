@@ -1,5 +1,5 @@
-import type { CategoryRuleDTO, MortgageCouponDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
-import type { CategoryRuleDoc, MortgageCouponDoc, StatementDoc, TransactionDoc } from "../db/models.js";
+import type { AutoCouponDTO, CategoryRuleDTO, MortgageCouponDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
+import type { AutoCouponDoc, CategoryRuleDoc, MortgageCouponDoc, StatementDoc, TransactionDoc } from "../db/models.js";
 import type { HydratedDocument } from "mongoose";
 
 const isoDate = (d: Date | null): string | null => (d ? d.toISOString().slice(0, 10) : null);
@@ -75,5 +75,25 @@ export function toMortgageCouponDTO(doc: HydratedDocument<MortgageCouponDoc>): M
     tipoCambioUsd: doc.tipoCambioUsd ?? null,
     tipoCambioSource: (doc.tipoCambioSource ?? null) as MortgageCouponDTO["tipoCambioSource"],
     totalUsd: doc.tipoCambioUsd ? doc.totalDebitado / doc.tipoCambioUsd : null,
+  };
+}
+
+export function toAutoCouponDTO(doc: HydratedDocument<AutoCouponDoc>): AutoCouponDTO {
+  return {
+    id: doc._id.toString(),
+    grupo: doc.grupo,
+    orden: doc.orden,
+    cuotaNro: doc.cuotaNro,
+    plan: doc.plan,
+    fechaEmision: doc.fechaEmision.toISOString().slice(0, 10),
+    fechaVencimiento: doc.fechaVencimiento.toISOString().slice(0, 10),
+    comprobante: doc.comprobante,
+    modelo: doc.modelo,
+    valorMovil: doc.valorMovil,
+    conceptos: doc.conceptos.map((c) => ({ label: c.label, amount: c.amount })),
+    totalAPagar: doc.totalAPagar,
+    tipoCambioUsd: doc.tipoCambioUsd ?? null,
+    tipoCambioSource: (doc.tipoCambioSource ?? null) as AutoCouponDTO["tipoCambioSource"],
+    totalUsd: doc.tipoCambioUsd ? doc.totalAPagar / doc.tipoCambioUsd : null,
   };
 }
