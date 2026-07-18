@@ -12,7 +12,8 @@
     "dev:client": "bun run --filter '@ledgerly/client' dev",
     "dev": "concurrently -n server,client -c blue,green \"bun run dev:server\" \"bun run dev:client\"",
     "seed": "tsx server/src/rules/seedRules.ts",
-    "seed:coupons": "tsx server/src/import/seedCoupons.ts"
+    "seed:coupons": "tsx server/src/import/seedCoupons.ts",
+    "seed:fx": "tsx server/src/import/backfillRates.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
