@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { parseCoupon } from "../ingestion/parseCoupon.js";
 import { MortgageCouponModel } from "../db/models.js";
+import { fetchOficialRate } from "../fx/dollarRate.js";
 
 export async function importCoupon(input: {
   data: Uint8Array;
@@ -17,6 +18,8 @@ export async function importCoupon(input: {
   if (existing && !input.replace) return { status: "duplicate", couponId: existing._id.toString() };
   if (existing && input.replace) await MortgageCouponModel.deleteOne({ _id: existing._id });
 
+  const tipoCambioUsd = await fetchOficialRate(coupon.fechaDebito).catch(() => null);
+
   const created = await MortgageCouponModel.create({
     prestamoNro: coupon.prestamoNro,
     cuotaNro: coupon.cuotaNro,
@@ -32,6 +35,8 @@ export async function importCoupon(input: {
     cft: coupon.cft,
     sourceFileName: input.fileName,
     sourceHash,
+    tipoCambioUsd,
+    tipoCambioSource: tipoCambioUsd != null ? "api" : null,
   });
   return { status: "imported", couponId: created._id.toString() };
 }
