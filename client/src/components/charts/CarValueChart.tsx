@@ -5,6 +5,7 @@ import { useAutoCoupons } from "../../api/hooks.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { byCuotaNro } from "../../autoConcepts.js";
 
 export const CarValueChart = () => {
   const theme = useTheme();
@@ -12,7 +13,7 @@ export const CarValueChart = () => {
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
   const points = [...data]
-    .sort((a, b) => a.cuotaNro - b.cuotaNro)
+    .sort(byCuotaNro)
     .map((c) => ({ x: c.fechaVencimiento.slice(0, 7), y: c.valorMovil }));
   const color = seriesColor(theme.palette.mode, 4);
   const series = [{ id: "Valor del auto", data: points }];

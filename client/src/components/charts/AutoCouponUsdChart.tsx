@@ -5,13 +5,14 @@ import { useAutoCoupons } from "../../api/hooks.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { byCuotaNro } from "../../autoConcepts.js";
 
 export const AutoCouponUsdChart = () => {
   const theme = useTheme();
   const { data } = useAutoCoupons();
   const points = (data ?? [])
     .filter((c) => c.totalUsd != null)
-    .sort((a, b) => a.cuotaNro - b.cuotaNro)
+    .sort(byCuotaNro)
     .map((c) => ({ x: c.fechaVencimiento.slice(0, 7), y: c.totalUsd as number }));
 
   if (points.length === 0) return <Typography color="text.secondary">Sin datos de dólar</Typography>;

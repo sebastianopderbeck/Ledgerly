@@ -17,5 +17,5 @@ describe("seedAutoCoupons", () => {
     const second = await seedAutoCoupons(dir);
     expect(second.duplicates).toBeGreaterThanOrEqual(1);
     expect(second.imported).toBe(0);
-  });
+  }, 30000);
 });

@@ -4,6 +4,7 @@ import { useAutoCoupons } from "../../api/hooks.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { byCuotaNro } from "../../autoConcepts.js";
 
 export const AutoTotalPaidByMonthChart = () => {
   const theme = useTheme();
@@ -11,7 +12,7 @@ export const AutoTotalPaidByMonthChart = () => {
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
   const rows = [...data]
-    .sort((a, b) => a.cuotaNro - b.cuotaNro)
+    .sort(byCuotaNro)
     .map((c) => ({ month: c.fechaVencimiento.slice(0, 7), total: c.totalAPagar }));
   const color = seriesColor(theme.palette.mode, 6);
 

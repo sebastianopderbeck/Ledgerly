@@ -4,19 +4,15 @@ import { useAutoCoupons } from "../../api/hooks.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { byCuotaNro, uniqueConceptLabels } from "../../autoConcepts.js";
 
 export const AutoCompositionChart = () => {
   const theme = useTheme();
   const { data } = useAutoCoupons();
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
-  const rows = [...data].sort((a, b) => a.cuotaNro - b.cuotaNro);
-  const labels: string[] = [];
-  for (const coupon of rows) {
-    for (const concept of coupon.conceptos) {
-      if (!labels.includes(concept.label)) labels.push(concept.label);
-    }
-  }
+  const rows = [...data].sort(byCuotaNro);
+  const labels = uniqueConceptLabels(rows);
   const chartData = rows.map((c) => {
     const row: Record<string, number | string> = { month: c.fechaVencimiento.slice(0, 7) };
     for (const label of labels) row[label] = c.conceptos.find((x) => x.label === label)?.amount ?? 0;

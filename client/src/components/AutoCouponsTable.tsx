@@ -3,6 +3,7 @@ import { Box, IconButton, Table, TableCell, TableContainer, TableHead, TableRow,
 import EditIcon from "@mui/icons-material/Edit";
 import type { AutoCouponDTO } from "@ledgerly/shared";
 import { useAutoCoupons, usePatchAutoRate } from "../api/hooks.js";
+import { byCuotaNro, uniqueConceptLabels } from "../autoConcepts.js";
 import { formatMoney } from "../format.js";
 import { MotionTableBody, MotionTableRow } from "./motion/motion.js";
 import { fadeUpItem, staggerContainer } from "./motion/variants.js";
@@ -49,13 +50,8 @@ export const AutoCouponsTable = () => {
   const { data } = useAutoCoupons();
   if (!data || data.length === 0) return null;
 
-  const rows = [...data].sort((a, b) => a.cuotaNro - b.cuotaNro);
-  const conceptLabels: string[] = [];
-  for (const coupon of rows) {
-    for (const concept of coupon.conceptos) {
-      if (!conceptLabels.includes(concept.label)) conceptLabels.push(concept.label);
-    }
-  }
+  const rows = [...data].sort(byCuotaNro);
+  const conceptLabels = uniqueConceptLabels(rows);
   const amountOf = (coupon: AutoCouponDTO, label: string): number | null =>
     coupon.conceptos.find((c) => c.label === label)?.amount ?? null;
 
