@@ -61,6 +61,18 @@ export const ImportPage = () => {
         </Alert>
       )}
 
+      {last && last.kind === "auto" && (
+        <Alert
+          severity={last.status === "duplicate" ? "info" : "success"}
+          sx={{ mb: 2 }}
+          action={last.status === "duplicate" ? replaceAction : undefined}
+        >
+          {last.status === "duplicate"
+            ? "Ese cupón del auto ya estaba importado"
+            : `Importado: cuota ${last.coupon.cuotaNro} del plan de auto`}
+        </Alert>
+      )}
+
       <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>Resúmenes importados</Typography>
       {statements.data && <StatementList statements={statements.data} onDelete={(id) => del.mutate(id)} />}
     </>
