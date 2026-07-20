@@ -31,5 +31,10 @@ describe("AutoPage", () => {
     expect(screen.getByText("Valor del auto")).toBeInTheDocument();
     expect(screen.getByText("Avance")).toBeInTheDocument();
     expect(screen.getByText("Detalle mes a mes")).toBeInTheDocument();
+    expect(screen.getByText("Composición de la cuota por mes")).toBeInTheDocument();
+    expect(screen.getByText("Total pagado por mes")).toBeInTheDocument();
+    expect(screen.getByText("Evolución del valor del auto")).toBeInTheDocument();
+    expect(screen.getByText("Avance del plan")).toBeInTheDocument();
+    expect(screen.getByText("Valor de la cuota en USD")).toBeInTheDocument();
   });
 });
