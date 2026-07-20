@@ -4,6 +4,20 @@ import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { DashboardPage } from "./DashboardPage.js";
 
 function route(url: string) {
+  if (url.includes("/statements")) return [
+    {
+      id: "i1", issuer: "icbc", cardLabel: "ICBC", last4: "1234",
+      closingDate: "2026-07-07", dueDate: "2026-07-20",
+      totals: {
+        totalConsumos: { ars: 0, usd: 0 },
+        saldoActual: { ars: 700000, usd: 0 },
+        pagoMinimo: { ars: 120000, usd: 0 },
+        saldoAnterior: { ars: 0, usd: 0 },
+      },
+      sourceFileName: "i.pdf", needsReview: false, reconciliation: { ok: true, entries: [] },
+      transactionCount: 0, uploadedAt: "2026-07-01T00:00:00.000Z",
+    },
+  ];
   if (url.includes("/stats/summary")) return { currency: "ARS", totalPurchases: 2000, transactionCount: 2, statementCount: 1, futureInstallmentTotal: 3000 };
   if (url.includes("/stats/by-category")) return [{ category: "Compras", total: 1500, count: 1 }];
   if (url.includes("/stats/monthly")) return [{ month: "2026-05", total: 2000, count: 2 }];
@@ -23,5 +37,6 @@ describe("DashboardPage", () => {
     renderWithProviders(<DashboardPage />, { route: "/" });
     await waitFor(() => expect(screen.getByText(/total gastado/i)).toBeInTheDocument());
     expect(screen.getByText(/gasto por categoría/i)).toBeInTheDocument();
+    expect(await screen.findByText("A pagar al cierre")).toBeInTheDocument();
   });
 });
