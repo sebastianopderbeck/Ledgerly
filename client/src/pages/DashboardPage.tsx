@@ -11,6 +11,7 @@ import { CategoryBreakdownChart } from "../components/charts/CategoryBreakdownCh
 import { MonthlyTrendChart } from "../components/charts/MonthlyTrendChart.js";
 import { FutureInstallmentsChart } from "../components/charts/FutureInstallmentsChart.js";
 import { TopMerchantsChart } from "../components/charts/TopMerchantsChart.js";
+import { MonthlyUsdChart } from "../components/charts/MonthlyUsdChart.js";
 
 export const DashboardPage = () => {
   const [params] = useSearchParams();
@@ -37,6 +38,7 @@ export const DashboardPage = () => {
         <ChartCard title="Evolución mensual"><MonthlyTrendChart {...filters} /></ChartCard>
         <ChartCard title="Cuotas a vencer"><FutureInstallmentsChart {...filters} /></ChartCard>
         <ChartCard title="Top comercios"><TopMerchantsChart {...filters} /></ChartCard>
+        <ChartCard title="Gasto mensual en USD (al oficial de cada mes)"><MonthlyUsdChart {...filters} /></ChartCard>
       </MotionBox>
     </>
   );

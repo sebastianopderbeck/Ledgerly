@@ -159,6 +159,19 @@ export const autoSummaryDtoSchema = z.object({
   fechaUltimoVencimiento: z.string(),
 });
 
+export const oficialRateDtoSchema = z.object({
+  date: z.string(),
+  rate: z.number().nullable(),
+  source: z.literal("oficial"),
+});
+
+export const monthlyUsdStatSchema = z.object({
+  month: z.string(),
+  totalArs: z.number(),
+  rate: z.number().nullable(),
+  totalUsd: z.number().nullable(),
+});
+
 export const couponImportResultSchema = z.object({
   kind: z.literal("coupon"),
   status: z.enum(["imported", "duplicate"]),
@@ -200,3 +213,5 @@ export type ImportResultUnionDTO = z.infer<typeof importResultUnionSchema>;
 export type AutoConceptDTO = z.infer<typeof autoConceptSchema>;
 export type AutoCouponDTO = z.infer<typeof autoCouponDtoSchema>;
 export type AutoSummaryDTO = z.infer<typeof autoSummaryDtoSchema>;
+export type OficialRateDTO = z.infer<typeof oficialRateDtoSchema>;
+export type MonthlyUsdStat = z.infer<typeof monthlyUsdStatSchema>;

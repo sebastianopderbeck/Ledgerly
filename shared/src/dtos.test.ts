@@ -62,3 +62,21 @@ describe("autoSummaryDtoSchema", () => {
     expect(autoSummaryDtoSchema.parse(dto)).toEqual(dto);
   });
 });
+
+import { oficialRateDtoSchema, monthlyUsdStatSchema } from "./dtos.js";
+
+describe("oficialRateDtoSchema", () => {
+  it("valida la cotización oficial y acepta rate null", () => {
+    expect(oficialRateDtoSchema.parse({ date: "2026-07-20", rate: 1000, source: "oficial" }))
+      .toEqual({ date: "2026-07-20", rate: 1000, source: "oficial" });
+    expect(oficialRateDtoSchema.parse({ date: "2026-07-20", rate: null, source: "oficial" }).rate).toBeNull();
+  });
+});
+
+describe("monthlyUsdStatSchema", () => {
+  it("valida un punto mensual en USD y acepta rate/totalUsd null", () => {
+    const dto = { month: "2026-05", totalArs: 2000, rate: 1000, totalUsd: 2 };
+    expect(monthlyUsdStatSchema.parse(dto)).toEqual(dto);
+    expect(monthlyUsdStatSchema.parse({ month: "2026-06", totalArs: 500, rate: null, totalUsd: null }).totalUsd).toBeNull();
+  });
+});

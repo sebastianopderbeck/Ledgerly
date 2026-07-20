@@ -4,7 +4,7 @@ import PaymentsIcon from "@mui/icons-material/Payments";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import DescriptionIcon from "@mui/icons-material/Description";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
-import { useSummary, type StatFilters } from "../api/hooks.js";
+import { useSummary, useOficialRate, type StatFilters } from "../api/hooks.js";
 import { formatMoney } from "../format.js";
 import { MotionBox } from "./motion/motion.js";
 import { CountUp } from "./motion/CountUp.js";
@@ -16,11 +16,12 @@ interface KpiProps {
   label: string;
   value: number;
   format: (value: number) => string;
+  sub?: string;
   icon: ReactNode;
   color: KpiColor;
 }
 
-const Kpi = ({ label, value, format, icon, color }: KpiProps) => (
+const Kpi = ({ label, value, format, sub, icon, color }: KpiProps) => (
   <MotionBox variants={fadeUpItem}>
     <Card>
       <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -45,6 +46,7 @@ const Kpi = ({ label, value, format, icon, color }: KpiProps) => (
           <Typography variant="h5" sx={{ fontWeight: 700 }} noWrap>
             <CountUp value={value} format={format} />
           </Typography>
+          {sub && <Typography variant="caption" color="text.secondary" noWrap>{sub}</Typography>}
         </Box>
       </CardContent>
     </Card>
@@ -53,8 +55,13 @@ const Kpi = ({ label, value, format, icon, color }: KpiProps) => (
 
 export const KpiCards = (filters: StatFilters) => {
   const { data } = useSummary(filters);
+  const { data: fx } = useOficialRate();
   if (!data) return null;
 
+  const rate = fx?.rate ?? null;
+  const totalGastadoSub = filters.currency === "ARS" && rate
+    ? `≈ ${formatMoney(data.totalPurchases / rate, "USD")}`
+    : undefined;
   const money = (value: number) => formatMoney(value, filters.currency);
   const integer = (value: number) => String(Math.round(value));
 
@@ -65,7 +72,7 @@ export const KpiCards = (filters: StatFilters) => {
       animate="visible"
       sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }, gap: 2, mb: 3 }}
     >
-      <Kpi label="Total gastado" value={data.totalPurchases} format={money} icon={<PaymentsIcon />} color="primary" />
+      <Kpi label="Total gastado" value={data.totalPurchases} format={money} sub={totalGastadoSub} icon={<PaymentsIcon />} color="primary" />
       <Kpi label="Movimientos" value={data.transactionCount} format={integer} icon={<ReceiptLongIcon />} color="secondary" />
       <Kpi label="Resúmenes" value={data.statementCount} format={integer} icon={<DescriptionIcon />} color="success" />
       <Kpi label="Deuda en cuotas" value={data.futureInstallmentTotal} format={money} icon={<CreditCardIcon />} color="warning" />

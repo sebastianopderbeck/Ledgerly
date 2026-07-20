@@ -3,7 +3,9 @@ import type { FilterQuery } from "mongoose";
 import { asyncHandler } from "../errors.js";
 import { StatementModel, TransactionModel, type TransactionDoc } from "../../db/models.js";
 import { computeFutureInstallments, computeFutureInstallmentsDetail } from "../../stats/futureInstallments.js";
-import type { Currency } from "@ledgerly/shared";
+import { representativeRateDate } from "../../stats/monthlyUsd.js";
+import { fetchOficialRate } from "../../fx/dollarRate.js";
+import type { Currency, MonthlyUsdStat } from "@ledgerly/shared";
 
 function baseMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   const currency = q.currency === "USD" ? "USD" : "ARS";
@@ -43,6 +45,23 @@ statsRouter.get("/monthly", asyncHandler(async (req, res) => {
     { $sort: { month: 1 } },
   ]);
   res.json(rows);
+}));
+
+statsRouter.get("/monthly-usd", asyncHandler(async (req, res) => {
+  const q = req.query as Record<string, unknown>;
+  const rows = (await TransactionModel.aggregate([
+    { $match: baseMatch({ ...q, currency: "ARS" }) },
+    { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$date" } }, total: { $sum: "$amount" } } },
+    { $project: { _id: 0, month: "$_id", total: 1 } },
+    { $sort: { month: 1 } },
+  ])) as { month: string; total: number }[];
+  const today = new Date().toISOString().slice(0, 10);
+  const result: MonthlyUsdStat[] = [];
+  for (const row of rows) {
+    const rate = await fetchOficialRate(representativeRateDate(row.month, today));
+    result.push({ month: row.month, totalArs: row.total, rate, totalUsd: rate ? row.total / rate : null });
+  }
+  res.json(result);
 }));
 
 statsRouter.get("/top-merchants", asyncHandler(async (req, res) => {

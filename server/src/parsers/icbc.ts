@@ -65,8 +65,21 @@ export const icbcParser: StatementParser = {
       /(?:Tarjeta\s+\d+\s+)?Total Consumos[^\n]*?([\d.]+,\d{2})(?:\s+\*?\s*([\d.]+,\d{2}))?/i,
     );
     const saldoAnterior = flat.match(/SALDO ANTERIOR\s+([\d.]+,\d{2})\s+([\d.]+,\d{2})/);
-    const saldoActual = flat.match(/SALDO ACTUAL\s+\$\s+([\d.]+,\d{2})/);
-    const pagoMinimo = flat.match(/PAGO MINIMO\s+\$\s+([\d.]+,\d{2})/);
+    const saldoActualLabel = flat.match(/SALDO ACTUAL\s+\$\s+([\d.]+,\d{2})/);
+    const pagoMinimoLabel = flat.match(/PAGO MINIMO\s+\$\s+([\d.]+,\d{2})/);
+    const totalsFooter = flat.match(
+      /([\d.]+,\d{2})\s+[\d.]+,\d{2}\s+\(\$\)\s+\(\$\)\s+\(U\$S\)\s+\(U\$S\)\s+([\d.]+,\d{2})/,
+    );
+    const saldoActualArs = saldoActualLabel
+      ? parseArAmount(saldoActualLabel[1]).amount
+      : totalsFooter
+        ? parseArAmount(totalsFooter[1]).amount
+        : 0;
+    const pagoMinimoArs = pagoMinimoLabel
+      ? parseArAmount(pagoMinimoLabel[1]).amount
+      : totalsFooter
+        ? parseArAmount(totalsFooter[2]).amount
+        : 0;
 
     return {
       header: {
@@ -80,8 +93,8 @@ export const icbcParser: StatementParser = {
             ars: totalConsumos ? parseArAmount(totalConsumos[1]).amount : 0,
             usd: totalConsumos?.[2] ? parseArAmount(totalConsumos[2]).amount : 0,
           },
-          saldoActual: { ars: saldoActual ? parseArAmount(saldoActual[1]).amount : 0, usd: 0 },
-          pagoMinimo: { ars: pagoMinimo ? parseArAmount(pagoMinimo[1]).amount : 0, usd: 0 },
+          saldoActual: { ars: saldoActualArs, usd: 0 },
+          pagoMinimo: { ars: pagoMinimoArs, usd: 0 },
           saldoAnterior: {
             ars: saldoAnterior ? parseArAmount(saldoAnterior[1]).amount : 0,
             usd: saldoAnterior ? parseArAmount(saldoAnterior[2]).amount : 0,

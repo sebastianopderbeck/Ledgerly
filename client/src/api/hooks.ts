@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
-  ImportResultUnionDTO, MerchantStat, MonthlyStat, MortgageCouponDTO, StatementDTO, SummaryStat, TransactionDTO,
+  ImportResultUnionDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, StatementDTO, SummaryStat, TransactionDTO,
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
 
@@ -136,6 +136,13 @@ export function usePatchCouponRate() {
       apiFetch<MortgageCouponDTO>(`/credits/coupons/${id}`, { method: "PATCH", body: JSON.stringify({ tipoCambioUsd }) }),
     onSuccess: () => qc.invalidateQueries(),
   });
+}
+
+export function useOficialRate() {
+  return useQuery({ queryKey: ["fx-oficial"], queryFn: () => apiFetch<OficialRateDTO>("/fx/oficial"), staleTime: 1000 * 60 * 60 });
+}
+export function useMonthlyUsd(f: StatFilters) {
+  return useQuery({ queryKey: ["monthly-usd", f], queryFn: () => apiFetch<MonthlyUsdStat[]>(`/stats/monthly-usd${qs(f)}`), staleTime: 1000 * 60 * 60 });
 }
 
 export function useAutoCoupons() {

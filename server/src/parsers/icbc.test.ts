@@ -8,6 +8,10 @@ const text = readFileSync(
   fileURLToPath(new URL("./__fixtures__/icbc.sample.txt", import.meta.url)),
   "utf8",
 );
+const realText = readFileSync(
+  fileURLToPath(new URL("../../../examples/icbc-real.txt", import.meta.url)),
+  "utf8",
+);
 const meta: PdfMeta = { producer: "iText 5.0.6", creator: null, pageCount: 10, encrypted: true };
 
 describe("icbcParser.detect", () => {
@@ -53,5 +57,14 @@ describe("icbcParser.parse", () => {
     expect(result.rows.find((r) => r.comprobante === "001003")).toMatchObject({
       amount: 100, type: "refund", direction: "credit",
     });
+  });
+});
+
+describe("icbcParser.parse — resumen real sin etiquetas SALDO ACTUAL/PAGO MINIMO", () => {
+  const result = icbcParser.parse(realText, meta);
+
+  it("extrae saldo actual y pago mínimo del pie de totales", () => {
+    expect(result.header.totals.saldoActual.ars).toBe(3137688.74);
+    expect(result.header.totals.pagoMinimo.ars).toBe(197650);
   });
 });

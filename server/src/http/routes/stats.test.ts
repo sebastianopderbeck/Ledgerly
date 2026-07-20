@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+vi.mock("../../fx/dollarRate.js", () => ({ fetchOficialRate: vi.fn() }));
 import request from "supertest";
 import { withDb } from "../../testing/withDb.js";
 import { createApp } from "../app.js";
 import { StatementModel, TransactionModel } from "../../db/models.js";
+import { fetchOficialRate } from "../../fx/dollarRate.js";
 
 withDb();
 const app = createApp();
@@ -39,6 +41,18 @@ describe("stats", () => {
   it("monthly agrupa por mes (solo compras)", async () => {
     const res = await request(app).get("/api/stats/monthly?currency=ARS");
     expect(res.body).toEqual([{ month: "2026-05", total: 2000, count: 2 }]);
+  });
+
+  it("monthly-usd convierte el gasto ARS al oficial de cada mes", async () => {
+    vi.mocked(fetchOficialRate).mockResolvedValue(1000);
+    const res = await request(app).get("/api/stats/monthly-usd?currency=ARS");
+    expect(res.body).toEqual([{ month: "2026-05", totalArs: 2000, rate: 1000, totalUsd: 2 }]);
+  });
+
+  it("monthly-usd deja totalUsd null si no hay cotización", async () => {
+    vi.mocked(fetchOficialRate).mockResolvedValue(null);
+    const res = await request(app).get("/api/stats/monthly-usd?currency=ARS");
+    expect(res.body).toEqual([{ month: "2026-05", totalArs: 2000, rate: null, totalUsd: null }]);
   });
 
   it("top-merchants ordena por gasto", async () => {

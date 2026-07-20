@@ -31,10 +31,12 @@ const statements = [
 ];
 
 beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(async (url: string) =>
-    new Response(JSON.stringify(url.includes("/statements") ? statements : {}), {
-      status: 200, headers: { "Content-Type": "application/json" },
-    })));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const data = url.includes("/fx/oficial")
+      ? { date: "2026-07-20", rate: 1000, source: "oficial" }
+      : url.includes("/statements") ? statements : {};
+    return new Response(JSON.stringify(data), { status: 200, headers: { "Content-Type": "application/json" } });
+  }));
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -46,5 +48,6 @@ describe("CardCycleSummary", () => {
     expect(screen.getByText(/Visa Signature/)).toBeInTheDocument();
     expect(screen.getByText(/ICBC/)).toBeInTheDocument();
     expect(screen.getByText(/corte 2026-07-07 · vence 2026-07-20/)).toBeInTheDocument();
+    expect(await screen.findByText((text) => text.includes("≈"))).toBeInTheDocument();
   });
 });

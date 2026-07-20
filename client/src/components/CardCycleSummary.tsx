@@ -1,5 +1,5 @@
 import { Box, Card, CardContent, Typography } from "@mui/material";
-import { useStatements } from "../api/hooks.js";
+import { useStatements, useOficialRate } from "../api/hooks.js";
 import { formatMoney } from "../format.js";
 import { buildCardCycleSummary } from "../cardCycle.js";
 import { CardCycleChart } from "./charts/CardCycleChart.js";
@@ -9,6 +9,8 @@ import { fadeUpItem } from "./motion/variants.js";
 export const CardCycleSummary = () => {
   const { data } = useStatements();
   const summary = buildCardCycleSummary(data ?? []);
+  const { data: fx } = useOficialRate();
+  const rate = fx?.rate ?? null;
   if (!summary) return null;
 
   return (
@@ -16,10 +18,22 @@ export const CardCycleSummary = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 0.5 }}>A pagar al cierre</Typography>
-          <Box sx={{ display: "flex", alignItems: "baseline", gap: 2, flexWrap: "wrap", mb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "baseline", gap: 2, flexWrap: "wrap" }}>
             <Typography variant="h4" sx={{ fontWeight: 700 }}>{formatMoney(summary.totalArs, "ARS")}</Typography>
+            {rate && (
+              <Typography variant="h6" color="text.secondary">≈ {formatMoney(summary.totalArs / rate, "USD")}</Typography>
+            )}
+          </Box>
+          <Box sx={{ mb: 1 }}>
+            {rate && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                al oficial {formatMoney(rate, "ARS")}
+              </Typography>
+            )}
             {summary.totalUsd > 0 && (
-              <Typography variant="h6" color="text.secondary">{formatMoney(summary.totalUsd, "USD")}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                + {formatMoney(summary.totalUsd, "USD")} en dólares
+              </Typography>
             )}
           </Box>
           <CardCycleChart cards={summary.cards} />

@@ -7,6 +7,7 @@ import { categoryRulesRouter } from "./routes/categoryRules.js";
 import { statsRouter } from "./routes/stats.js";
 import { creditsRouter } from "./routes/credits.js";
 import { autoRouter } from "./routes/auto.js";
+import { fxRouter } from "./routes/fx.js";
 import { importRouter } from "./routes/import.js";
 
 export function createApp(): express.Express {
@@ -23,6 +24,7 @@ export function createApp(): express.Express {
   app.use("/api/stats", statsRouter);
   app.use("/api/credits", creditsRouter);
   app.use("/api/auto", autoRouter);
+  app.use("/api/fx", fxRouter);
   app.use("/api/import", importRouter);
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "No encontrado")));
