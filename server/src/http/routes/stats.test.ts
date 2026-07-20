@@ -12,7 +12,7 @@ const app = createApp();
 beforeEach(async () => {
   const s = await StatementModel.create({
     issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-07-02"), dueDate: null,
-    totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+    totals: { totalConsumos: { ars: 6000, usd: 0 }, saldoActual: { ars: 6000, usd: 0 },
       pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
     sourceFileName: "r.pdf", sourceHash: "h", pageCount: 1, parserVersion: "1.0.0",
     needsReview: false, reconciliation: { ok: true, entries: [] },
@@ -43,16 +43,16 @@ describe("stats", () => {
     expect(res.body).toEqual([{ month: "2026-05", total: 2000, count: 2 }]);
   });
 
-  it("monthly-usd convierte el gasto ARS al oficial de cada mes", async () => {
+  it("monthly-usd suma el saldo a pagar de los resúmenes por mes de consumo, en USD", async () => {
     vi.mocked(fetchOficialRate).mockResolvedValue(1000);
     const res = await request(app).get("/api/stats/monthly-usd?currency=ARS");
-    expect(res.body).toEqual([{ month: "2026-05", totalArs: 2000, rate: 1000, totalUsd: 2 }]);
+    expect(res.body).toEqual([{ month: "2026-06", totalArs: 6000, rate: 1000, totalUsd: 6 }]);
   });
 
   it("monthly-usd deja totalUsd null si no hay cotización", async () => {
     vi.mocked(fetchOficialRate).mockResolvedValue(null);
     const res = await request(app).get("/api/stats/monthly-usd?currency=ARS");
-    expect(res.body).toEqual([{ month: "2026-05", totalArs: 2000, rate: null, totalUsd: null }]);
+    expect(res.body).toEqual([{ month: "2026-06", totalArs: 6000, rate: null, totalUsd: null }]);
   });
 
   it("top-merchants ordena por gasto", async () => {

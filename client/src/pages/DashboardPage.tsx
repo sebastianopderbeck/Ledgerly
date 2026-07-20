@@ -38,7 +38,7 @@ export const DashboardPage = () => {
         <ChartCard title="Evolución mensual"><MonthlyTrendChart {...filters} /></ChartCard>
         <ChartCard title="Cuotas a vencer"><FutureInstallmentsChart {...filters} /></ChartCard>
         <ChartCard title="Top comercios"><TopMerchantsChart {...filters} /></ChartCard>
-        <ChartCard title="Gasto mensual en USD (al oficial de cada mes)"><MonthlyUsdChart {...filters} /></ChartCard>
+        <ChartCard title="A pagar por mes en USD (al oficial)"><MonthlyUsdChart {...filters} /></ChartCard>
       </MotionBox>
     </>
   );

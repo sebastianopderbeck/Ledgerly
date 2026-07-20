@@ -40,7 +40,7 @@ describe("DashboardPage", () => {
     await waitFor(() => expect(screen.getByText(/total gastado/i)).toBeInTheDocument());
     expect(screen.getByText(/gasto por categoría/i)).toBeInTheDocument();
     expect(await screen.findByText("A pagar al cierre")).toBeInTheDocument();
-    expect(await screen.findByText("Gasto mensual en USD (al oficial de cada mes)")).toBeInTheDocument();
+    expect(await screen.findByText("A pagar por mes en USD (al oficial)")).toBeInTheDocument();
     expect(screen.getAllByText((text) => text.includes("≈")).length).toBeGreaterThan(0);
   });
 });

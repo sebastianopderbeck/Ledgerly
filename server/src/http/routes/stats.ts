@@ -1,9 +1,9 @@
 import { Router } from "express";
 import type { FilterQuery } from "mongoose";
 import { asyncHandler } from "../errors.js";
-import { StatementModel, TransactionModel, type TransactionDoc } from "../../db/models.js";
+import { StatementModel, TransactionModel, type TransactionDoc, type StatementDoc } from "../../db/models.js";
 import { computeFutureInstallments, computeFutureInstallmentsDetail } from "../../stats/futureInstallments.js";
-import { representativeRateDate } from "../../stats/monthlyUsd.js";
+import { representativeRateDate, consumptionMonth } from "../../stats/monthlyUsd.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import type { Currency, MonthlyUsdStat } from "@ledgerly/shared";
 
@@ -49,17 +49,26 @@ statsRouter.get("/monthly", asyncHandler(async (req, res) => {
 
 statsRouter.get("/monthly-usd", asyncHandler(async (req, res) => {
   const q = req.query as Record<string, unknown>;
-  const rows = (await TransactionModel.aggregate([
-    { $match: baseMatch({ ...q, currency: "ARS" }) },
-    { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$date" } }, total: { $sum: "$amount" } } },
-    { $project: { _id: 0, month: "$_id", total: 1 } },
-    { $sort: { month: 1 } },
-  ])) as { month: string; total: number }[];
+  const filter: FilterQuery<StatementDoc> = {};
+  if (typeof q.cardLabel === "string") filter.cardLabel = q.cardLabel;
+  if (typeof q.from === "string" || typeof q.to === "string") {
+    filter.closingDate = {};
+    if (typeof q.from === "string") filter.closingDate.$gte = new Date(q.from);
+    if (typeof q.to === "string") filter.closingDate.$lte = new Date(q.to);
+  }
+  const statements = await StatementModel.find(filter).lean();
+  const totalArsByMonth = new Map<string, number>();
+  for (const statement of statements) {
+    if (!statement.closingDate) continue;
+    const month = consumptionMonth(statement.closingDate.toISOString().slice(0, 10));
+    totalArsByMonth.set(month, (totalArsByMonth.get(month) ?? 0) + (statement.totals?.saldoActual?.ars ?? 0));
+  }
   const today = new Date().toISOString().slice(0, 10);
   const result: MonthlyUsdStat[] = [];
-  for (const row of rows) {
-    const rate = await fetchOficialRate(representativeRateDate(row.month, today));
-    result.push({ month: row.month, totalArs: row.total, rate, totalUsd: rate ? row.total / rate : null });
+  for (const month of [...totalArsByMonth.keys()].sort()) {
+    const totalArs = totalArsByMonth.get(month)!;
+    const rate = await fetchOficialRate(representativeRateDate(month, today));
+    result.push({ month, totalArs, rate, totalUsd: rate ? totalArs / rate : null });
   }
   res.json(result);
 }));
