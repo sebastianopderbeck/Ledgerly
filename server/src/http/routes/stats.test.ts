@@ -113,4 +113,50 @@ describe("stats", () => {
     expect(summary.body.statementCount).toBe(1);
     expect(summary.body.futureInstallmentTotal).toBe(3000);
   });
+
+  it("last-statement/by-category agrega solo el último resumen de cada issuer", async () => {
+    const oldIcbc = await StatementModel.create({
+      issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-05-02"), dueDate: null,
+      totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+        pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
+      sourceFileName: "old.pdf", sourceHash: "hold", pageCount: 1, parserVersion: "1.0.0",
+      needsReview: false, reconciliation: { ok: true, entries: [] },
+    });
+    await TransactionModel.create({
+      statementId: oldIcbc._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-04-04"),
+      descriptionRaw: "OLD", merchant: "OLD", category: "Viejo", categorySource: "rule", amount: 777, currency: "ARS",
+      direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+      comprobante: "10", fingerprint: "f10",
+    });
+    const res = await request(app).get("/api/stats/last-statement/by-category?currency=ARS");
+    expect(res.body.some((c: { category: string }) => c.category === "Viejo")).toBe(false);
+    const compras = res.body.find((c: { category: string }) => c.category === "Compras");
+    expect(compras.total).toBe(1500);
+  });
+
+  it("last-statement/by-category respeta cardLabel y currency", async () => {
+    const visa = await StatementModel.create({
+      issuer: "visa_signature", cardLabel: "VISA1", last4: null, closingDate: new Date("2026-07-05"), dueDate: null,
+      totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+        pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
+      sourceFileName: "v.pdf", sourceHash: "hv", pageCount: 1, parserVersion: "1.0.0",
+      needsReview: false, reconciliation: { ok: true, entries: [] },
+    });
+    await TransactionModel.insertMany([
+      { statementId: visa._id, issuer: "visa_signature", cardLabel: "VISA1", date: new Date("2026-06-04"),
+        descriptionRaw: "V", merchant: "V", category: "VisaCat", categorySource: "rule", amount: 300, currency: "ARS",
+        direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null, comprobante: "20", fingerprint: "f20" },
+      { statementId: visa._id, issuer: "visa_signature", cardLabel: "VISA1", date: new Date("2026-06-05"),
+        descriptionRaw: "U", merchant: "U", category: "Dolar", categorySource: "rule", amount: 40, currency: "USD",
+        direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null, comprobante: "21", fingerprint: "f21" },
+    ]);
+    const arsAll = await request(app).get("/api/stats/last-statement/by-category?currency=ARS");
+    expect(arsAll.body.map((c: { category: string }) => c.category).sort()).toEqual(["Compras", "Transporte", "VisaCat"]);
+
+    const onlyVisa = await request(app).get("/api/stats/last-statement/by-category?currency=ARS&cardLabel=VISA1");
+    expect(onlyVisa.body).toEqual([{ category: "VisaCat", total: 300, count: 1 }]);
+
+    const usd = await request(app).get("/api/stats/last-statement/by-category?currency=USD");
+    expect(usd.body).toEqual([{ category: "Dolar", total: 40, count: 1 }]);
+  });
 });

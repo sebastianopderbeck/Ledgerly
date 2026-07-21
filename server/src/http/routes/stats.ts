@@ -4,6 +4,7 @@ import { asyncHandler } from "../errors.js";
 import { StatementModel, TransactionModel, type TransactionDoc, type StatementDoc } from "../../db/models.js";
 import { computeFutureInstallments, computeFutureInstallmentsDetail } from "../../stats/futureInstallments.js";
 import { representativeRateDate, consumptionMonth } from "../../stats/monthlyUsd.js";
+import { latestStatementIdsPerIssuer } from "../../stats/lastStatement.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import type { Currency, MonthlyUsdStat } from "@ledgerly/shared";
 
@@ -30,6 +31,33 @@ export const statsRouter = Router();
 statsRouter.get("/by-category", asyncHandler(async (req, res) => {
   const rows = await TransactionModel.aggregate([
     { $match: baseMatch(req.query as Record<string, unknown>) },
+    { $group: { _id: "$category", total: { $sum: "$amount" }, count: { $sum: 1 } } },
+    { $project: { _id: 0, category: "$_id", total: 1, count: 1 } },
+    { $sort: { total: -1 } },
+  ]);
+  res.json(rows);
+}));
+
+statsRouter.get("/last-statement/by-category", asyncHandler(async (req, res) => {
+  const q = req.query as Record<string, unknown>;
+  const currency = q.currency === "USD" ? "USD" : "ARS";
+  const filter: FilterQuery<StatementDoc> = {};
+  if (typeof q.cardLabel === "string") filter.cardLabel = q.cardLabel;
+  const statements = await StatementModel.find(filter).lean();
+  const ids = latestStatementIdsPerIssuer(
+    statements.map((s) => ({
+      id: s._id,
+      issuer: s.issuer,
+      closingDate: s.closingDate ?? null,
+      uploadedAt: (s as unknown as { uploadedAt: Date }).uploadedAt,
+    })),
+  );
+  if (ids.length === 0) {
+    res.json([]);
+    return;
+  }
+  const rows = await TransactionModel.aggregate([
+    { $match: { type: "purchase", currency, statementId: { $in: ids } } },
     { $group: { _id: "$category", total: { $sum: "$amount" }, count: { $sum: 1 } } },
     { $project: { _id: 0, category: "$_id", total: 1, count: 1 } },
     { $sort: { total: -1 } },
