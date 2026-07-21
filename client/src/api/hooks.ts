@@ -72,6 +72,12 @@ export function usePatchTransaction() {
 export function useByCategory(f: StatFilters) {
   return useQuery({ queryKey: ["by-category", f], queryFn: () => apiFetch<CategoryStat[]>(`/stats/by-category${qs(f)}`) });
 }
+export function useByCategoryLastStatement(f: StatFilters) {
+  return useQuery({
+    queryKey: ["by-category-last-statement", f.currency, f.cardLabel],
+    queryFn: () => apiFetch<CategoryStat[]>(`/stats/last-statement/by-category${qs({ currency: f.currency, cardLabel: f.cardLabel })}`),
+  });
+}
 export function useMonthly(f: StatFilters) {
   return useQuery({ queryKey: ["monthly", f], queryFn: () => apiFetch<MonthlyStat[]>(`/stats/monthly${qs(f)}`) });
 }

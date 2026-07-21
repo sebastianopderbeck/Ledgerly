@@ -21,6 +21,7 @@ function route(url: string) {
   if (url.includes("/fx/oficial")) return { date: "2026-07-20", rate: 1000, source: "oficial" };
   if (url.includes("/stats/monthly-usd")) return [{ month: "2026-05", totalArs: 2000, rate: 1000, totalUsd: 2 }];
   if (url.includes("/stats/summary")) return { currency: "ARS", totalPurchases: 2000, transactionCount: 2, statementCount: 1, futureInstallmentTotal: 3000 };
+  if (url.includes("/stats/last-statement/by-category")) return [{ category: "Restaurantes", total: 900, count: 2 }];
   if (url.includes("/stats/by-category")) return [{ category: "Compras", total: 1500, count: 1 }];
   if (url.includes("/stats/monthly")) return [{ month: "2026-05", total: 2000, count: 2 }];
   if (url.includes("/stats/future-installments")) return [{ month: "2026-06", total: 1500 }];
@@ -38,7 +39,8 @@ describe("DashboardPage", () => {
   it("muestra KPIs con el total gastado", async () => {
     renderWithProviders(<DashboardPage />, { route: "/" });
     await waitFor(() => expect(screen.getByText(/total gastado/i)).toBeInTheDocument());
-    expect(screen.getByText(/gasto por categoría/i)).toBeInTheDocument();
+    expect(screen.getByText("Gasto por categoría")).toBeInTheDocument();
+    expect(screen.getByText("Gasto por categoría (último resumen)")).toBeInTheDocument();
     expect(await screen.findByText("A pagar al cierre")).toBeInTheDocument();
     expect(await screen.findByText("A pagar por mes en USD (al oficial)")).toBeInTheDocument();
     expect(screen.getAllByText((text) => text.includes("≈")).length).toBeGreaterThan(0);
