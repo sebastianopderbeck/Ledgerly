@@ -20,12 +20,6 @@ function baseMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   return match;
 }
 
-function installmentMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
-  const match: FilterQuery<TransactionDoc> = { type: "purchase", isInstallment: true };
-  if (typeof q.cardLabel === "string") match.cardLabel = q.cardLabel;
-  return match;
-}
-
 async function latestStatementInstallmentTxs(q: Record<string, unknown>) {
   const statementFilter = typeof q.cardLabel === "string" ? { cardLabel: q.cardLabel } : {};
   const statements = await StatementModel.find(statementFilter).lean();
@@ -140,7 +134,7 @@ statsRouter.get("/future-installments", asyncHandler(async (req, res) => {
 
 statsRouter.get("/future-installments/detail", asyncHandler(async (req, res) => {
   const currency: Currency = req.query.currency === "USD" ? "USD" : "ARS";
-  const txs = await TransactionModel.find(installmentMatch(req.query as Record<string, unknown>)).lean();
+  const txs = await latestStatementInstallmentTxs(req.query as Record<string, unknown>);
   const mapped = txs.map((t) => ({
     date: t.date.toISOString().slice(0, 10),
     amount: t.amount, currency: t.currency as Currency,
