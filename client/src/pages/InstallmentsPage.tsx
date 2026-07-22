@@ -11,6 +11,9 @@ import { FutureInstallmentsChart } from "../components/charts/FutureInstallments
 import { RemainingDebtChart } from "../components/charts/RemainingDebtChart.js";
 import { InstallmentsByCategoryChart } from "../components/charts/InstallmentsByCategoryChart.js";
 import { InstallmentsByMerchantChart } from "../components/charts/InstallmentsByMerchantChart.js";
+import { PendingInstallmentsByCategoryChart } from "../components/charts/PendingInstallmentsByCategoryChart.js";
+import CreditCardIcon from "@mui/icons-material/CreditCard";
+import { Kpi } from "../components/Kpi.js";
 
 export const InstallmentsPage = () => {
   const [params] = useSearchParams();
@@ -24,6 +27,7 @@ export const InstallmentsPage = () => {
   const totalCuotas = months.reduce((acc, m) => acc + m.count, 0);
   const plural = (n: number, singular: string) => `${n} ${singular}${n === 1 ? "" : "s"}`;
   const mesesLabel = months.length === 1 ? "1 mes" : `${months.length} meses`;
+  const money = (value: number) => formatMoney(value, filters.currency);
 
   return (
     <>
@@ -35,6 +39,9 @@ export const InstallmentsPage = () => {
 
       {!isLoading && months.length > 0 && (
         <>
+          <MotionBox variants={staggerContainer} initial="hidden" animate="visible" sx={{ mb: 3, maxWidth: { sm: 320 } }}>
+            <Kpi label="Cuotas pendientes" value={totalFuturo} format={money} icon={<CreditCardIcon />} color="warning" />
+          </MotionBox>
           <MotionBox
             variants={staggerContainer}
             initial="hidden"
@@ -45,6 +52,7 @@ export const InstallmentsPage = () => {
             <ChartCard title="Deuda restante"><RemainingDebtChart {...filters} /></ChartCard>
             <ChartCard title="Por categoría"><InstallmentsByCategoryChart {...filters} /></ChartCard>
             <ChartCard title="Por comercio"><InstallmentsByMerchantChart {...filters} /></ChartCard>
+            <ChartCard title="Cuotas pendientes por categoría"><PendingInstallmentsByCategoryChart {...filters} /></ChartCard>
           </MotionBox>
 
           <Typography color="text.secondary" sx={{ mb: 2 }}>
