@@ -40,10 +40,47 @@ describe("GET /api/transactions", () => {
     expect(res.body.total).toBe(1);
     expect(res.body.items[0].merchant).toBe("MERCADOLIBRE");
   });
+  it("filtra por varias categorías (repetido)", async () => {
+    const base = await StatementModel.findOne({});
+    await TransactionModel.create({
+      statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-05"),
+      descriptionRaw: "UBER", merchant: "UBER", category: "Transporte", categorySource: "rule", amount: 200, currency: "ARS",
+      direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+      comprobante: "3", fingerprint: "f3",
+    });
+    const res = await request(app).get("/api/transactions?category=Compras&category=Sin categoría");
+    expect(res.body.total).toBe(2);
+    const categories = res.body.items.map((t: { category: string }) => t.category).sort();
+    expect(categories).toEqual(["Compras", "Sin categoría"]);
+  });
+  it("categories devuelve las categorías distintas ordenadas", async () => {
+    const res = await request(app).get("/api/transactions/categories");
+    expect(res.body).toEqual(["Compras", "Sin categoría"]);
+  });
   it("filtra por rango de fechas", async () => {
     const res = await request(app).get("/api/transactions?from=2026-06-01&to=2026-06-30");
     expect(res.body.total).toBe(1);
     expect(res.body.items[0].type).toBe("payment");
+  });
+  it("sin pageSize devuelve TODOS los movimientos (no sólo la primera página)", async () => {
+    const base = await StatementModel.findOne({});
+    await TransactionModel.insertMany(
+      Array.from({ length: 60 }, (_, i) => ({
+        statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date(Date.UTC(2026, 0, (i % 27) + 1)),
+        descriptionRaw: `M${i}`, merchant: `M${i}`, category: "Compras", categorySource: "rule",
+        amount: 10, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
+        installmentCurrent: null, installmentTotal: null, comprobante: null, fingerprint: `bulk-${i}`,
+      })),
+    );
+    const res = await request(app).get("/api/transactions");
+    expect(res.body.total).toBe(62);
+    expect(res.body.items).toHaveLength(62);
+  });
+  it("con pageSize explícito pagina", async () => {
+    const res = await request(app).get("/api/transactions?pageSize=1&page=1");
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.total).toBe(2);
+    expect(res.body.pageSize).toBe(1);
   });
   it("filtra por cardLabel", async () => {
     const other = await StatementModel.create({

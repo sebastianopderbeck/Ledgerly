@@ -9,7 +9,10 @@ function buildFilter(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   if (typeof q.currency === "string") filter.currency = q.currency;
   if (typeof q.issuer === "string") filter.issuer = q.issuer;
   if (typeof q.cardLabel === "string") filter.cardLabel = q.cardLabel;
-  if (typeof q.category === "string") filter.category = q.category;
+  const categories = Array.isArray(q.category)
+    ? q.category.filter((c): c is string => typeof c === "string")
+    : typeof q.category === "string" ? [q.category] : [];
+  if (categories.length) filter.category = { $in: categories };
   if (typeof q.search === "string") filter.merchant = { $regex: q.search, $options: "i" };
   if (typeof q.from === "string" || typeof q.to === "string") {
     filter.date = {};
@@ -24,14 +27,24 @@ export const transactionsRouter = Router();
 transactionsRouter.get(
   "/",
   asyncHandler(async (req, res) => {
+    const paginated = req.query.pageSize !== undefined;
     const page = Math.max(1, Number(req.query.page ?? 1));
     const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize ?? 50)));
     const filter = buildFilter(req.query as Record<string, unknown>);
+    const cursor = TransactionModel.find(filter).sort({ date: -1 });
     const [items, total] = await Promise.all([
-      TransactionModel.find(filter).sort({ date: -1 }).skip((page - 1) * pageSize).limit(pageSize),
+      paginated ? cursor.skip((page - 1) * pageSize).limit(pageSize) : cursor,
       TransactionModel.countDocuments(filter),
     ]);
-    res.json({ items: items.map(toTransactionDTO), total, page, pageSize });
+    res.json({ items: items.map(toTransactionDTO), total, page: paginated ? page : 1, pageSize: paginated ? pageSize : total });
+  }),
+);
+
+transactionsRouter.get(
+  "/categories",
+  asyncHandler(async (_req, res) => {
+    const categories = await TransactionModel.distinct<string>("category");
+    res.json([...categories].sort((a, b) => a.localeCompare(b)));
   }),
 );
 
