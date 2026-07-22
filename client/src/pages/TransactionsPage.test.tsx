@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, cleanup } from "@testing-library/react";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { TransactionsPage } from "./TransactionsPage.js";
 
@@ -18,7 +18,7 @@ beforeEach(() => {
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("TransactionsPage", () => {
   it("renderiza los movimientos en la tabla", async () => {
@@ -35,5 +35,20 @@ describe("TransactionsPage", () => {
       .find((u) => u.includes("/transactions") && !u.includes("/categories"));
     expect(listUrl).toContain("category=Compras");
     expect(listUrl).toContain("category=Salud");
+  });
+
+  it("borrar una fila y confirmar dispara POST /transactions/delete con el id", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    await waitFor(() => expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /borrar MERCADOLIBRE/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Borrar" }));
+    await waitFor(() => {
+      const call = vi.mocked(fetch).mock.calls.find(
+        (c) => String(c[0]).includes("/transactions/delete") && (c[1] as RequestInit)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ ids: ["1"] });
+    });
   });
 });

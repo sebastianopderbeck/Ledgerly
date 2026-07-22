@@ -2,7 +2,7 @@ import { Router } from "express";
 import { HttpError, asyncHandler } from "../errors.js";
 import { CategoryRuleModel, TransactionModel } from "../../db/models.js";
 import { toCategoryRuleDTO } from "../mappers.js";
-import { categorize, type RuleInput } from "../../rules/categorize.js";
+import { matchRule, type RuleInput } from "../../rules/categorize.js";
 
 export const categoryRulesRouter = Router();
 
@@ -50,12 +50,15 @@ categoryRulesRouter.post(
   "/apply",
   asyncHandler(async (_req, res) => {
     const rules = (await CategoryRuleModel.find({ enabled: true }).lean()) as unknown as RuleInput[];
-    const txs = await TransactionModel.find({ categorySource: { $ne: "manual" } });
+    const txs = await TransactionModel.find({});
     let updated = 0;
     for (const tx of txs) {
-      const { category } = categorize(tx.descriptionRaw, tx.merchant, rules);
-      if (category !== tx.category) {
+      const matched = matchRule(tx.descriptionRaw, tx.merchant, rules);
+      if (matched === null && tx.categorySource === "manual") continue;
+      const category = matched ?? "Sin categoría";
+      if (category !== tx.category || tx.categorySource !== "rule") {
         tx.category = category;
+        tx.categorySource = "rule";
         await tx.save();
         updated += 1;
       }

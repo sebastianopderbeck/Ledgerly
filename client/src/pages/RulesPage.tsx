@@ -1,9 +1,9 @@
-import { Alert, Button, CircularProgress, IconButton, Stack, Switch, Table, TableCell, TableHead, TableRow, Typography } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
+import { Alert, Button, CircularProgress, Stack, Table, TableCell, TableHead, TableRow, Typography } from "@mui/material";
 import { useApplyRules, useCategoryRules, useCreateRule, useDeleteRule, useUpdateRule } from "../api/hooks.js";
 import { CategoryRuleForm } from "../components/CategoryRuleForm.js";
-import { MotionTableBody, MotionTableRow } from "../components/motion/motion.js";
-import { fadeItem, staggerContainer } from "../components/motion/variants.js";
+import { CategoryRuleRow } from "../components/CategoryRuleRow.js";
+import { MotionTableBody } from "../components/motion/motion.js";
+import { staggerContainer } from "../components/motion/variants.js";
 
 export const RulesPage = () => {
   const { data, isLoading, isError, error } = useCategoryRules();
@@ -24,7 +24,7 @@ export const RulesPage = () => {
         </Button>
       </Stack>
 
-      {apply.isSuccess && <Alert severity="success" sx={{ mb: 2 }}>{apply.data.updated} movimientos recategorizados</Alert>}
+      {apply.isSuccess && <Alert severity="success" sx={{ mb: 2 }}>{apply.data.updated} movimientos recategorizados (las reglas pisan también las categorías manuales cuando matchean)</Alert>}
 
       <CategoryRuleForm onCreate={(values) => create.mutate(values)} />
 
@@ -37,18 +37,13 @@ export const RulesPage = () => {
         </TableHead>
         <MotionTableBody variants={staggerContainer} initial="hidden" animate="visible">
           {(data ?? []).map((r) => (
-            <MotionTableRow key={r.id} variants={fadeItem}>
-              <TableCell>{r.priority}</TableCell>
-              <TableCell>{r.matchType}</TableCell>
-              <TableCell>{r.pattern}</TableCell>
-              <TableCell>{r.category}</TableCell>
-              <TableCell>
-                <Switch checked={r.enabled} onChange={(e) => update.mutate({ id: r.id, body: { enabled: e.target.checked } })} />
-              </TableCell>
-              <TableCell>
-                <IconButton aria-label="borrar" onClick={() => del.mutate(r.id)}><DeleteIcon /></IconButton>
-              </TableCell>
-            </MotionTableRow>
+            <CategoryRuleRow
+              key={r.id}
+              rule={r}
+              onSave={(id, body) => update.mutate({ id, body })}
+              onDelete={(id) => del.mutate(id)}
+              onToggle={(id, enabled) => update.mutate({ id, body: { enabled } })}
+            />
           ))}
         </MotionTableBody>
       </Table>

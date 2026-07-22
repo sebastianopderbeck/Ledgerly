@@ -60,3 +60,38 @@ describe("importStatement", () => {
     expect(await TransactionModel.countDocuments()).toBe(2);
   });
 });
+
+const cuotaRow = (cur: number): ParsedStatement["rows"][number] => ({
+  date: "2025-08-25", descriptionRaw: "VISUAR ICBC MALL", merchant: "VISUAR ICBC MALL", amount: 9999.95,
+  currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
+  installmentCurrent: cur, installmentTotal: 12, comprobante: "001061",
+});
+const stmtWith = (rows: ParsedStatement["rows"]): ParsedStatement => ({
+  header: {
+    issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: "2026-07-02", dueDate: "2026-07-14",
+    totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+      pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
+  },
+  rows,
+});
+const okMeta = { reconciliation: { ok: true, entries: [] },
+  meta: { producer: null, creator: null, pageCount: 1, encrypted: false } };
+
+describe("importStatement dedup entre resúmenes", () => {
+  it("no duplica una línea idéntica (misma cuota) presente en dos resúmenes distintos", async () => {
+    mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5)]), ...okMeta });
+    await importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5), cuotaRow(6)]), ...okMeta });
+    const res = await importStatement({ data: new Uint8Array([2]), fileName: "b.pdf" });
+    expect(res.transactionCount).toBe(1);
+    expect(await TransactionModel.countDocuments()).toBe(2);
+  });
+
+  it("conserva cuotas distintas de la misma compra (no son duplicados)", async () => {
+    mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5)]), ...okMeta });
+    await importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(6)]), ...okMeta });
+    await importStatement({ data: new Uint8Array([2]), fileName: "b.pdf" });
+    expect(await TransactionModel.countDocuments()).toBe(2);
+  });
+});

@@ -62,3 +62,15 @@ transactionsRouter.patch(
     res.json(toTransactionDTO(doc));
   }),
 );
+
+transactionsRouter.post(
+  "/delete",
+  asyncHandler(async (req, res) => {
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => typeof id === "string")) {
+      throw new HttpError(400, "ids debe ser un array de strings no vacío");
+    }
+    const result = await TransactionModel.deleteMany({ _id: { $in: ids } });
+    res.json({ deleted: result.deletedCount });
+  }),
+);

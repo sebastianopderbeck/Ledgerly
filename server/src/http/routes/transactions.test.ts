@@ -111,3 +111,33 @@ describe("PATCH /api/transactions/:id", () => {
     expect(res.body.categorySource).toBe("manual");
   });
 });
+
+describe("POST /api/transactions/delete", () => {
+  it("borra los movimientos por id y devuelve la cantidad", async () => {
+    const list = await request(app).get("/api/transactions");
+    const ids = list.body.items.map((t: { id: string }) => t.id);
+    const res = await request(app).post("/api/transactions/delete").send({ ids });
+    expect(res.status).toBe(200);
+    expect(res.body.deleted).toBe(2);
+    expect(await TransactionModel.countDocuments()).toBe(0);
+  });
+
+  it("borra sólo los ids indicados", async () => {
+    const list = await request(app).get("/api/transactions?category=Compras");
+    const id = list.body.items[0].id;
+    const res = await request(app).post("/api/transactions/delete").send({ ids: [id] });
+    expect(res.status).toBe(200);
+    expect(res.body.deleted).toBe(1);
+    expect(await TransactionModel.countDocuments()).toBe(1);
+  });
+
+  it("rechaza ids vacío con 400", async () => {
+    const res = await request(app).post("/api/transactions/delete").send({ ids: [] });
+    expect(res.status).toBe(400);
+  });
+
+  it("rechaza body sin ids con 400", async () => {
+    const res = await request(app).post("/api/transactions/delete").send({});
+    expect(res.status).toBe(400);
+  });
+});

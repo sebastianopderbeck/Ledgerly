@@ -79,6 +79,15 @@ export function usePatchTransaction() {
   });
 }
 
+export function useDeleteTransactions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      apiFetch<{ deleted: number }>("/transactions/delete", { method: "POST", body: JSON.stringify({ ids }) }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 export function useByCategory(f: StatFilters) {
   return useQuery({ queryKey: ["by-category", f], queryFn: () => apiFetch<CategoryStat[]>(`/stats/by-category${qs(f)}`) });
 }

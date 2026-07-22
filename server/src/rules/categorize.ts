@@ -6,22 +6,32 @@ export interface RuleInput {
   enabled: boolean;
 }
 
+export function matchRule(descriptionRaw: string, merchant: string, rules: RuleInput[]): string | null {
+  const haystack = `${descriptionRaw} ${merchant}`.toUpperCase();
+  const ordered = [...rules].filter((r) => r.enabled).sort((a, b) => a.priority - b.priority);
+
+  for (const rule of ordered) {
+    let matched = false;
+    if (rule.matchType === "contains") {
+      matched = haystack.includes(rule.pattern.toUpperCase());
+    } else {
+      try {
+        matched = new RegExp(rule.pattern, "i").test(haystack);
+      } catch {
+        matched = false;
+      }
+    }
+    if (matched) return rule.category;
+  }
+  return null;
+}
+
 export function categorize(
   descriptionRaw: string,
   merchant: string,
   rules: RuleInput[],
 ): { category: string; source: "rule" } {
-  const haystack = `${descriptionRaw} ${merchant}`.toUpperCase();
-  const ordered = [...rules].filter((r) => r.enabled).sort((a, b) => a.priority - b.priority);
-
-  for (const rule of ordered) {
-    const matched =
-      rule.matchType === "contains"
-        ? haystack.includes(rule.pattern.toUpperCase())
-        : new RegExp(rule.pattern, "i").test(haystack);
-    if (matched) return { category: rule.category, source: "rule" };
-  }
-  return { category: "Sin categoría", source: "rule" };
+  return { category: matchRule(descriptionRaw, merchant, rules) ?? "Sin categoría", source: "rule" };
 }
 
 export const SEED_RULES: Omit<RuleInput, "enabled">[] = [

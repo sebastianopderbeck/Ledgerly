@@ -1,12 +1,13 @@
 import { Alert, CircularProgress, Typography } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
-import { usePatchTransaction, useTransactions, type TxFilters } from "../api/hooks.js";
+import { useDeleteTransactions, usePatchTransaction, useTransactions, type TxFilters } from "../api/hooks.js";
 import { FiltersBar } from "../components/FiltersBar.js";
 import { TransactionsTable } from "../components/TransactionsTable.js";
 
 export const TransactionsPage = () => {
   const [params] = useSearchParams();
   const patch = usePatchTransaction();
+  const del = useDeleteTransactions();
   const filters: TxFilters = {
     currency: (params.get("currency") as "ARS" | "USD") ?? undefined,
     from: params.get("from") ?? undefined,
@@ -27,6 +28,7 @@ export const TransactionsPage = () => {
       <TransactionsTable
         rows={data?.items ?? []}
         onCategoryChange={(id, category) => patch.mutate({ id, body: { category } })}
+        onDelete={(ids) => del.mutate(ids)}
       />
     </>
   );

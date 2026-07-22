@@ -7,9 +7,10 @@ export const PARSER_VERSION = "1.0.0";
 
 export function fingerprintOf(
   issuer: string, dateIso: string, comprobante: string | null, amount: number, currency: string,
+  installmentCurrent: number | null, installmentTotal: number | null,
 ): string {
   return createHash("sha256")
-    .update(`${issuer}|${dateIso}|${comprobante ?? ""}|${amount}|${currency}`)
+    .update(`${issuer}|${dateIso}|${comprobante ?? ""}|${amount}|${currency}|${installmentCurrent ?? ""}|${installmentTotal ?? ""}`)
     .digest("hex");
 }
 
@@ -70,10 +71,23 @@ export async function importStatement(input: {
       installmentCurrent: row.installmentCurrent,
       installmentTotal: row.installmentTotal,
       comprobante: row.comprobante,
-      fingerprint: fingerprintOf(statement.header.issuer, row.date, row.comprobante, row.amount, row.currency),
+      fingerprint: fingerprintOf(
+        statement.header.issuer, row.date, row.comprobante, row.amount, row.currency,
+        row.installmentCurrent, row.installmentTotal,
+      ),
     };
   });
-  await TransactionModel.insertMany(docs);
 
-  return { status: "imported", statementId: created._id.toString(), transactionCount: docs.length };
+  const existingFingerprints = new Set(
+    (await TransactionModel.find({ fingerprint: { $in: docs.map((d) => d.fingerprint) } }).distinct("fingerprint")) as string[],
+  );
+  const seen = new Set<string>();
+  const toInsert = docs.filter((doc) => {
+    if (existingFingerprints.has(doc.fingerprint) || seen.has(doc.fingerprint)) return false;
+    seen.add(doc.fingerprint);
+    return true;
+  });
+  if (toInsert.length > 0) await TransactionModel.insertMany(toInsert);
+
+  return { status: "imported", statementId: created._id.toString(), transactionCount: toInsert.length };
 }

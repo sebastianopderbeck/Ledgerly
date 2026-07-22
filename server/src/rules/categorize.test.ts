@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { categorize, SEED_RULES } from "./categorize.js";
+import { categorize, matchRule, SEED_RULES } from "./categorize.js";
 import type { RuleInput } from "./categorize.js";
 
 const rules: RuleInput[] = [
@@ -24,6 +24,19 @@ describe("categorize", () => {
       { priority: 1, matchType: "contains", pattern: "CAFE", category: "A", enabled: true },
     ];
     expect(categorize("BICHO CAFE", "BICHO CAFE", r).category).toBe("A");
+  });
+});
+
+describe("matchRule", () => {
+  it("devuelve la categoría de la primera regla que matchea (por prioridad)", () => {
+    expect(matchRule("NETFLIX.COM 1", "NETFLIX.COM", rules)).toBe("Suscripciones");
+  });
+  it("devuelve null si ninguna matchea", () => {
+    expect(matchRule("PANADERIA LA REAL", "PANADERIA", rules)).toBeNull();
+  });
+  it("un regex inválido no rompe (esa regla no matchea)", () => {
+    const bad: RuleInput[] = [{ priority: 1, matchType: "regex", pattern: "(", category: "X", enabled: true }];
+    expect(matchRule("HOLA", "HOLA", bad)).toBeNull();
   });
 });
 

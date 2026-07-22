@@ -15,7 +15,8 @@
     "seed:coupons": "tsx server/src/import/seedCoupons.ts",
     "seed:fx": "tsx server/src/import/backfillRates.ts",
     "seed:auto": "tsx server/src/import/seedAutoCoupons.ts",
-    "seed:fx:auto": "tsx server/src/import/backfillAutoRates.ts"
+    "seed:fx:auto": "tsx server/src/import/backfillAutoRates.ts",
+    "seed:fingerprints": "tsx server/src/import/backfillFingerprints.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
