@@ -114,6 +114,24 @@ describe("stats", () => {
     expect(summary.body.futureInstallmentTotal).toBe(3000);
   });
 
+  it("summary: futureInstallmentTotal usa solo el último resumen (no duplica cuotas)", async () => {
+    const older = await StatementModel.create({
+      issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-06-02"), dueDate: null,
+      totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+        pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
+      sourceFileName: "old.pdf", sourceHash: "hold", pageCount: 1, parserVersion: "1.0.0",
+      needsReview: false, reconciliation: { ok: true, entries: [] },
+    });
+    await TransactionModel.create({
+      statementId: older._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-04"),
+      descriptionRaw: "MERCADOLIBRE", merchant: "MERCADOLIBRE", category: "Compras", categorySource: "rule",
+      amount: 1500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
+      installmentCurrent: 1, installmentTotal: 4, comprobante: "1b", fingerprint: "f1b",
+    });
+    const res = await request(app).get("/api/stats/summary?currency=ARS");
+    expect(res.body.futureInstallmentTotal).toBe(3000);
+  });
+
   it("last-statement/by-category agrega solo el último resumen de cada issuer", async () => {
     const oldIcbc = await StatementModel.create({
       issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-05-02"), dueDate: null,

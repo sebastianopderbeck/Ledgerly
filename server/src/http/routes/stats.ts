@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { FilterQuery } from "mongoose";
 import { asyncHandler } from "../errors.js";
 import { StatementModel, TransactionModel, type TransactionDoc, type StatementDoc } from "../../db/models.js";
-import { computeFutureInstallments, computeFutureInstallmentsDetail } from "../../stats/futureInstallments.js";
+import { computeFutureInstallments, computeFutureInstallmentsDetail, remainingInstallmentDebt } from "../../stats/futureInstallments.js";
 import { representativeRateDate, consumptionMonth } from "../../stats/monthlyUsd.js";
 import { latestStatementIdsPerIssuer } from "../../stats/lastStatement.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
@@ -137,26 +137,36 @@ statsRouter.get("/future-installments/detail", asyncHandler(async (req, res) => 
 }));
 
 statsRouter.get("/summary", asyncHandler(async (req, res) => {
-  const currency: Currency = req.query.currency === "USD" ? "USD" : "ARS";
-  const match = baseMatch(req.query as Record<string, unknown>);
+  const q = req.query as Record<string, unknown>;
+  const currency: Currency = q.currency === "USD" ? "USD" : "ARS";
   const [agg] = await TransactionModel.aggregate([
-    { $match: match },
+    { $match: baseMatch(q) },
     { $group: { _id: null, totalPurchases: { $sum: "$amount" }, transactionCount: { $sum: 1 } } },
   ]);
-  const installmentTxs = await TransactionModel.find(installmentMatch(req.query as Record<string, unknown>)).lean();
-  const future = computeFutureInstallments(
-    installmentTxs.map((t) => ({
-      date: t.date.toISOString().slice(0, 10), amount: t.amount, currency: t.currency as Currency,
-      isInstallment: t.isInstallment, installmentCurrent: t.installmentCurrent ?? null, installmentTotal: t.installmentTotal ?? null,
+  const statementFilter = typeof q.cardLabel === "string" ? { cardLabel: q.cardLabel } : {};
+  const statements = await StatementModel.find(statementFilter).lean();
+  const lastStatementIds = latestStatementIdsPerIssuer(
+    statements.map((s) => ({
+      id: s._id,
+      issuer: s.issuer,
+      closingDate: s.closingDate ?? null,
+      uploadedAt: (s as unknown as { uploadedAt: Date }).uploadedAt,
     })),
-    currency,
   );
-  const cardLabel = req.query.cardLabel;
+  const installmentTxs = await TransactionModel.find({
+    type: "purchase", isInstallment: true, statementId: { $in: lastStatementIds },
+  }).lean();
   res.json({
     currency,
     totalPurchases: agg?.totalPurchases ?? 0,
     transactionCount: agg?.transactionCount ?? 0,
-    statementCount: await StatementModel.countDocuments(typeof cardLabel === "string" ? { cardLabel } : {}),
-    futureInstallmentTotal: future.reduce((acc, f) => acc + f.total, 0),
+    statementCount: statements.length,
+    futureInstallmentTotal: remainingInstallmentDebt(
+      installmentTxs.map((t) => ({
+        amount: t.amount, currency: t.currency as Currency,
+        isInstallment: t.isInstallment, installmentCurrent: t.installmentCurrent ?? null, installmentTotal: t.installmentTotal ?? null,
+      })),
+      currency,
+    ),
   });
 }));
