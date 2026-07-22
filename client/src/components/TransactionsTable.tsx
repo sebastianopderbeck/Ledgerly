@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Box, Button, IconButton } from "@mui/material";
+import { Box, Button, Chip, IconButton } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
   DataGrid,
@@ -30,6 +30,17 @@ export const TransactionsTable = ({ rows, onCategoryChange, onDelete }: Transact
       valueFormatter: (_v, row) => formatMoney(row.amount, row.currency),
     },
     { field: "type", headerName: "Tipo", width: 110 },
+    {
+      field: "installment", headerName: "Cuota", width: 110, sortable: false, filterable: false,
+      renderCell: (params: GridRenderCellParams<TransactionDTO>) => {
+        const { isInstallment, installmentCurrent, installmentTotal } = params.row;
+        if (!isInstallment) return "—";
+        const label = installmentCurrent && installmentTotal
+          ? `${installmentCurrent}/${installmentTotal}`
+          : "cuota";
+        return <Chip size="small" variant="outlined" label={label} />;
+      },
+    },
     {
       field: "actions", headerName: "", width: 60, sortable: false, filterable: false, disableColumnMenu: true,
       renderCell: (params: GridRenderCellParams<TransactionDTO>) => (

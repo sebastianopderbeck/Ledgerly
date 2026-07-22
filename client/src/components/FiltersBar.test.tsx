@@ -39,4 +39,13 @@ describe("FiltersBar", () => {
     expect(within(listbox).getByRole("option", { name: "Compras" })).toHaveAttribute("aria-selected", "true");
     expect(within(listbox).getByRole("option", { name: "Transporte" })).toHaveAttribute("aria-selected", "true");
   });
+
+  it("ofrece un filtro de cuotas con opciones todas/solo/sin", async () => {
+    renderWithProviders(<FiltersBar showCategory />, { route: "/transactions" });
+    const select = await screen.findByRole("combobox", { name: /cuotas/i });
+    await userEvent.click(select);
+    const listbox = await screen.findByRole("listbox");
+    expect(within(listbox).getByRole("option", { name: "Solo cuotas" })).toBeInTheDocument();
+    expect(within(listbox).getByRole("option", { name: "Sin cuotas" })).toBeInTheDocument();
+  });
 });

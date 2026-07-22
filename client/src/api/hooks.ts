@@ -55,7 +55,7 @@ export function useDeleteStatement() {
 }
 
 export interface TxFilters extends Partial<StatFilters> {
-  category?: string[]; issuer?: string; search?: string; page?: number; pageSize?: number;
+  category?: string[]; issuer?: string; search?: string; installment?: string; page?: number; pageSize?: number;
 }
 
 export function useTransactions(filters: TxFilters) {

@@ -82,6 +82,21 @@ describe("GET /api/transactions", () => {
     expect(res.body.total).toBe(2);
     expect(res.body.pageSize).toBe(1);
   });
+  it("filtra por cuotas (installment=true / false)", async () => {
+    const base = await StatementModel.findOne({});
+    await TransactionModel.create({
+      statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-06-10"),
+      descriptionRaw: "NOTEBOOK", merchant: "NOTEBOOK", category: "Tecnología", categorySource: "rule", amount: 45000,
+      currency: "ARS", direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 3,
+      installmentTotal: 12, comprobante: "3", fingerprint: "f-cuota",
+    });
+    const solo = await request(app).get("/api/transactions?installment=true");
+    expect(solo.body.total).toBe(1);
+    expect(solo.body.items[0].merchant).toBe("NOTEBOOK");
+    const sin = await request(app).get("/api/transactions?installment=false");
+    expect(sin.body.total).toBe(2);
+    expect(sin.body.items.every((t: { isInstallment: boolean }) => !t.isInstallment)).toBe(true);
+  });
   it("filtra por cardLabel", async () => {
     const other = await StatementModel.create({
       issuer: "visa_signature", cardLabel: "VISA1", last4: null, closingDate: new Date("2026-07-02"), dueDate: null,

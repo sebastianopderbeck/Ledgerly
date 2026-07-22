@@ -88,6 +88,14 @@ export const FiltersBar = ({ showCategory = false, showMonth = true }: FiltersBa
             ))}
           </TextField>
           <TextField
+            select label="Cuotas" size="small" sx={{ minWidth: 150 }}
+            value={params.get("installment") ?? ""} onChange={(e) => set("installment", e.target.value)}
+          >
+            <MenuItem value="">Todas</MenuItem>
+            <MenuItem value="true">Solo cuotas</MenuItem>
+            <MenuItem value="false">Sin cuotas</MenuItem>
+          </TextField>
+          <TextField
             label="Buscar comercio" size="small"
             value={params.get("search") ?? ""} onChange={(e) => set("search", e.target.value)}
           />

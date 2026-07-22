@@ -13,6 +13,8 @@ function buildFilter(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
     ? q.category.filter((c): c is string => typeof c === "string")
     : typeof q.category === "string" ? [q.category] : [];
   if (categories.length) filter.category = { $in: categories };
+  if (q.installment === "true") filter.isInstallment = true;
+  else if (q.installment === "false") filter.isInstallment = false;
   if (typeof q.search === "string") filter.merchant = { $regex: q.search, $options: "i" };
   if (typeof q.from === "string" || typeof q.to === "string") {
     filter.date = {};

@@ -15,6 +15,7 @@ export const TransactionsPage = () => {
     category: params.getAll("category"),
     search: params.get("search") ?? undefined,
     cardLabel: params.get("cardLabel") ?? undefined,
+    installment: params.get("installment") ?? undefined,
   };
   const { data, isLoading, isError, error } = useTransactions(filters);
 
