@@ -10,10 +10,12 @@ const statements = [
 ];
 
 beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(async (url: string) =>
-    new Response(JSON.stringify(url.includes("/statements") ? statements : {}), {
-      status: 200, headers: { "Content-Type": "application/json" },
-    })));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const body = url.includes("/transactions/categories") ? ["Compras", "Transporte", "Sin categoría"]
+      : url.includes("/statements") ? statements
+      : {};
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  }));
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -25,5 +27,16 @@ describe("FiltersBar", () => {
     const listbox = await screen.findByRole("listbox");
     expect(within(listbox).getByText("ICBC")).toBeInTheDocument();
     expect(within(listbox).getByText("Visa Signature ****8883")).toBeInTheDocument();
+  });
+
+  it("permite filtrar por varias categorías", async () => {
+    renderWithProviders(<FiltersBar showCategory />, { route: "/transactions" });
+    const select = await screen.findByRole("combobox", { name: /categorías/i });
+    await userEvent.click(select);
+    const listbox = await screen.findByRole("listbox");
+    await userEvent.click(within(listbox).getByRole("option", { name: "Compras" }));
+    await userEvent.click(within(listbox).getByRole("option", { name: "Transporte" }));
+    expect(within(listbox).getByRole("option", { name: "Compras" })).toHaveAttribute("aria-selected", "true");
+    expect(within(listbox).getByRole("option", { name: "Transporte" })).toHaveAttribute("aria-selected", "true");
   });
 });

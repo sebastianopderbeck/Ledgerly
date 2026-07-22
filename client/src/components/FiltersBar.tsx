@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { Box, MenuItem, TextField } from "@mui/material";
-import { useMonthly, useStatements } from "../api/hooks.js";
+import { useCategories, useMonthly, useStatements } from "../api/hooks.js";
 import { formatMonthLabel } from "../format.js";
 
 interface FiltersBarProps { showCategory?: boolean; showMonth?: boolean; }
@@ -9,6 +9,8 @@ export const FiltersBar = ({ showCategory = false, showMonth = true }: FiltersBa
   const [params, setParams] = useSearchParams();
   const { data } = useStatements();
   const cards = Array.isArray(data) ? [...new Set(data.map((s) => s.cardLabel))] : [];
+  const { data: categoryData } = useCategories();
+  const categories = Array.isArray(categoryData) ? categoryData : [];
 
   const currency = params.get("currency") === "USD" ? "USD" : "ARS";
   const cardLabel = params.get("cardLabel") ?? undefined;
@@ -20,6 +22,13 @@ export const FiltersBar = ({ showCategory = false, showMonth = true }: FiltersBa
   const set = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value); else next.delete(key);
+    setParams(next, { replace: true });
+  };
+
+  const setMulti = (key: string, values: string[]) => {
+    const next = new URLSearchParams(params);
+    next.delete(key);
+    for (const value of values) next.append(key, value);
     setParams(next, { replace: true });
   };
 
@@ -67,10 +76,22 @@ export const FiltersBar = ({ showCategory = false, showMonth = true }: FiltersBa
         </TextField>
       )}
       {showCategory && (
-        <TextField
-          label="Buscar comercio" size="small"
-          value={params.get("search") ?? ""} onChange={(e) => set("search", e.target.value)}
-        />
+        <>
+          <TextField
+            select label="Categorías" size="small" sx={{ minWidth: 220 }}
+            value={params.getAll("category")}
+            onChange={(e) => setMulti("category", e.target.value as unknown as string[])}
+            SelectProps={{ multiple: true, renderValue: (selected) => (selected as string[]).join(", ") }}
+          >
+            {categories.map((category) => (
+              <MenuItem key={category} value={category}>{category}</MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Buscar comercio" size="small"
+            value={params.get("search") ?? ""} onChange={(e) => set("search", e.target.value)}
+          />
+        </>
       )}
     </Box>
   );
