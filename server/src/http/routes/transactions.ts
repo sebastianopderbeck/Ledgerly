@@ -43,7 +43,7 @@ transactionsRouter.get(
 transactionsRouter.get(
   "/categories",
   asyncHandler(async (_req, res) => {
-    const categories = await TransactionModel.distinct<string>("category");
+    const categories = (await TransactionModel.distinct("category")) as string[];
     res.json([...categories].sort((a, b) => a.localeCompare(b)));
   }),
 );
