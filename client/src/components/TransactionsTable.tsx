@@ -41,18 +41,6 @@ export const TransactionsTable = ({ rows, onCategoryChange, onDelete }: Transact
         return <Chip size="small" variant="outlined" label={label} />;
       },
     },
-    {
-      field: "actions", headerName: "", width: 60, sortable: false, filterable: false, disableColumnMenu: true,
-      renderCell: (params: GridRenderCellParams<TransactionDTO>) => (
-        <IconButton
-          aria-label={`borrar ${params.row.merchant}`}
-          size="small"
-          onClick={() => setPendingIds([String(params.id)])}
-        >
-          <DeleteIcon fontSize="small" />
-        </IconButton>
-      ),
-    },
   ], []);
 
   const processRowUpdate = (next: GridRowModel<TransactionDTO>, prev: GridRowModel<TransactionDTO>) => {
@@ -78,13 +66,7 @@ export const TransactionsTable = ({ rows, onCategoryChange, onDelete }: Transact
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      {selectedIds.length > 0 && (
-        <Box sx={{ mb: 1 }}>
-          <Button color="error" startIcon={<DeleteIcon />} onClick={() => setPendingIds(selectedIds)}>
-            {`Borrar seleccionados (${selectedIds.length})`}
-          </Button>
-        </Box>
-      )}
+
       <DataGrid
         rows={rows}
         columns={columns}
@@ -99,6 +81,13 @@ export const TransactionsTable = ({ rows, onCategoryChange, onDelete }: Transact
         initialState={{ pagination: { paginationModel: { pageSize: 100, page: 0 } } }}
         pageSizeOptions={[25, 50, 100]}
       />
+        {selectedIds.length > 0 && (
+            <Box sx={{ mb: 1 }}>
+                <Button color="error" startIcon={<DeleteIcon />} onClick={() => setPendingIds(selectedIds)}>
+                    {`Borrar seleccionados (${selectedIds.length})`}
+                </Button>
+            </Box>
+        )}
       <ConfirmDialog
         open={pendingIds !== null}
         title="Borrar movimientos"
