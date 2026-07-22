@@ -38,6 +38,18 @@ export function computeFutureInstallments(txns: InstallmentTx[], currency: Curre
     .sort((a, b) => a.month.localeCompare(b.month));
 }
 
+type InstallmentDebtTx = Pick<InstallmentTx, "amount" | "currency" | "isInstallment" | "installmentCurrent" | "installmentTotal">;
+
+export function remainingInstallmentDebt(txns: InstallmentDebtTx[], currency: Currency): number {
+  let total = 0;
+  for (const tx of txns) {
+    if (tx.currency !== currency) continue;
+    if (!tx.isInstallment || tx.installmentCurrent === null || tx.installmentTotal === null) continue;
+    total += (tx.installmentTotal - tx.installmentCurrent) * tx.amount;
+  }
+  return total;
+}
+
 export function computeFutureInstallmentsDetail(txns: InstallmentTxDetail[], currency: Currency): FutureInstallmentMonth[] {
   const buckets = new Map<string, FutureInstallmentItem[]>();
   for (const tx of txns) {

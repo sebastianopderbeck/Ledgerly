@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeFutureInstallments, computeFutureInstallmentsDetail } from "./futureInstallments.js";
+import { computeFutureInstallments, computeFutureInstallmentsDetail, remainingInstallmentDebt } from "./futureInstallments.js";
 
 describe("computeFutureInstallments", () => {
   it("proyecta las cuotas restantes a meses futuros", () => {
@@ -69,5 +69,27 @@ describe("computeFutureInstallmentsDetail", () => {
       "ARS",
     );
     expect(res).toEqual([]);
+  });
+});
+
+describe("remainingInstallmentDebt", () => {
+  it("suma (total - actual) * monto de cada cuota", () => {
+    const total = remainingInstallmentDebt(
+      [{ amount: 1500, currency: "ARS", isInstallment: true, installmentCurrent: 2, installmentTotal: 4 }],
+      "ARS",
+    );
+    expect(total).toBe(3000);
+  });
+
+  it("ignora no-cuotas, cuotas terminadas y otra moneda", () => {
+    const total = remainingInstallmentDebt(
+      [
+        { amount: 500, currency: "ARS", isInstallment: false, installmentCurrent: null, installmentTotal: null },
+        { amount: 500, currency: "ARS", isInstallment: true, installmentCurrent: 6, installmentTotal: 6 },
+        { amount: 9, currency: "USD", isInstallment: true, installmentCurrent: 1, installmentTotal: 3 },
+      ],
+      "ARS",
+    );
+    expect(total).toBe(0);
   });
 });
