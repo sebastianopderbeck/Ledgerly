@@ -26,6 +26,20 @@ function installmentMatch(q: Record<string, unknown>): FilterQuery<TransactionDo
   return match;
 }
 
+async function latestStatementInstallmentTxs(q: Record<string, unknown>) {
+  const statementFilter = typeof q.cardLabel === "string" ? { cardLabel: q.cardLabel } : {};
+  const statements = await StatementModel.find(statementFilter).lean();
+  const ids = latestStatementIdsPerIssuer(
+    statements.map((s) => ({
+      id: s._id,
+      issuer: s.issuer,
+      closingDate: s.closingDate ?? null,
+      uploadedAt: (s as unknown as { uploadedAt: Date }).uploadedAt,
+    })),
+  );
+  return TransactionModel.find({ type: "purchase", isInstallment: true, statementId: { $in: ids } }).lean();
+}
+
 export const statsRouter = Router();
 
 statsRouter.get("/by-category", asyncHandler(async (req, res) => {
@@ -143,24 +157,13 @@ statsRouter.get("/summary", asyncHandler(async (req, res) => {
     { $match: baseMatch(q) },
     { $group: { _id: null, totalPurchases: { $sum: "$amount" }, transactionCount: { $sum: 1 } } },
   ]);
-  const statementFilter = typeof q.cardLabel === "string" ? { cardLabel: q.cardLabel } : {};
-  const statements = await StatementModel.find(statementFilter).lean();
-  const lastStatementIds = latestStatementIdsPerIssuer(
-    statements.map((s) => ({
-      id: s._id,
-      issuer: s.issuer,
-      closingDate: s.closingDate ?? null,
-      uploadedAt: (s as unknown as { uploadedAt: Date }).uploadedAt,
-    })),
-  );
-  const installmentTxs = await TransactionModel.find({
-    type: "purchase", isInstallment: true, statementId: { $in: lastStatementIds },
-  }).lean();
+  const cardLabel = q.cardLabel;
+  const installmentTxs = await latestStatementInstallmentTxs(q);
   res.json({
     currency,
     totalPurchases: agg?.totalPurchases ?? 0,
     transactionCount: agg?.transactionCount ?? 0,
-    statementCount: statements.length,
+    statementCount: await StatementModel.countDocuments(typeof cardLabel === "string" ? { cardLabel } : {}),
     futureInstallmentTotal: remainingInstallmentDebt(
       installmentTxs.map((t) => ({
         amount: t.amount, currency: t.currency as Currency,
