@@ -12,8 +12,9 @@ const tx = {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-    const body = url.includes("/transactions")
-      ? { items: [tx], total: 1, page: 1, pageSize: 50 } : {};
+    const body = url.includes("/transactions/categories") ? ["Compras", "Salud"]
+      : url.includes("/transactions") ? { items: [tx], total: 1, page: 1, pageSize: 50 }
+      : {};
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
 });
@@ -24,5 +25,15 @@ describe("TransactionsPage", () => {
     renderWithProviders(<TransactionsPage />, { route: "/transactions" });
     await waitFor(() => expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument());
     expect(screen.getByText("Compras")).toBeInTheDocument();
+  });
+
+  it("envía las categorías seleccionadas al API", async () => {
+    renderWithProviders(<TransactionsPage />, { route: "/transactions?category=Compras&category=Salud" });
+    await waitFor(() => expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument());
+    const listUrl = vi.mocked(fetch).mock.calls
+      .map((c) => String(c[0]))
+      .find((u) => u.includes("/transactions") && !u.includes("/categories"));
+    expect(listUrl).toContain("category=Compras");
+    expect(listUrl).toContain("category=Salud");
   });
 });

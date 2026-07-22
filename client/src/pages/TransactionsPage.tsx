@@ -11,10 +11,9 @@ export const TransactionsPage = () => {
     currency: (params.get("currency") as "ARS" | "USD") ?? undefined,
     from: params.get("from") ?? undefined,
     to: params.get("to") ?? undefined,
-    category: params.get("category") ?? undefined,
+    category: params.getAll("category"),
     search: params.get("search") ?? undefined,
     cardLabel: params.get("cardLabel") ?? undefined,
-    pageSize: 100,
   };
   const { data, isLoading, isError, error } = useTransactions(filters);
 

@@ -10,7 +10,13 @@ export interface StatFilters { currency: "ARS" | "USD"; from?: string; to?: stri
 function qs(params: object): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (item !== undefined && item !== null && item !== "") sp.append(k, String(item));
+      }
+    } else if (v !== undefined && v !== null && v !== "") {
+      sp.set(k, String(v));
+    }
   }
   const s = sp.toString();
   return s ? `?${s}` : "";
@@ -49,7 +55,7 @@ export function useDeleteStatement() {
 }
 
 export interface TxFilters extends Partial<StatFilters> {
-  category?: string; issuer?: string; search?: string; page?: number; pageSize?: number;
+  category?: string[]; issuer?: string; search?: string; page?: number; pageSize?: number;
 }
 
 export function useTransactions(filters: TxFilters) {
@@ -58,6 +64,10 @@ export function useTransactions(filters: TxFilters) {
     queryFn: () =>
       apiFetch<{ items: TransactionDTO[]; total: number; page: number; pageSize: number }>(`/transactions${qs(filters)}`),
   });
+}
+
+export function useCategories() {
+  return useQuery({ queryKey: ["categories"], queryFn: () => apiFetch<string[]>("/transactions/categories") });
 }
 
 export function usePatchTransaction() {
