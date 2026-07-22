@@ -129,7 +129,7 @@ statsRouter.get("/top-merchants", asyncHandler(async (req, res) => {
 
 statsRouter.get("/future-installments", asyncHandler(async (req, res) => {
   const currency: Currency = req.query.currency === "USD" ? "USD" : "ARS";
-  const txs = await TransactionModel.find(installmentMatch(req.query as Record<string, unknown>)).lean();
+  const txs = await latestStatementInstallmentTxs(req.query as Record<string, unknown>);
   const mapped = txs.map((t) => ({
     date: t.date.toISOString().slice(0, 10),
     amount: t.amount, currency: t.currency as Currency,

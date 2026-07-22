@@ -65,6 +65,25 @@ describe("stats", () => {
     expect(res.body).toEqual([{ month: "2026-06", total: 1500 }, { month: "2026-07", total: 1500 }]);
   });
 
+  it("future-installments no duplica cuotas con varios resúmenes", async () => {
+    const older = await StatementModel.create({
+      issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-06-02"), dueDate: null,
+      totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+        pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
+      sourceFileName: "old.pdf", sourceHash: "hf1", pageCount: 1, parserVersion: "1.0.0",
+      needsReview: false, reconciliation: { ok: true, entries: [] },
+    });
+    await TransactionModel.create({
+      statementId: older._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-04"),
+      descriptionRaw: "MERCADOLIBRE", merchant: "MERCADOLIBRE", category: "Compras", categorySource: "rule",
+      amount: 1500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
+      installmentCurrent: 1, installmentTotal: 4, comprobante: "1b", fingerprint: "f1b",
+    });
+    const res = await request(app).get("/api/stats/future-installments?currency=ARS");
+    const total = res.body.reduce((acc: number, m: { total: number }) => acc + m.total, 0);
+    expect(total).toBe(3000);
+  });
+
   it("summary", async () => {
     const res = await request(app).get("/api/stats/summary?currency=ARS");
     expect(res.body.totalPurchases).toBe(2000);
