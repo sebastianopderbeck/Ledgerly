@@ -1,5 +1,5 @@
-import type { AutoCouponDTO, CategoryRuleDTO, MortgageCouponDTO, PayslipDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
-import type { AutoCouponDoc, CategoryRuleDoc, MortgageCouponDoc, PayslipDoc, StatementDoc, TransactionDoc } from "../db/models.js";
+import type { AutoCouponDTO, CategoryRuleDTO, InflationRateDTO, MortgageCouponDTO, PayslipDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
+import type { AutoCouponDoc, CategoryRuleDoc, InflationRateDoc, MortgageCouponDoc, PayslipDoc, StatementDoc, TransactionDoc } from "../db/models.js";
 import type { HydratedDocument } from "mongoose";
 
 const isoDate = (d: Date | null): string | null => (d ? d.toISOString().slice(0, 10) : null);
@@ -115,4 +115,8 @@ export function toPayslipDTO(doc: HydratedDocument<PayslipDoc>): PayslipDTO {
     tipoCambioSource: (doc.tipoCambioSource ?? null) as PayslipDTO["tipoCambioSource"],
     netoUsd: doc.tipoCambioUsd ? doc.neto / doc.tipoCambioUsd : null,
   };
+}
+
+export function toInflationRateDTO(doc: HydratedDocument<InflationRateDoc>): InflationRateDTO {
+  return { periodo: doc.periodo, variacionMensual: doc.variacionMensual };
 }

@@ -135,12 +135,18 @@ const payslipSchema = new Schema(
 );
 payslipSchema.index({ cuil: 1, periodo: 1 }, { unique: true });
 
+const inflationRateSchema = new Schema({
+  periodo: { type: String, required: true, unique: true, index: true },
+  variacionMensual: { type: Number, required: true },
+});
+
 export type StatementDoc = InferSchemaType<typeof statementSchema>;
 export type TransactionDoc = InferSchemaType<typeof transactionSchema>;
 export type CategoryRuleDoc = InferSchemaType<typeof categoryRuleSchema>;
 export type MortgageCouponDoc = InferSchemaType<typeof mortgageCouponSchema>;
 export type AutoCouponDoc = InferSchemaType<typeof autoCouponSchema>;
 export type PayslipDoc = InferSchemaType<typeof payslipSchema>;
+export type InflationRateDoc = InferSchemaType<typeof inflationRateSchema>;
 
 export const StatementModel: Model<StatementDoc> =
   mongoose.models.Statement ?? mongoose.model("Statement", statementSchema);
@@ -154,3 +160,5 @@ export const AutoCouponModel: Model<AutoCouponDoc> =
   mongoose.models.AutoCoupon ?? mongoose.model("AutoCoupon", autoCouponSchema);
 export const PayslipModel: Model<PayslipDoc> =
   mongoose.models.Payslip ?? mongoose.model("Payslip", payslipSchema);
+export const InflationRateModel: Model<InflationRateDoc> =
+  mongoose.models.InflationRate ?? mongoose.model("InflationRate", inflationRateSchema);

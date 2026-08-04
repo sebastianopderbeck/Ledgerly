@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mortgageCouponDtoSchema, creditSummaryDtoSchema, importResultUnionSchema } from "./dtos.js";
+import { mortgageCouponDtoSchema, creditSummaryDtoSchema, importResultUnionSchema, inflationRateDtoSchema } from "./dtos.js";
 
 describe("mortgageCouponDtoSchema", () => {
   it("valida un cupón", () => {
@@ -11,6 +11,13 @@ describe("mortgageCouponDtoSchema", () => {
       tipoCambioUsd: 1350.5, tipoCambioSource: "api", totalUsd: 1044.58,
     };
     expect(mortgageCouponDtoSchema.parse(dto)).toEqual(dto);
+  });
+});
+
+describe("inflationRateDtoSchema", () => {
+  it("valida un punto de inflación mensual", () => {
+    const dto = { periodo: "2025-01", variacionMensual: 2.2 };
+    expect(inflationRateDtoSchema.parse(dto)).toEqual(dto);
   });
 });
 

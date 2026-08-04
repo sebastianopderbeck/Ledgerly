@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { withDb } from "../testing/withDb.js";
-import { StatementModel, TransactionModel } from "../db/models.js";
-import { toStatementDTO, toTransactionDTO } from "./mappers.js";
-import { statementDtoSchema, transactionDtoSchema } from "@ledgerly/shared";
+import { StatementModel, TransactionModel, InflationRateModel } from "../db/models.js";
+import { toStatementDTO, toTransactionDTO, toInflationRateDTO } from "./mappers.js";
+import { statementDtoSchema, transactionDtoSchema, inflationRateDtoSchema } from "@ledgerly/shared";
 
 withDb();
 
@@ -37,5 +37,11 @@ describe("mappers", () => {
     const dto = toStatementDTO(s, 3);
     expect(() => statementDtoSchema.parse(dto)).not.toThrow();
     expect(dto.transactionCount).toBe(3);
+  });
+
+  it("toInflationRateDTO cumple el schema", async () => {
+    const doc = await InflationRateModel.create({ periodo: "2025-01", variacionMensual: 2.2 });
+    const dto = toInflationRateDTO(doc);
+    expect(inflationRateDtoSchema.parse(dto)).toEqual({ periodo: "2025-01", variacionMensual: 2.2 });
   });
 });

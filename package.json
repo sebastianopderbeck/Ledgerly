@@ -17,6 +17,7 @@
     "seed:auto": "tsx server/src/import/seedAutoCoupons.ts",
     "seed:fx:auto": "tsx server/src/import/backfillAutoRates.ts",
     "seed:sueldo": "tsx server/src/import/seedPayslips.ts",
+    "seed:inflation": "tsx server/src/import/backfillInflation.ts",
     "seed:fingerprints": "tsx server/src/import/backfillFingerprints.ts"
   },
   "devDependencies": {

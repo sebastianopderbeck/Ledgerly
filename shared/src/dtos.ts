@@ -200,6 +200,11 @@ export const oficialRateDtoSchema = z.object({
   source: z.literal("oficial"),
 });
 
+export const inflationRateDtoSchema = z.object({
+  periodo: z.string(),
+  variacionMensual: z.number(),
+});
+
 export const monthlyUsdStatSchema = z.object({
   month: z.string(),
   totalArs: z.number(),
@@ -260,3 +265,4 @@ export type MonthlyUsdStat = z.infer<typeof monthlyUsdStatSchema>;
 export type PayslipConceptoDTO = z.infer<typeof payslipConceptoSchema>;
 export type PayslipDTO = z.infer<typeof payslipDtoSchema>;
 export type PayslipSummaryDTO = z.infer<typeof payslipSummaryDtoSchema>;
+export type InflationRateDTO = z.infer<typeof inflationRateDtoSchema>;
