@@ -159,6 +159,41 @@ export const autoSummaryDtoSchema = z.object({
   fechaUltimoVencimiento: z.string(),
 });
 
+export const payslipConceptoSchema = z.object({
+  codigo: z.string(),
+  label: z.string(),
+  tipo: z.enum(["remunerativo", "no_remunerativo", "descuento"]),
+  monto: z.number(),
+});
+
+export const payslipDtoSchema = z.object({
+  id: z.string(),
+  periodo: z.string(),
+  fechaPago: z.string(),
+  cuil: z.string(),
+  conceptos: z.array(payslipConceptoSchema),
+  remunerativo: z.number(),
+  noRemunerativo: z.number(),
+  descuentos: z.number(),
+  brutoTotal: z.number(),
+  neto: z.number(),
+  costoTotalEmpleador: z.number().nullable(),
+  tipoCambioUsd: z.number().nullable(),
+  tipoCambioSource: z.enum(["api", "manual"]).nullable(),
+  netoUsd: z.number().nullable(),
+});
+
+export const payslipSummaryDtoSchema = z.object({
+  periodos: z.number().int(),
+  ultimoPeriodo: z.string(),
+  ultimoNeto: z.number(),
+  ultimoNetoUsd: z.number().nullable(),
+  ultimoBruto: z.number(),
+  variacionNetoMensual: z.number(),
+  porcentajeDescuentos: z.number(),
+  netoAcumuladoAnio: z.number(),
+});
+
 export const oficialRateDtoSchema = z.object({
   date: z.string(),
   rate: z.number().nullable(),
@@ -190,10 +225,17 @@ export const autoImportResultSchema = z.object({
   coupon: autoCouponDtoSchema,
 });
 
+export const payslipImportResultSchema = z.object({
+  kind: z.literal("payslip"),
+  status: z.enum(["imported", "duplicate"]),
+  payslip: payslipDtoSchema,
+});
+
 export const importResultUnionSchema = z.discriminatedUnion("kind", [
   couponImportResultSchema,
   statementImportResultSchema,
   autoImportResultSchema,
+  payslipImportResultSchema,
 ]);
 
 export type TransactionDTO = z.infer<typeof transactionDtoSchema>;
@@ -215,3 +257,6 @@ export type AutoCouponDTO = z.infer<typeof autoCouponDtoSchema>;
 export type AutoSummaryDTO = z.infer<typeof autoSummaryDtoSchema>;
 export type OficialRateDTO = z.infer<typeof oficialRateDtoSchema>;
 export type MonthlyUsdStat = z.infer<typeof monthlyUsdStatSchema>;
+export type PayslipConceptoDTO = z.infer<typeof payslipConceptoSchema>;
+export type PayslipDTO = z.infer<typeof payslipDtoSchema>;
+export type PayslipSummaryDTO = z.infer<typeof payslipSummaryDtoSchema>;

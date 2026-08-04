@@ -104,11 +104,43 @@ const autoCouponSchema = new Schema(
 );
 autoCouponSchema.index({ grupo: 1, orden: 1, cuotaNro: 1 }, { unique: true });
 
+const payslipConceptoSchema = new Schema(
+  {
+    codigo: { type: String, required: true },
+    label: { type: String, required: true },
+    tipo: { type: String, required: true, enum: ["remunerativo", "no_remunerativo", "descuento"] },
+    monto: { type: Number, required: true },
+  },
+  { _id: false },
+);
+
+const payslipSchema = new Schema(
+  {
+    periodo: { type: String, required: true, index: true },
+    fechaPago: { type: Date, required: true },
+    cuil: { type: String, required: true },
+    conceptos: { type: [payslipConceptoSchema], default: [] },
+    remunerativo: { type: Number, required: true },
+    noRemunerativo: { type: Number, required: true },
+    descuentos: { type: Number, required: true },
+    brutoTotal: { type: Number, required: true },
+    neto: { type: Number, required: true },
+    costoTotalEmpleador: { type: Number, default: null },
+    tipoCambioUsd: { type: Number, default: null },
+    tipoCambioSource: { type: String, enum: ["api", "manual", null], default: null },
+    sourceFileName: { type: String, required: true },
+    sourceHash: { type: String, required: true },
+  },
+  { timestamps: { createdAt: "uploadedAt", updatedAt: false } },
+);
+payslipSchema.index({ cuil: 1, periodo: 1 }, { unique: true });
+
 export type StatementDoc = InferSchemaType<typeof statementSchema>;
 export type TransactionDoc = InferSchemaType<typeof transactionSchema>;
 export type CategoryRuleDoc = InferSchemaType<typeof categoryRuleSchema>;
 export type MortgageCouponDoc = InferSchemaType<typeof mortgageCouponSchema>;
 export type AutoCouponDoc = InferSchemaType<typeof autoCouponSchema>;
+export type PayslipDoc = InferSchemaType<typeof payslipSchema>;
 
 export const StatementModel: Model<StatementDoc> =
   mongoose.models.Statement ?? mongoose.model("Statement", statementSchema);
@@ -120,3 +152,5 @@ export const MortgageCouponModel: Model<MortgageCouponDoc> =
   mongoose.models.MortgageCoupon ?? mongoose.model("MortgageCoupon", mortgageCouponSchema);
 export const AutoCouponModel: Model<AutoCouponDoc> =
   mongoose.models.AutoCoupon ?? mongoose.model("AutoCoupon", autoCouponSchema);
+export const PayslipModel: Model<PayslipDoc> =
+  mongoose.models.Payslip ?? mongoose.model("Payslip", payslipSchema);

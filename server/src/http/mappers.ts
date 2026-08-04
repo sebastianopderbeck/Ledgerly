@@ -1,5 +1,5 @@
-import type { AutoCouponDTO, CategoryRuleDTO, MortgageCouponDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
-import type { AutoCouponDoc, CategoryRuleDoc, MortgageCouponDoc, StatementDoc, TransactionDoc } from "../db/models.js";
+import type { AutoCouponDTO, CategoryRuleDTO, MortgageCouponDTO, PayslipDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
+import type { AutoCouponDoc, CategoryRuleDoc, MortgageCouponDoc, PayslipDoc, StatementDoc, TransactionDoc } from "../db/models.js";
 import type { HydratedDocument } from "mongoose";
 
 const isoDate = (d: Date | null): string | null => (d ? d.toISOString().slice(0, 10) : null);
@@ -95,5 +95,24 @@ export function toAutoCouponDTO(doc: HydratedDocument<AutoCouponDoc>): AutoCoupo
     tipoCambioUsd: doc.tipoCambioUsd ?? null,
     tipoCambioSource: (doc.tipoCambioSource ?? null) as AutoCouponDTO["tipoCambioSource"],
     totalUsd: doc.tipoCambioUsd ? doc.totalAPagar / doc.tipoCambioUsd : null,
+  };
+}
+
+export function toPayslipDTO(doc: HydratedDocument<PayslipDoc>): PayslipDTO {
+  return {
+    id: doc._id.toString(),
+    periodo: doc.periodo,
+    fechaPago: doc.fechaPago.toISOString().slice(0, 10),
+    cuil: doc.cuil,
+    conceptos: doc.conceptos.map((c) => ({ codigo: c.codigo, label: c.label, tipo: c.tipo as PayslipDTO["conceptos"][number]["tipo"], monto: c.monto })),
+    remunerativo: doc.remunerativo,
+    noRemunerativo: doc.noRemunerativo,
+    descuentos: doc.descuentos,
+    brutoTotal: doc.brutoTotal,
+    neto: doc.neto,
+    costoTotalEmpleador: doc.costoTotalEmpleador ?? null,
+    tipoCambioUsd: doc.tipoCambioUsd ?? null,
+    tipoCambioSource: (doc.tipoCambioSource ?? null) as PayslipDTO["tipoCambioSource"],
+    netoUsd: doc.tipoCambioUsd ? doc.neto / doc.tipoCambioUsd : null,
   };
 }

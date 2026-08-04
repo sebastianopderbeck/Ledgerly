@@ -13,6 +13,7 @@ const NAV = [
   { to: "/installments", label: "Cuotas" },
   { to: "/credits", label: "Créditos" },
   { to: "/auto", label: "Auto" },
+  { to: "/sueldo", label: "Sueldo" },
   { to: "/transactions", label: "Movimientos" },
   { to: "/rules", label: "Reglas" },
   { to: "/import", label: "Importar" },

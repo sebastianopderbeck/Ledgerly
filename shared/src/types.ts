@@ -61,3 +61,30 @@ export interface AutoCouponParser {
   detect(text: string, meta: PdfMeta): boolean;
   parse(text: string, meta: PdfMeta): ParsedAutoCoupon;
 }
+
+export type PayslipConceptoTipo = "remunerativo" | "no_remunerativo" | "descuento";
+
+export interface ParsedPayslipConcepto {
+  codigo: string;
+  label: string;
+  tipo: PayslipConceptoTipo;
+  monto: number;
+}
+
+export interface ParsedPayslip {
+  periodo: string;
+  fechaPago: string;
+  cuil: string;
+  conceptos: ParsedPayslipConcepto[];
+  remunerativo: number;
+  noRemunerativo: number;
+  descuentos: number;
+  brutoTotal: number;
+  neto: number;
+  costoTotalEmpleador: number | null;
+}
+
+export interface PayslipParser {
+  detect(text: string, meta: PdfMeta): boolean;
+  parse(text: string, meta: PdfMeta): ParsedPayslip;
+}

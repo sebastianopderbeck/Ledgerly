@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
-  ImportResultUnionDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, StatementDTO, SummaryStat, TransactionDTO,
+  ImportResultUnionDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, SummaryStat, TransactionDTO,
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
 
@@ -181,6 +181,21 @@ export function usePatchAutoRate() {
   return useMutation({
     mutationFn: ({ id, tipoCambioUsd }: { id: string; tipoCambioUsd: number }) =>
       apiFetch<AutoCouponDTO>(`/auto/coupons/${id}`, { method: "PATCH", body: JSON.stringify({ tipoCambioUsd }) }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function usePayslips() {
+  return useQuery({ queryKey: ["payslips"], queryFn: () => apiFetch<PayslipDTO[]>("/payslips") });
+}
+export function usePayslipSummary() {
+  return useQuery({ queryKey: ["payslip-summary"], queryFn: () => apiFetch<PayslipSummaryDTO>("/payslips/summary") });
+}
+export function usePatchPayslipRate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tipoCambioUsd }: { id: string; tipoCambioUsd: number }) =>
+      apiFetch<PayslipDTO>(`/payslips/${id}`, { method: "PATCH", body: JSON.stringify({ tipoCambioUsd }) }),
     onSuccess: () => qc.invalidateQueries(),
   });
 }

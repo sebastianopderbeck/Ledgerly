@@ -32,3 +32,10 @@ export class InvalidAutoCouponError extends Error {
     this.name = "InvalidAutoCouponError";
   }
 }
+
+export class InvalidPayslipError extends Error {
+  constructor() {
+    super("El recibo de sueldo tiene un formato inesperado");
+    this.name = "InvalidPayslipError";
+  }
+}

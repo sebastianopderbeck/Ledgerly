@@ -12,6 +12,7 @@ import { InstallmentsPage } from "./pages/InstallmentsPage.js";
 import { RulesPage } from "./pages/RulesPage.js";
 import { CreditsPage } from "./pages/CreditsPage.js";
 import { AutoPage } from "./pages/AutoPage.js";
+import { PayslipsPage } from "./pages/PayslipsPage.js";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -25,6 +26,7 @@ const AnimatedRoutes = () => {
         <Route path="/import" element={<PageTransition><ImportPage /></PageTransition>} />
         <Route path="/credits" element={<PageTransition><CreditsPage /></PageTransition>} />
         <Route path="/auto" element={<PageTransition><AutoPage /></PageTransition>} />
+        <Route path="/sueldo" element={<PageTransition><PayslipsPage /></PageTransition>} />
         <Route path="/transactions" element={<PageTransition><TransactionsPage /></PageTransition>} />
         <Route path="/installments" element={<PageTransition><InstallmentsPage /></PageTransition>} />
       </Routes>
