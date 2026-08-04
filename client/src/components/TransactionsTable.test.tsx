@@ -29,27 +29,27 @@ const setup = () => {
 };
 
 describe("TransactionsTable borrado", () => {
-  it("el ícono de fila + confirmar llama onDelete con ese id", async () => {
-    const onDelete = setup();
-    await userEvent.click(screen.getByRole("button", { name: /borrar MERCADOLIBRE/i }));
-    await userEvent.click(screen.getByRole("button", { name: "Borrar" }));
-    expect(onDelete).toHaveBeenCalledWith(["1"]);
+  it("sin selección no muestra el botón de borrar seleccionados", () => {
+    setup();
+    expect(screen.queryByRole("button", { name: /borrar seleccionados/i })).not.toBeInTheDocument();
   });
 
-  it("cancelar no llama onDelete", async () => {
-    const onDelete = setup();
-    await userEvent.click(screen.getByRole("button", { name: /borrar SU PAGO/i }));
-    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(onDelete).not.toHaveBeenCalled();
-  });
-
-  it("selección múltiple + borrar seleccionados + confirmar llama onDelete con los ids", async () => {
+  it("selección + borrar seleccionados + confirmar llama onDelete con los ids", async () => {
     const onDelete = setup();
     const checkboxes = screen.getAllByRole("checkbox");
     await userEvent.click(checkboxes[1]);
     await userEvent.click(screen.getByRole("button", { name: /borrar seleccionados \(1\)/i }));
     await userEvent.click(screen.getByRole("button", { name: "Borrar" }));
     expect(onDelete).toHaveBeenCalledWith(["1"]);
+  });
+
+  it("cancelar no llama onDelete", async () => {
+    const onDelete = setup();
+    const checkboxes = screen.getAllByRole("checkbox");
+    await userEvent.click(checkboxes[1]);
+    await userEvent.click(screen.getByRole("button", { name: /borrar seleccionados \(1\)/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(onDelete).not.toHaveBeenCalled();
   });
 });
 

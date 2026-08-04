@@ -37,11 +37,13 @@ describe("TransactionsPage", () => {
     expect(listUrl).toContain("category=Salud");
   });
 
-  it("borrar una fila y confirmar dispara POST /transactions/delete con el id", async () => {
+  it("seleccionar una fila y confirmar dispara POST /transactions/delete con el id", async () => {
     const { default: userEvent } = await import("@testing-library/user-event");
     renderWithProviders(<TransactionsPage />, { route: "/transactions" });
     await waitFor(() => expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: /borrar MERCADOLIBRE/i }));
+    const checkboxes = screen.getAllByRole("checkbox");
+    await userEvent.click(checkboxes[1]);
+    await userEvent.click(screen.getByRole("button", { name: /borrar seleccionados \(1\)/i }));
     await userEvent.click(screen.getByRole("button", { name: "Borrar" }));
     await waitFor(() => {
       const call = vi.mocked(fetch).mock.calls.find(
