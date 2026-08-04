@@ -11,7 +11,8 @@ const COSTO_EMPLEADOR = /COSTO TOTAL EMPLEADOR\s*\$?\s*(\d[\d.]*,\d{2})/i;
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
-function clasificar(codigo: string): PayslipConceptoTipo | null {
+function clasificar(codigo: string, label: string): PayslipConceptoTipo | null {
+  if (/OBRA\s+SOCIAL/i.test(label)) return "descuento";
   if (codigo.startsWith("05")) return null;
   if (codigo.startsWith("04")) return "descuento";
   if (codigo === "9999") return "no_remunerativo";
@@ -25,13 +26,16 @@ function parseConceptos(text: string): ParsedPayslipConcepto[] {
 
   for (let i = 0; i < starts.length; i += 1) {
     const { codigo, index } = starts[i];
-    const tipo = clasificar(codigo);
-    if (!tipo || porCodigo.has(codigo)) continue;
+    if (porCodigo.has(codigo)) continue;
 
     const end = i + 1 < starts.length ? starts[i + 1].index : flat.length;
     const segment = flat.slice(index + codigo.length, end);
     const match = segment.match(SEGMENT);
     if (!match) continue;
+
+    const label = match[1].replace(/\s+\d{1,3}$/, "").trim();
+    const tipo = clasificar(codigo, label);
+    if (!tipo) continue;
 
     const amounts = match[2].match(AR_AMOUNT) ?? [];
     const raw = amounts[amounts.length - 1];
@@ -39,7 +43,7 @@ function parseConceptos(text: string): ParsedPayslipConcepto[] {
     const signo = raw.trim().startsWith("-") ? -1 : 1;
     porCodigo.set(codigo, {
       codigo,
-      label: match[1].replace(/\s+\d{1,3}$/, "").trim(),
+      label,
       tipo,
       monto: round2(signo * parseArAmount(raw).amount),
     });

@@ -2,6 +2,42 @@ import type { PayslipDTO } from "@ledgerly/shared";
 
 export const byPeriodo = (a: PayslipDTO, b: PayslipDTO): number => a.periodo.localeCompare(b.periodo);
 
+const MONTHS_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+export function payslipYears(payslips: PayslipDTO[]): string[] {
+  return [...new Set(payslips.map((payslip) => payslip.periodo.slice(0, 4)))].sort();
+}
+
+export function monthLabel(periodo: string): string {
+  return MONTHS_SHORT[Number(periodo.slice(5, 7)) - 1] ?? periodo;
+}
+
+const ACCENTS: Record<string, string> = { Á: "A", É: "E", Í: "I", Ó: "O", Ú: "U", Ü: "U", Ñ: "N" };
+
+const normalizeLabel = (label: string): string =>
+  label.toUpperCase().replace(/[ÁÉÍÓÚÜÑ]/g, (char) => ACCENTS[char] ?? char);
+
+export interface DescuentoTotal {
+  ars: number;
+  usd: number;
+}
+
+export function sumDescuento(
+  payslips: PayslipDTO[],
+  match: (normalizedLabel: string) => boolean,
+): DescuentoTotal {
+  let ars = 0;
+  let usd = 0;
+  for (const payslip of payslips) {
+    const monto = payslip.conceptos
+      .filter((concepto) => concepto.tipo === "descuento" && match(normalizeLabel(concepto.label)))
+      .reduce((acc, concepto) => acc + concepto.monto, 0);
+    ars += monto;
+    if (payslip.tipoCambioUsd) usd += monto / payslip.tipoCambioUsd;
+  }
+  return { ars, usd };
+}
+
 export function uniqueConceptLabels(payslips: PayslipDTO[]): string[] {
   const labels: string[] = [];
   for (const payslip of payslips) {

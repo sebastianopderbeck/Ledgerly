@@ -1,19 +1,23 @@
 import { ResponsiveBar } from "@nivo/bar";
 import { Box, Typography, useTheme } from "@mui/material";
-import { usePayslips } from "../../api/hooks.js";
+import type { PayslipDTO } from "@ledgerly/shared";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
-import { byPeriodo } from "../../payslipConcepts.js";
+import { byPeriodo, monthLabel } from "../../payslipConcepts.js";
 
 const KEYS = ["Bruto", "Neto"];
 
-export const PayslipGrossNetChart = () => {
-  const theme = useTheme();
-  const { data } = usePayslips();
-  if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
+interface PayslipGrossNetChartProps {
+  payslips: PayslipDTO[];
+  monthOnly?: boolean;
+}
 
-  const rows = [...data]
+export const PayslipGrossNetChart = ({ payslips, monthOnly = false }: PayslipGrossNetChartProps) => {
+  const theme = useTheme();
+  if (payslips.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
+
+  const rows = [...payslips]
     .sort(byPeriodo)
     .map((p) => ({ month: p.periodo, Bruto: p.brutoTotal, Neto: p.neto }));
   const colors = [seriesColor(theme.palette.mode, 1), seriesColor(theme.palette.mode, 2)];
@@ -34,7 +38,12 @@ export const PayslipGrossNetChart = () => {
         enableLabel={false}
         enableGridX={false}
         valueFormat={(value) => formatMoney(value, "ARS")}
-        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45 }}
+        axisBottom={{
+          tickSize: 0,
+          tickPadding: 10,
+          tickRotation: monthOnly ? 0 : -45,
+          format: monthOnly ? (value) => monthLabel(String(value)) : undefined,
+        }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
         legends={[{
           dataFrom: "keys",

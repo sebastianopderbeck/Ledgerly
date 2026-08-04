@@ -1,17 +1,21 @@
 import { ResponsiveBar } from "@nivo/bar";
 import { Box, Typography, useTheme } from "@mui/material";
-import { usePayslips } from "../../api/hooks.js";
+import type { PayslipDTO } from "@ledgerly/shared";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
-import { buildCompositionData, rawKey } from "../../payslipConcepts.js";
+import { buildCompositionData, monthLabel, rawKey } from "../../payslipConcepts.js";
 
-export const PayslipCompositionChart = () => {
+interface PayslipCompositionChartProps {
+  payslips: PayslipDTO[];
+  monthOnly?: boolean;
+}
+
+export const PayslipCompositionChart = ({ payslips, monthOnly = false }: PayslipCompositionChartProps) => {
   const theme = useTheme();
-  const { data } = usePayslips();
-  if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
+  if (payslips.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
-  const { labels, rows } = buildCompositionData(data);
+  const { labels, rows } = buildCompositionData(payslips);
   const colors = labels.map((_, index) => seriesColor(theme.palette.mode, index));
   const chartTheme = nivoTheme(theme);
 
@@ -27,7 +31,12 @@ export const PayslipCompositionChart = () => {
         padding={0.35}
         enableLabel={false}
         enableGridX={false}
-        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45 }}
+        axisBottom={{
+          tickSize: 0,
+          tickPadding: 10,
+          tickRotation: monthOnly ? 0 : -45,
+          format: monthOnly ? (value) => monthLabel(String(value)) : undefined,
+        }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
         tooltip={({ id, color, data: row }) => (
           <div style={{ ...chartTheme.tooltip?.container, display: "flex", alignItems: "center", gap: 8 }}>

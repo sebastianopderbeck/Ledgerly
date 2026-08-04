@@ -7,22 +7,21 @@ import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { byPeriodo, monthLabel } from "../../payslipConcepts.js";
 
-interface PayslipNetoUsdChartProps {
+interface PayslipNetoArsChartProps {
   payslips: PayslipDTO[];
   monthOnly?: boolean;
 }
 
-export const PayslipNetoUsdChart = ({ payslips, monthOnly = false }: PayslipNetoUsdChartProps) => {
+export const PayslipNetoArsChart = ({ payslips, monthOnly = false }: PayslipNetoArsChartProps) => {
   const theme = useTheme();
-  const points = payslips
-    .filter((p) => p.netoUsd != null)
+  if (payslips.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
+
+  const points = [...payslips]
     .sort(byPeriodo)
-    .map((p) => ({ x: p.periodo, y: p.netoUsd as number }));
+    .map((p) => ({ x: p.periodo, y: p.neto }));
 
-  if (points.length === 0) return <Typography color="text.secondary">Sin datos de dólar</Typography>;
-
-  const color = seriesColor(theme.palette.mode, 8);
-  const series = [{ id: "Neto en USD", data: points }];
+  const color = seriesColor(theme.palette.mode, 2);
+  const series = [{ id: "Neto en pesos", data: points }];
 
   return (
     <Box sx={{ height: 260 }}>
@@ -41,11 +40,11 @@ export const PayslipNetoUsdChart = ({ payslips, monthOnly = false }: PayslipNeto
         pointBorderColor={{ from: "serieColor" }}
         enableArea
         areaOpacity={1}
-        defs={[linearGradientDef("payslipUsdArea", [
+        defs={[linearGradientDef("payslipArsArea", [
           { offset: 0, color: "inherit", opacity: 0.35 },
           { offset: 100, color: "inherit", opacity: 0 },
         ])]}
-        fill={[{ match: "*", id: "payslipUsdArea" }]}
+        fill={[{ match: "*", id: "payslipArsArea" }]}
         enableGridX={false}
         axisBottom={{
           tickSize: 0,
@@ -53,8 +52,8 @@ export const PayslipNetoUsdChart = ({ payslips, monthOnly = false }: PayslipNeto
           tickRotation: monthOnly ? 0 : -45,
           format: monthOnly ? (value) => monthLabel(String(value)) : undefined,
         }}
-        axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "USD") }}
-        yFormat={(value) => formatMoney(Number(value), "USD")}
+        axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
+        yFormat={(value) => formatMoney(Number(value), "ARS")}
         useMesh
         motionConfig="gentle"
       />
