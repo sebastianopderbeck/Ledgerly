@@ -1,15 +1,35 @@
 import type { AutoCouponParser, ParsedAutoConcept, ParsedAutoCoupon } from "@ledgerly/shared";
 import { parseArAmount, parseSlashDate } from "./normalize.js";
 
+const flex = (keyword: string): string => keyword.replace(/\s+/g, "").split("").join("\\s*");
+
 const MARKER = "Ahorro para Fines Determinados";
-const HEADER = /GRUPO\s+(\d+)\s+ORDEN\s+(\d+)\s+CUOTA\s+(\d+)\s+PLAN\s+(\w+)/;
+const HEADER = new RegExp(`${flex("GRUPO")}\\s+(\\d+)\\s+${flex("ORDEN")}\\s+(\\d+)\\s+${flex("CUOTA")}\\s+(\\d+)\\s+${flex("PLAN")}\\s+(\\w+)`);
 const EMISION = /Fecha de Emisión\s+(\d{2}\/\d{2}\/\d{4})/;
-const VENCIMIENTO = /VENCIMIENTO\s+(\d{2}\/\d{2}\/\d{4})/;
+const VENCIMIENTO = new RegExp(`${flex("VENCIMIENTO")}\\s+(\\d{2}\\/\\d{2}\\/\\d{4})`);
 const COMPROBANTE = /Comprobante Nro\.:\s*(\d+)/;
-const TOTAL = /TOTAL A PAGAR\s+\$\s*(\d[\d.]*,\d{2})/;
+const TOTAL = new RegExp(`${flex("TOTAL A PAGAR")}\\s+\\$\\s*(\\d[\\d.]*,\\d{2})`);
 const VALOR = /A fecha emisión de esta cuota\s+\$\s*(\d[\d.]*,\d{2})/;
 const MODELO = /Modelo de ahorro a fecha de emisión\s+(.+?)\./;
 const CONCEPT = /([A-ZÁÉÍÓÚ][^$\n]*?)\s+\$\s*(-\s*)?(\d[\d.]*,\d{2})/g;
+
+const CANONICAL_CONCEPTS = [
+  "ANTICIPO ALICUOTA (AL)",
+  "PORCION DE ALICUOTA DIFERIDA",
+  "IVA SOBRE CONCEPTOS GRAVADOS",
+  "RECUP IMP BANCARIOS LEY 25413",
+  "DER. INSCRIP.PRORR. HIST (DIP)",
+  "GASTOS ADMINISTRATIVOS",
+  "SEGURO DE VIDA (SV)",
+  "DIFERIMIENTO COMERCIAL",
+  "ACTUALIZACIÓN VALOR HIST.DIP",
+  "GASTOS DE SELLADO PRORR (GSP)",
+  "ACTUALIZACIÓN VALOR HIST.GSP",
+  "RECUPERO DIFERIDO (RD)",
+];
+
+const conceptKey = (label: string): string => label.toUpperCase().replace(/[^A-Z0-9]/g, "");
+const CANONICAL_BY_KEY = new Map(CANONICAL_CONCEPTS.map((c) => [conceptKey(c), c]));
 
 function required(flat: string, re: RegExp, field: string): string {
   const m = flat.match(re);
@@ -18,8 +38,9 @@ function required(flat: string, re: RegExp, field: string): string {
 }
 
 function normalizeLabel(raw: string): string {
-  const label = raw.replace(/\s+/g, " ").trim();
-  return label.replace(/^(DIFERIMIENTO COMERCIAL)\s+\d+$/, "$1");
+  const label = raw.replace(/\s+/g, " ").trim().replace(/^(DIFERIMIENTO COMERCIAL)\s+\d+$/, "$1");
+  const key = conceptKey(label);
+  return CANONICAL_BY_KEY.get(key) ?? CANONICAL_BY_KEY.get(key.replace(/\d+$/, "")) ?? label;
 }
 
 function parseConceptos(block: string): ParsedAutoConcept[] {

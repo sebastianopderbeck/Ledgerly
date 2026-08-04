@@ -58,3 +58,31 @@ describe("autoPlanParser.parse — normalización de labels", () => {
     expect(diferimiento?.amount).toBe(-66856.69);
   });
 });
+
+describe("autoPlanParser.parse — formato con espacios espurios (wkhtmltopdf)", () => {
+  const garbled = [
+    "Circulo de Inversores S.A.U. de Ahorro para Fines Determinados",
+    "GRUPO 3684 ORDEN 97 CUOT A 23 PLAN K Fecha de Emisión 18/07/2026 VENCIMIENT O 10/08/2026 Comprobante Nro.: 000065811268 ANTICIPO ALICUO TA (AL) $ 365619,89 IVA SO BRE CO NCEPTO S GRAVADO S $ 11997,67 RECUP IMP BANCARIO S LEY 25413 $ 3752,87 GASTO S ADMINISTRATIVO S $ 36561,99 DIFERIMIENTO CO MERCIAL 3 $ - 36561,99 DER. INSCRIP.PRO RR. HIST (DIP) $ 34274,38 SEGURO DE VIDA (SV) $ 30855,28 Clave de Acceso para pago redes Link y Banelco: 036840975 T OT AL A PAGAR $ 467069,84",
+    "A fecha emisión de esta cuota $ 43870000,00 $ 0,00",
+    "Modelo de ahorro a fecha de emisión AIRCROSS T200 FEEL PK MY26.",
+  ].join("\n");
+
+  it("tolera CUOTA, VENCIMIENTO y TOTAL A PAGAR partidos por espacios", () => {
+    const c = autoPlanParser.parse(garbled, meta);
+    expect(c.cuotaNro).toBe(23);
+    expect(c.fechaVencimiento).toBe("2026-08-10");
+    expect(c.totalAPagar).toBe(467069.84);
+    expect(c.valorMovil).toBe(43870000);
+  });
+
+  it("canonicaliza labels de conceptos fragmentados por espacios", () => {
+    const c = autoPlanParser.parse(garbled, meta);
+    const byLabel = Object.fromEntries(c.conceptos.map((x) => [x.label, x.amount]));
+    expect(byLabel["ANTICIPO ALICUOTA (AL)"]).toBe(365619.89);
+    expect(byLabel["IVA SOBRE CONCEPTOS GRAVADOS"]).toBe(11997.67);
+    expect(byLabel["RECUP IMP BANCARIOS LEY 25413"]).toBe(3752.87);
+    expect(byLabel["GASTOS ADMINISTRATIVOS"]).toBe(36561.99);
+    expect(byLabel["DIFERIMIENTO COMERCIAL"]).toBe(-36561.99);
+    expect(byLabel["DER. INSCRIP.PRORR. HIST (DIP)"]).toBe(34274.38);
+  });
+});
