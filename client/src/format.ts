@@ -14,6 +14,10 @@ export function formatMonthLabel(value: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+export function formatPercent(value: number): string {
+  return `${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)}%`;
+}
+
 export function formatUva(value: number): string {
   const formatted = new Intl.NumberFormat("es-AR", {
     minimumFractionDigits: 2,

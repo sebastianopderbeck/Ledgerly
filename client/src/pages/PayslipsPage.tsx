@@ -10,6 +10,7 @@ import { ChartCard } from "../components/charts/ChartCard.js";
 import { PayslipNetoUsdChart } from "../components/charts/PayslipNetoUsdChart.js";
 import { PayslipNetoArsChart } from "../components/charts/PayslipNetoArsChart.js";
 import { PayslipRealArsChart } from "../components/charts/PayslipRealArsChart.js";
+import { InflationAccumulatedChart } from "../components/charts/InflationAccumulatedChart.js";
 import { PayslipCompositionChart } from "../components/charts/PayslipCompositionChart.js";
 import { PayslipGrossNetChart } from "../components/charts/PayslipGrossNetChart.js";
 import { payslipYears } from "../payslipConcepts.js";
@@ -84,6 +85,7 @@ export const PayslipsPage = () => {
         <ChartCard title="Evolución del neto en USD"><PayslipNetoUsdChart payslips={filtered} monthOnly={monthOnly} /></ChartCard>
         <ChartCard title="Evolución del neto en pesos"><PayslipNetoArsChart payslips={filtered} monthOnly={monthOnly} /></ChartCard>
         <ChartCard title="Sueldo real (pesos de hoy)"><PayslipRealArsChart payslips={filtered} inflation={inflation} monthOnly={monthOnly} /></ChartCard>
+        <ChartCard title="Inflación acumulada"><InflationAccumulatedChart inflation={inflation} year={activeYear === ALL ? null : activeYear} years={years} monthOnly={monthOnly} /></ChartCard>
         <ChartCard title="Bruto vs neto por mes"><PayslipGrossNetChart payslips={filtered} monthOnly={monthOnly} /></ChartCard>
         <ChartCard title="Composición del recibo por mes"><PayslipCompositionChart payslips={filtered} monthOnly={monthOnly} /></ChartCard>
       </MotionBox>
