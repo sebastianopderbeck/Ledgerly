@@ -140,6 +140,13 @@ const inflationRateSchema = new Schema({
   variacionMensual: { type: Number, required: true },
 });
 
+const macroSeriesSchema = new Schema({
+  serie: { type: String, required: true, enum: ["usd_oficial", "uva", "tasa30"] },
+  fecha: { type: String, required: true },
+  valor: { type: Number, required: true },
+});
+macroSeriesSchema.index({ serie: 1, fecha: 1 }, { unique: true });
+
 export type StatementDoc = InferSchemaType<typeof statementSchema>;
 export type TransactionDoc = InferSchemaType<typeof transactionSchema>;
 export type CategoryRuleDoc = InferSchemaType<typeof categoryRuleSchema>;
@@ -147,6 +154,7 @@ export type MortgageCouponDoc = InferSchemaType<typeof mortgageCouponSchema>;
 export type AutoCouponDoc = InferSchemaType<typeof autoCouponSchema>;
 export type PayslipDoc = InferSchemaType<typeof payslipSchema>;
 export type InflationRateDoc = InferSchemaType<typeof inflationRateSchema>;
+export type MacroSeriesDoc = InferSchemaType<typeof macroSeriesSchema>;
 
 export const StatementModel: Model<StatementDoc> =
   mongoose.models.Statement ?? mongoose.model("Statement", statementSchema);
@@ -162,3 +170,5 @@ export const PayslipModel: Model<PayslipDoc> =
   mongoose.models.Payslip ?? mongoose.model("Payslip", payslipSchema);
 export const InflationRateModel: Model<InflationRateDoc> =
   mongoose.models.InflationRate ?? mongoose.model("InflationRate", inflationRateSchema);
+export const MacroSeriesModel: Model<MacroSeriesDoc> =
+  mongoose.models.MacroSeries ?? mongoose.model("MacroSeries", macroSeriesSchema);
