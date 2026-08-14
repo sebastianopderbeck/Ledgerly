@@ -10,6 +10,7 @@ import { autoRouter } from "./routes/auto.js";
 import { payslipsRouter } from "./routes/payslips.js";
 import { inflationRouter } from "./routes/inflation.js";
 import { fxRouter } from "./routes/fx.js";
+import { macroRouter } from "./routes/macro.js";
 import { importRouter } from "./routes/import.js";
 
 export function createApp(): express.Express {
@@ -29,6 +30,7 @@ export function createApp(): express.Express {
   app.use("/api/payslips", payslipsRouter);
   app.use("/api/inflation", inflationRouter);
   app.use("/api/fx", fxRouter);
+  app.use("/api/macro", macroRouter);
   app.use("/api/import", importRouter);
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "No encontrado")));
