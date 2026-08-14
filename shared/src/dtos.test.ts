@@ -28,6 +28,7 @@ describe("creditSummaryDtoSchema", () => {
       totalPagado: 1, capitalPagado: 1, interesPagado: 1, seguroPagado: 1,
       capitalOriginalUva: 1, capitalAmortizadoUva: 1, capitalPendienteUva: 1, capitalPendientePesos: 1,
       porcentajeAvanceCapital: 0.017, cotizacionUvaActual: 1998.77, cuotaPuraUva: 699.6, tna: 8.9,
+      tasaRealMensual: 0.0074,
     };
     expect(creditSummaryDtoSchema.parse(dto)).toEqual(dto);
   });
@@ -85,5 +86,27 @@ describe("monthlyUsdStatSchema", () => {
     const dto = { month: "2026-05", totalArs: 2000, rate: 1000, totalUsd: 2 };
     expect(monthlyUsdStatSchema.parse(dto)).toEqual(dto);
     expect(monthlyUsdStatSchema.parse({ month: "2026-06", totalArs: 500, rate: null, totalUsd: null }).totalUsd).toBeNull();
+  });
+});
+
+import { macroSeriesDtoSchema } from "./dtos.js";
+
+describe("macroSeriesDtoSchema", () => {
+  it("valida la serie macro mensual", () => {
+    const dto = {
+      desde: "2025-01",
+      meses: [{ periodo: "2025-01", usdOficial: 1035.5, uva: 1250.3, tasa30: 29.1, inflacion: 2.2 }],
+      hoy: { fecha: "2026-08-14", usdOficial: 1515, uva: 2075.56, tasa30: 20.04 },
+    };
+    expect(macroSeriesDtoSchema.parse(dto)).toEqual(dto);
+  });
+
+  it("acepta huecos como null en cualquier serie", () => {
+    const dto = {
+      desde: "2025-01",
+      meses: [{ periodo: "2025-01", usdOficial: null, uva: null, tasa30: null, inflacion: null }],
+      hoy: { fecha: "2026-08-14", usdOficial: null, uva: null, tasa30: null },
+    };
+    expect(macroSeriesDtoSchema.parse(dto).meses[0].usdOficial).toBeNull();
   });
 });

@@ -33,6 +33,17 @@ describe("computeCreditProgress", () => {
     expect(r.cuotasTotales).toBe(240);
   });
 
+  it("expone la tasa real mensual (fallback TNA con un solo cupón)", () => {
+    const r = computeCreditProgress([inputs[0]])!;
+    expect(r.tasaRealMensual).toBeCloseTo(inputs[0].tna / 12 / 100, 12);
+  });
+
+  it("expone una tasa real mensual plausible con los cupones reales", () => {
+    const r = computeCreditProgress(inputs)!;
+    expect(r.tasaRealMensual).toBeGreaterThan(0);
+    expect(r.tasaRealMensual).toBeLessThan(0.05);
+  });
+
   it("devuelve null si no se puede establecer una tasa positiva (tna=0, un solo cupón)", () => {
     const bad = { ...inputs[0], tna: 0 };
     expect(computeCreditProgress([bad])).toBeNull();

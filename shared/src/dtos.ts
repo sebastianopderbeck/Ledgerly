@@ -122,6 +122,7 @@ export const creditSummaryDtoSchema = z.object({
   cotizacionUvaActual: z.number(),
   cuotaPuraUva: z.number(),
   tna: z.number(),
+  tasaRealMensual: z.number(),
 });
 
 export const autoConceptSchema = z.object({ label: z.string(), amount: z.number() });
@@ -212,6 +213,27 @@ export const monthlyUsdStatSchema = z.object({
   totalUsd: z.number().nullable(),
 });
 
+export const macroMonthSchema = z.object({
+  periodo: z.string(),
+  usdOficial: z.number().nullable(),
+  uva: z.number().nullable(),
+  tasa30: z.number().nullable(),
+  inflacion: z.number().nullable(),
+});
+
+export const macroSpotSchema = z.object({
+  fecha: z.string(),
+  usdOficial: z.number().nullable(),
+  uva: z.number().nullable(),
+  tasa30: z.number().nullable(),
+});
+
+export const macroSeriesDtoSchema = z.object({
+  desde: z.string(),
+  meses: z.array(macroMonthSchema),
+  hoy: macroSpotSchema,
+});
+
 export const couponImportResultSchema = z.object({
   kind: z.literal("coupon"),
   status: z.enum(["imported", "duplicate"]),
@@ -262,6 +284,9 @@ export type AutoCouponDTO = z.infer<typeof autoCouponDtoSchema>;
 export type AutoSummaryDTO = z.infer<typeof autoSummaryDtoSchema>;
 export type OficialRateDTO = z.infer<typeof oficialRateDtoSchema>;
 export type MonthlyUsdStat = z.infer<typeof monthlyUsdStatSchema>;
+export type MacroMonth = z.infer<typeof macroMonthSchema>;
+export type MacroSpot = z.infer<typeof macroSpotSchema>;
+export type MacroSeriesDTO = z.infer<typeof macroSeriesDtoSchema>;
 export type PayslipConceptoDTO = z.infer<typeof payslipConceptoSchema>;
 export type PayslipDTO = z.infer<typeof payslipDtoSchema>;
 export type PayslipSummaryDTO = z.infer<typeof payslipSummaryDtoSchema>;

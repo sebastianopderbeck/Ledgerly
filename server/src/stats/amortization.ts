@@ -60,5 +60,6 @@ export function computeCreditProgress(coupons: CouponInput[]): CreditSummaryDTO 
     cotizacionUvaActual: last.cotizacionUva,
     cuotaPuraUva: P,
     tna: last.tna,
+    tasaRealMensual: i,
   };
 }
