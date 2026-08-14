@@ -45,7 +45,7 @@ export const MacroPage = () => {
       <>
         <Title />
         <Typography color="text.secondary">
-          Todavía no cargaste las series macro. Corré <code>bun run seed:macro</code> para traer dólar, UVA, tasa e inflación.
+          Todavía no cargaste las series macro. Usá el botón de actualizar de la barra superior para traer dólar, UVA, tasa e inflación.
         </Typography>
       </>
     );

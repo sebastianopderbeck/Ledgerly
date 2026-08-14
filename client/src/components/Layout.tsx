@@ -5,6 +5,7 @@ import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import AutoGraphIcon from "@mui/icons-material/AutoGraph";
 import { useColorMode } from "../theme.js";
+import { RefreshDataButton } from "./RefreshDataButton.js";
 
 interface LayoutProps { children: ReactNode; }
 
@@ -78,6 +79,7 @@ export const Layout = ({ children }: LayoutProps) => {
               </Button>
             ))}
           </Box>
+          <RefreshDataButton />
           <IconButton color="inherit" onClick={toggle} aria-label="cambiar tema">
             {mode === "light" ? <DarkModeIcon /> : <LightModeIcon />}
           </IconButton>

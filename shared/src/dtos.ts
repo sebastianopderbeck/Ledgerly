@@ -234,6 +234,25 @@ export const macroSeriesDtoSchema = z.object({
   hoy: macroSpotSchema,
 });
 
+export const rateRefreshCountSchema = z.object({
+  updated: z.number(),
+  skipped: z.number(),
+});
+
+export const macroRefreshDtoSchema = z.object({
+  series: z.object({
+    usdOficial: z.number(),
+    uva: z.number(),
+    tasa30: z.number(),
+    inflacion: z.number(),
+  }),
+  tipoCambio: z.object({
+    cupones: rateRefreshCountSchema,
+    auto: rateRefreshCountSchema,
+    sueldos: rateRefreshCountSchema,
+  }),
+});
+
 export const couponImportResultSchema = z.object({
   kind: z.literal("coupon"),
   status: z.enum(["imported", "duplicate"]),
@@ -287,6 +306,8 @@ export type MonthlyUsdStat = z.infer<typeof monthlyUsdStatSchema>;
 export type MacroMonth = z.infer<typeof macroMonthSchema>;
 export type MacroSpot = z.infer<typeof macroSpotSchema>;
 export type MacroSeriesDTO = z.infer<typeof macroSeriesDtoSchema>;
+export type RateRefreshCount = z.infer<typeof rateRefreshCountSchema>;
+export type MacroRefreshDTO = z.infer<typeof macroRefreshDtoSchema>;
 export type PayslipConceptoDTO = z.infer<typeof payslipConceptoSchema>;
 export type PayslipDTO = z.infer<typeof payslipDtoSchema>;
 export type PayslipSummaryDTO = z.infer<typeof payslipSummaryDtoSchema>;

@@ -110,3 +110,24 @@ describe("macroSeriesDtoSchema", () => {
     expect(macroSeriesDtoSchema.parse(dto).meses[0].usdOficial).toBeNull();
   });
 });
+
+import { macroRefreshDtoSchema } from "./dtos.js";
+
+describe("macroRefreshDtoSchema", () => {
+  it("valida el resumen de una actualización", () => {
+    const dto = {
+      series: { usdOficial: 232, uva: 232, tasa30: 221, inflacion: 19 },
+      tipoCambio: {
+        cupones: { updated: 12, skipped: 1 },
+        auto: { updated: 8, skipped: 0 },
+        sueldos: { updated: 6, skipped: 0 },
+      },
+    };
+    expect(macroRefreshDtoSchema.parse(dto)).toEqual(dto);
+  });
+
+  it("rechaza un resumen sin el detalle de tipo de cambio", () => {
+    const dto = { series: { usdOficial: 232, uva: 232, tasa30: 221, inflacion: 19 } };
+    expect(macroRefreshDtoSchema.safeParse(dto).success).toBe(false);
+  });
+});

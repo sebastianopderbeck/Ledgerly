@@ -1,23 +1,11 @@
 import { connectMongo, disconnectMongo } from "../db/connection.js";
 import { AutoCouponModel } from "../db/models.js";
-import { fetchOficialRate } from "../fx/dollarRate.js";
+import { createRateResolver } from "../fx/rateCache.js";
+import { refreshDocRates, type RateRefreshCount } from "./refreshRates.js";
 
-export async function backfillAutoRates(): Promise<{ updated: number; skipped: number }> {
+export async function backfillAutoRates(): Promise<RateRefreshCount> {
   const docs = await AutoCouponModel.find({ tipoCambioUsd: null });
-  let updated = 0;
-  let skipped = 0;
-  for (const doc of docs) {
-    const rate = await fetchOficialRate(doc.fechaVencimiento.toISOString().slice(0, 10)).catch(() => null);
-    if (rate == null) {
-      skipped += 1;
-      continue;
-    }
-    doc.tipoCambioUsd = rate;
-    doc.tipoCambioSource = "api";
-    await doc.save();
-    updated += 1;
-  }
-  return { updated, skipped };
+  return refreshDocRates(docs, (doc) => doc.fechaVencimiento, createRateResolver());
 }
 
 if (process.argv[1]?.endsWith("backfillAutoRates.ts")) {

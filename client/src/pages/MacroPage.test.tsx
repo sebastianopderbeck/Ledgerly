@@ -44,9 +44,9 @@ describe("MacroPage", () => {
     expect(screen.getByText("Tasa real en pesos, mes a mes")).toBeInTheDocument();
   });
 
-  it("sin series cargadas explica cómo poblarlas", async () => {
+  it("sin series cargadas invita a actualizar desde la barra", async () => {
     stubFetch({ desde: "2025-01", meses: [], hoy: { fecha: "2025-01", usdOficial: null, uva: null, tasa30: null } });
     renderWithProviders(<MacroPage />, { route: "/contexto" });
-    await waitFor(() => expect(screen.getByText(/seed:macro/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/botón de actualizar/)).toBeInTheDocument());
   });
 });

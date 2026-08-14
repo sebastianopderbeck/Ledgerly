@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
-  ImportResultUnionDTO, InflationRateDTO, MacroSeriesDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, SummaryStat, TransactionDTO,
+  ImportResultUnionDTO, InflationRateDTO, MacroRefreshDTO, MacroSeriesDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, SummaryStat, TransactionDTO,
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
 
@@ -174,6 +174,14 @@ export function useInflation() {
 }
 export function useMacroSeries() {
   return useQuery({ queryKey: ["macro-series"], queryFn: () => apiFetch<MacroSeriesDTO>("/macro/series"), staleTime: 1000 * 60 * 60 });
+}
+
+export function useRefreshMacro() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<MacroRefreshDTO>("/macro/refresh", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
 }
 
 export function useAutoCoupons() {
