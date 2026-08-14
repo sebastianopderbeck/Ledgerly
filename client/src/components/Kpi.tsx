@@ -4,7 +4,7 @@ import { MotionBox } from "./motion/motion.js";
 import { CountUp } from "./motion/CountUp.js";
 import { fadeUpItem } from "./motion/variants.js";
 
-export type KpiColor = "primary" | "secondary" | "success" | "warning";
+export type KpiColor = "primary" | "secondary" | "success" | "warning" | "error";
 
 interface KpiProps {
   label: string;
@@ -13,9 +13,10 @@ interface KpiProps {
   sub?: string;
   icon: ReactNode;
   color: KpiColor;
+  subMultiline?: boolean;
 }
 
-export const Kpi = ({ label, value, format, sub, icon, color }: KpiProps) => (
+export const Kpi = ({ label, value, format, sub, icon, color, subMultiline = false }: KpiProps) => (
   <MotionBox variants={fadeUpItem}>
     <Card>
       <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -40,7 +41,11 @@ export const Kpi = ({ label, value, format, sub, icon, color }: KpiProps) => (
           <Typography variant="h5" sx={{ fontWeight: 700 }} noWrap>
             <CountUp value={value} format={format} />
           </Typography>
-          {sub && <Typography variant="caption" color="text.secondary" noWrap>{sub}</Typography>}
+          {sub && (
+            <Typography variant="caption" color="text.secondary" noWrap={!subMultiline} sx={{ display: "block" }}>
+              {sub}
+            </Typography>
+          )}
         </Box>
       </CardContent>
     </Card>

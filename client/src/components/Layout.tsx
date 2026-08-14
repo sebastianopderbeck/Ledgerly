@@ -14,6 +14,7 @@ const NAV = [
   { to: "/credits", label: "Créditos" },
   { to: "/auto", label: "Auto" },
   { to: "/sueldo", label: "Sueldo" },
+  { to: "/contexto", label: "Contexto" },
   { to: "/transactions", label: "Movimientos" },
   { to: "/rules", label: "Reglas" },
   { to: "/import", label: "Importar" },

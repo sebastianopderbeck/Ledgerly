@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
-  ImportResultUnionDTO, InflationRateDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, SummaryStat, TransactionDTO,
+  ImportResultUnionDTO, InflationRateDTO, MacroSeriesDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, SummaryStat, TransactionDTO,
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
 
@@ -171,6 +171,9 @@ export function useMonthlyUsd(f: StatFilters) {
 }
 export function useInflation() {
   return useQuery({ queryKey: ["inflation"], queryFn: () => apiFetch<InflationRateDTO[]>("/inflation"), staleTime: 1000 * 60 * 60 });
+}
+export function useMacroSeries() {
+  return useQuery({ queryKey: ["macro-series"], queryFn: () => apiFetch<MacroSeriesDTO>("/macro/series"), staleTime: 1000 * 60 * 60 });
 }
 
 export function useAutoCoupons() {
