@@ -7,6 +7,7 @@ import { withDb } from "../../testing/withDb.js";
 vi.mock("../../pdf/extract.js", () => ({ extractPdfText: vi.fn() }));
 import { extractPdfText } from "../../pdf/extract.js";
 import { createApp } from "../app.js";
+import { MAX_UPLOAD_BYTES } from "./import.js";
 
 withDb();
 const app = createApp();
@@ -69,5 +70,63 @@ describe("POST /api/import (auto)", () => {
     const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("duplicate");
+  });
+});
+
+describe("POST /api/import (validación de archivo)", () => {
+  it("rechaza un archivo que no es PDF → 400", async () => {
+    mocked.mockResolvedValue({ text: statementText, meta });
+    const res = await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("no soy un pdf"), { filename: "notas.txt", contentType: "text/plain" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/pdf/i);
+  });
+
+  it("no llega a extraer texto si el archivo no es PDF", async () => {
+    mocked.mockClear();
+    mocked.mockResolvedValue({ text: statementText, meta });
+    await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("no soy un pdf"), { filename: "notas.txt", contentType: "text/plain" });
+    expect(mocked).not.toHaveBeenCalled();
+  });
+
+  it("rechaza un archivo más grande que el límite → 413", async () => {
+    mocked.mockResolvedValue({ text: statementText, meta });
+    const tooBig = Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0x20);
+    const res = await request(app)
+      .post("/api/import")
+      .attach("file", tooBig, { filename: "enorme.pdf", contentType: "application/pdf" });
+    expect(res.status).toBe(413);
+    expect(res.body.error).toMatch(/supera/i);
+  });
+
+  it("acepta un PDF justo por debajo del límite", async () => {
+    mocked.mockResolvedValue({ text: statementText, meta });
+    const res = await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.alloc(1024, 0x20), { filename: "chico.pdf", contentType: "application/pdf" });
+    expect([200, 201]).toContain(res.status);
+  });
+});
+
+describe("POST /api/import (eficiencia)", () => {
+  it("extrae el texto del PDF una sola vez por subida", async () => {
+    mocked.mockClear();
+    mocked.mockResolvedValue({ text: statementText, meta });
+    await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("statement-unico-para-conteo"), "s.pdf");
+    expect(mocked).toHaveBeenCalledTimes(1);
+  });
+
+  it("extrae el texto una sola vez también para un cupón", async () => {
+    mocked.mockClear();
+    mocked.mockResolvedValue({ text: couponText, meta });
+    await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("cupon-unico-para-conteo"), "c.pdf");
+    expect(mocked).toHaveBeenCalledTimes(1);
   });
 });

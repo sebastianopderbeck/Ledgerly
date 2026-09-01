@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { withDb } from "../testing/withDb.js";
 
@@ -8,8 +9,9 @@ import { AutoCouponModel } from "../db/models.js";
 
 withDb();
 const dir = fileURLToPath(new URL("../../../examples/auto/", import.meta.url));
+const hasReal = existsSync(dir);
 
-describe("seedAutoCoupons", () => {
+describe.skipIf(!hasReal)("seedAutoCoupons", () => {
   it("importa los cupones reales y deduplica en la segunda pasada", async () => {
     const first = await seedAutoCoupons(dir);
     expect(first.imported).toBeGreaterThanOrEqual(1);

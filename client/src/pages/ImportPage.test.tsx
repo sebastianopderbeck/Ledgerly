@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { ImportPage } from "./ImportPage.js";
@@ -12,7 +12,10 @@ function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
 beforeEach(() => {
   mockFetch((url) => (url.includes("/statements") ? [] : {}));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("ImportPage", () => {
   it("muestra el dropzone y el título", async () => {
@@ -70,5 +73,31 @@ describe("ImportPage", () => {
     const input = document.querySelector('input[type="file"]')!;
     await userEvent.upload(input as HTMLInputElement, new File(["x"], "c.pdf", { type: "application/pdf" }));
     await waitFor(() => expect(screen.getByText(/cuota 7 del crédito/i)).toBeInTheDocument());
+  });
+
+  it("muestra el resultado de un recibo de sueldo", async () => {
+    mockFetch((url, init) => {
+      if (url.includes("/import") && init?.method === "POST") {
+        return { kind: "payslip", status: "imported", payslip: { periodo: "2026-05", neto: 3897401 } };
+      }
+      return [];
+    });
+    renderWithProviders(<ImportPage />);
+    const input = document.querySelector('input[type="file"]')!;
+    await userEvent.upload(input as HTMLInputElement, new File(["x"], "p.pdf", { type: "application/pdf" }));
+    await waitFor(() => expect(screen.getByText(/recibo de 2026-05/i)).toBeInTheDocument());
+  });
+
+  it("muestra el resultado de un cupón de auto", async () => {
+    mockFetch((url, init) => {
+      if (url.includes("/import") && init?.method === "POST") {
+        return { kind: "auto", status: "imported", coupon: { cuotaNro: 12 } };
+      }
+      return [];
+    });
+    renderWithProviders(<ImportPage />);
+    const input = document.querySelector('input[type="file"]')!;
+    await userEvent.upload(input as HTMLInputElement, new File(["x"], "a.pdf", { type: "application/pdf" }));
+    await waitFor(() => expect(screen.getByText(/cuota 12 del plan de auto/i)).toBeInTheDocument());
   });
 });

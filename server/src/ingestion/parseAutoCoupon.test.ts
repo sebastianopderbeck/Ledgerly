@@ -1,14 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseAutoCoupon } from "./parseAutoCoupon.js";
 
-const pdf = readFileSync(fileURLToPath(new URL("../../../examples/auto/11-2024.pdf", import.meta.url)));
-const pdfWkhtml = readFileSync(fileURLToPath(new URL("../../../examples/auto/08-2026.pdf", import.meta.url)));
+const pdfPath = fileURLToPath(new URL("../../../examples/auto/11-2024.pdf", import.meta.url));
+const pdfWkhtmlPath = fileURLToPath(new URL("../../../examples/auto/08-2026.pdf", import.meta.url));
+const hasReal = existsSync(pdfPath) && existsSync(pdfWkhtmlPath);
 
-describe("parseAutoCoupon", () => {
+describe.skipIf(!hasReal)("parseAutoCoupon", () => {
   it("extrae y parsea un cupón real", async () => {
-    const { coupon } = await parseAutoCoupon(new Uint8Array(pdf));
+    const { coupon } = await parseAutoCoupon(new Uint8Array(readFileSync(pdfPath)));
     expect(coupon.grupo).toBe("3684");
     expect(coupon.cuotaNro).toBe(2);
     expect(coupon.totalAPagar).toBe(268551.23);
@@ -18,7 +19,7 @@ describe("parseAutoCoupon", () => {
   });
 
   it("parsea un cupón renderizado con wkhtmltopdf (espacios espurios y mojibake)", async () => {
-    const { coupon } = await parseAutoCoupon(new Uint8Array(pdfWkhtml));
+    const { coupon } = await parseAutoCoupon(new Uint8Array(readFileSync(pdfWkhtmlPath)));
     expect(coupon.grupo).toBe("3684");
     expect(coupon.orden).toBe("97");
     expect(coupon.cuotaNro).toBe(23);

@@ -4,15 +4,28 @@ import UploadFileIcon from "@mui/icons-material/UploadFile";
 
 interface FileDropzoneProps { onFile: (file: File) => void; disabled?: boolean; }
 
+const isPdf = (file: File): boolean =>
+  file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+
 export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [rejected, setRejected] = useState(false);
+
+  const handleFile = (file: File) => {
+    if (!isPdf(file)) {
+      setRejected(true);
+      return;
+    }
+    setRejected(false);
+    onFile(file);
+  };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) onFile(file);
+    if (file) handleFile(file);
   };
 
   return (
@@ -31,12 +44,17 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
       <Button variant="contained" disabled={disabled} onClick={() => inputRef.current?.click()}>
         Elegir archivo
       </Button>
+      {rejected && (
+        <Typography color="error" variant="body2" sx={{ mt: 2 }}>
+          Sólo se aceptan archivos PDF
+        </Typography>
+      )}
       <input
         ref={inputRef}
         type="file"
         accept="application/pdf"
         hidden
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
       />
     </Box>
   );

@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { visaSignatureParser } from "./visaSignature.js";
 import { reconcile } from "./reconcile.js";
-import type { PdfMeta } from "@ledgerly/shared";
+import type { ParsedStatement, PdfMeta } from "@ledgerly/shared";
 
 const text = readFileSync(
   fileURLToPath(new URL("./__fixtures__/visa-signature.sample.txt", import.meta.url)),
@@ -69,7 +69,11 @@ const hasReal = existsSync(realPath);
 const realMeta: PdfMeta = { producer: "Adobe LiveCycle", creator: null, pageCount: 2, encrypted: false };
 
 describe.skipIf(!hasReal)("visaSignatureParser.parse (extracción real)", () => {
-  const result = visaSignatureParser.parse(readFileSync(realPath, "utf8"), realMeta);
+  let result: ParsedStatement;
+
+  beforeAll(() => {
+    result = visaSignatureParser.parse(readFileSync(realPath, "utf8"), realMeta);
+  });
 
   it("parsea los 43 movimientos del resumen real", () => {
     expect(result.rows).toHaveLength(43);

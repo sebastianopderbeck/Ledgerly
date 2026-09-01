@@ -1,17 +1,15 @@
-import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { describe, it, expect, beforeAll } from "vitest";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { icbcParser } from "./icbc.js";
-import type { PdfMeta } from "@ledgerly/shared";
+import type { ParsedStatement, PdfMeta } from "@ledgerly/shared";
 
 const text = readFileSync(
   fileURLToPath(new URL("./__fixtures__/icbc.sample.txt", import.meta.url)),
   "utf8",
 );
-const realText = readFileSync(
-  fileURLToPath(new URL("../../../examples/icbc-real.txt", import.meta.url)),
-  "utf8",
-);
+const realPath = fileURLToPath(new URL("../../../examples/icbc-real.txt", import.meta.url));
+const hasReal = existsSync(realPath);
 const meta: PdfMeta = { producer: "iText 5.0.6", creator: null, pageCount: 10, encrypted: true };
 
 describe("icbcParser.detect", () => {
@@ -60,8 +58,12 @@ describe("icbcParser.parse", () => {
   });
 });
 
-describe("icbcParser.parse — resumen real sin etiquetas SALDO ACTUAL/PAGO MINIMO", () => {
-  const result = icbcParser.parse(realText, meta);
+describe.skipIf(!hasReal)("icbcParser.parse — resumen real sin etiquetas SALDO ACTUAL/PAGO MINIMO", () => {
+  let result: ParsedStatement;
+
+  beforeAll(() => {
+    result = icbcParser.parse(readFileSync(realPath, "utf8"), meta);
+  });
 
   it("extrae saldo actual y pago mínimo del pie de totales", () => {
     expect(result.header.totals.saldoActual.ars).toBe(3137688.74);

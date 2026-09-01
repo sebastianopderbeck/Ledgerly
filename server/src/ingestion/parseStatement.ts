@@ -1,15 +1,15 @@
-import type { ParsedStatement, PdfMeta, ReconciliationResult } from "@ledgerly/shared";
+import type { ParsedStatement, ExtractedPdf, PdfMeta, ReconciliationResult } from "@ledgerly/shared";
 import { extractPdfText } from "../pdf/extract.js";
 import { detectParser } from "../parsers/registry.js";
 import { reconcile } from "../parsers/reconcile.js";
 import { NoTextError, NoTransactionsError, UnsupportedFormatError } from "./errors.js";
 
-export async function parseStatement(data: Uint8Array): Promise<{
+export async function parseStatement(data: Uint8Array, extracted?: ExtractedPdf): Promise<{
   statement: ParsedStatement;
   reconciliation: ReconciliationResult;
   meta: PdfMeta;
 }> {
-  const { text, meta } = await extractPdfText(data);
+  const { text, meta } = extracted ?? await extractPdfText(data);
   if (text.trim().length < 20) throw new NoTextError();
 
   const parser = detectParser(text, meta);

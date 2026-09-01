@@ -1,14 +1,16 @@
 import { describe, it, expect } from "vitest";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { withDb } from "../testing/withDb.js";
 import { seedCoupons } from "./seedCoupons.js";
 import { MortgageCouponModel } from "../db/models.js";
 
 const dir = fileURLToPath(new URL("../../../examples/credito/", import.meta.url));
+const hasReal = existsSync(dir);
 
 withDb();
 
-describe("seedCoupons", () => {
+describe.skipIf(!hasReal)("seedCoupons", () => {
   it("importa los 11 cupones de ejemplo", async () => {
     const r = await seedCoupons(dir);
     expect(r.imported).toBe(11);

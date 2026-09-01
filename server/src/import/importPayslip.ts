@@ -1,3 +1,4 @@
+import type { ExtractedPdf } from "@ledgerly/shared";
 import { createHash } from "node:crypto";
 import { parsePayslip } from "../ingestion/parsePayslip.js";
 import { PayslipModel } from "../db/models.js";
@@ -7,9 +8,10 @@ export async function importPayslip(input: {
   data: Uint8Array;
   fileName: string;
   replace?: boolean;
+  extracted?: ExtractedPdf;
 }): Promise<{ status: "imported" | "duplicate"; payslipId: string }> {
   const sourceHash = createHash("sha256").update(input.data).digest("hex");
-  const { payslip } = await parsePayslip(input.data);
+  const { payslip } = await parsePayslip(input.data, input.extracted);
 
   const existing = await PayslipModel.findOne({ cuil: payslip.cuil, periodo: payslip.periodo });
   if (existing && !input.replace) return { status: "duplicate", payslipId: existing._id.toString() };

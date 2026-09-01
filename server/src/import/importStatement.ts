@@ -1,3 +1,4 @@
+import type { ExtractedPdf } from "@ledgerly/shared";
 import { createHash } from "node:crypto";
 import { parseStatement } from "../ingestion/parseStatement.js";
 import { CategoryRuleModel, StatementModel, TransactionModel } from "../db/models.js";
@@ -18,6 +19,7 @@ export async function importStatement(input: {
   data: Uint8Array;
   fileName: string;
   replace?: boolean;
+  extracted?: ExtractedPdf;
 }): Promise<{ status: "imported" | "duplicate"; statementId: string; transactionCount: number }> {
   const sourceHash = createHash("sha256").update(input.data).digest("hex");
 
@@ -34,7 +36,7 @@ export async function importStatement(input: {
     await StatementModel.deleteOne({ _id: existing._id });
   }
 
-  const { statement, reconciliation, meta } = await parseStatement(input.data);
+  const { statement, reconciliation, meta } = await parseStatement(input.data, input.extracted);
   const rules = (await CategoryRuleModel.find({ enabled: true }).lean()) as unknown as RuleInput[];
 
   const created = await StatementModel.create({

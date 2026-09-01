@@ -1,3 +1,4 @@
+import type { ExtractedPdf } from "@ledgerly/shared";
 import { createHash } from "node:crypto";
 import { parseAutoCoupon } from "../ingestion/parseAutoCoupon.js";
 import { AutoCouponModel } from "../db/models.js";
@@ -7,9 +8,10 @@ export async function importAutoCoupon(input: {
   data: Uint8Array;
   fileName: string;
   replace?: boolean;
+  extracted?: ExtractedPdf;
 }): Promise<{ status: "imported" | "duplicate"; couponId: string }> {
   const sourceHash = createHash("sha256").update(input.data).digest("hex");
-  const { coupon } = await parseAutoCoupon(input.data);
+  const { coupon } = await parseAutoCoupon(input.data, input.extracted);
 
   const existing = await AutoCouponModel.findOne({
     grupo: coupon.grupo,

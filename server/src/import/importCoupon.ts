@@ -1,3 +1,4 @@
+import type { ExtractedPdf } from "@ledgerly/shared";
 import { createHash } from "node:crypto";
 import { parseCoupon } from "../ingestion/parseCoupon.js";
 import { MortgageCouponModel } from "../db/models.js";
@@ -7,9 +8,10 @@ export async function importCoupon(input: {
   data: Uint8Array;
   fileName: string;
   replace?: boolean;
+  extracted?: ExtractedPdf;
 }): Promise<{ status: "imported" | "duplicate"; couponId: string }> {
   const sourceHash = createHash("sha256").update(input.data).digest("hex");
-  const { coupon } = await parseCoupon(input.data);
+  const { coupon } = await parseCoupon(input.data, input.extracted);
 
   const existing = await MortgageCouponModel.findOne({
     prestamoNro: coupon.prestamoNro,

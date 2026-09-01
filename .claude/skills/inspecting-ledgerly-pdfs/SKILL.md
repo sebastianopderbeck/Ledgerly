@@ -46,4 +46,26 @@ Regenerate them after any change to `extract.ts`, or the tests keep validating t
 
 Unit tests use synthetic fixtures in `server/src/parsers/__fixtures__/`, which are hand-written and do **not** match runtime extraction byte-for-byte. They cannot catch an extraction regression on their own. Before and after any change to `extract.ts` or a parser, parse every real PDF and diff the results — 103 files across the four directories. Identical JSON means the change is safe.
 
-Tests that read `examples/` must guard with `existsSync` + `describe.skipIf`, since a fresh clone has no `examples/`. `visaSignature.test.ts` does this correctly; `icbc.test.ts:11`, `parseCoupon.test.ts:6` and `parseAutoCoupon.test.ts:6` do not, and break on a fresh clone.
+## Tests that touch `examples/`
+
+A fresh clone has no `examples/`, so every test reading it must guard with `existsSync` + `describe.skipIf`.
+
+**`skipIf` alone is not enough.** Vitest runs the `describe` callback during collection even when the suite is skipped, so a `readFileSync` sitting directly in the describe body still throws and fails the whole file. Defer every read into `beforeAll` or the `it` body:
+
+```ts
+const realPath = fileURLToPath(new URL("../../../examples/visa-real.txt", import.meta.url));
+const hasReal = existsSync(realPath);
+
+describe.skipIf(!hasReal)("...", () => {
+  let result: ParsedStatement;
+  beforeAll(() => {
+    result = visaSignatureParser.parse(readFileSync(realPath, "utf8"), realMeta);
+  });
+});
+```
+
+To verify a guard actually works, hide the directory and run the suite — it must report skips, never failures:
+
+```bash
+mv examples .examples-hidden && npx vitest run; mv .examples-hidden examples
+```
