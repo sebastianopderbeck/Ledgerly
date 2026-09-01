@@ -5,7 +5,8 @@ export async function extractPdfText(data: Uint8Array): Promise<ExtractedPdf> {
   const bytes = new Uint8Array(data);
   const encrypted = Buffer.from(bytes).includes("/Encrypt");
   const pdf = await getDocumentProxy(bytes, { password: "" });
-  const { text } = await extractText(pdf, { mergePages: true });
+  const { text: pages } = await extractText(pdf, { mergePages: false });
+  const text = pages.join("\n");
   const { info } = await getMeta(pdf);
 
   const meta: PdfMeta = {

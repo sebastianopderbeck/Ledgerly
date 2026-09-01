@@ -12,18 +12,6 @@ import {
 const ROW = /^\s*(\d{2}\.\d{2}\.\d{2})\s+(?:(\d{4,6})[*FK]?\s+)?(.*)$/;
 const SKIP = /SALDO ANTERIOR|Total Consumos|SALDO ACTUAL|PAGO MINIMO|DEBITAREMOS/;
 
-function splitRecords(text: string): string[] {
-  return text
-    .replace(/\n+/g, " ")
-    .replace(/(?<![\d,])(\d{2}\.\d{2}\.\d{2})\s/g, "\n$1 ")
-    .replace(/(Tarjeta\s+\d{3,}\s+Total Consumos)/g, "\n$1")
-    .replace(/(SALDO ANTERIOR)/g, "\n$1")
-    .replace(/(SALDO ACTUAL)/g, "\n$1")
-    .replace(/(PAGO MINIMO)/g, "\n$1")
-    .replace(/(DEBITAREMOS)/g, "\n$1")
-    .split("\n");
-}
-
 export const visaSignatureParser: StatementParser = {
   issuer: "visa_signature",
 
@@ -36,7 +24,7 @@ export const visaSignatureParser: StatementParser = {
     const rows: ParsedRow[] = [];
     let started = false;
 
-    for (const line of splitRecords(text)) {
+    for (const line of text.split("\n")) {
       if (/SALDO ANTERIOR/.test(line)) {
         started = true;
         continue;

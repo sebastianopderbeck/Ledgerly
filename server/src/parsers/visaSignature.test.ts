@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { visaSignatureParser } from "./visaSignature.js";
+import { reconcile } from "./reconcile.js";
 import type { PdfMeta } from "@ledgerly/shared";
 
 const text = readFileSync(
@@ -60,5 +61,36 @@ describe("visaSignatureParser.parse", () => {
 
   it("clasifica el impuesto", () => {
     expect(result.rows.find((r) => r.comprobante === "444444")).toMatchObject({ amount: 210, type: "tax" });
+  });
+});
+
+const realPath = fileURLToPath(new URL("../../../examples/visa-real.txt", import.meta.url));
+const hasReal = existsSync(realPath);
+const realMeta: PdfMeta = { producer: "Adobe LiveCycle", creator: null, pageCount: 2, encrypted: false };
+
+describe.skipIf(!hasReal)("visaSignatureParser.parse (extracción real)", () => {
+  const result = visaSignatureParser.parse(readFileSync(realPath, "utf8"), realMeta);
+
+  it("parsea los 43 movimientos del resumen real", () => {
+    expect(result.rows).toHaveLength(43);
+  });
+
+  it("extrae el header del resumen real", () => {
+    expect(result.header.last4).toBe("8883");
+    expect(result.header.closingDate).toBe("2026-07-02");
+    expect(result.header.totals.totalConsumos).toEqual({ ars: 2585250.04, usd: 691.71 });
+    expect(result.header.totals.saldoActual).toEqual({ ars: 2895556.7, usd: 691.71 });
+    expect(result.header.totals.pagoMinimo).toEqual({ ars: 544016, usd: 0 });
+    expect(result.header.totals.saldoAnterior).toEqual({ ars: 1990883.84, usd: 11.95 });
+  });
+
+  it("reconcilia los consumos contra los totales del header", () => {
+    expect(reconcile(result)).toMatchObject({
+      ok: true,
+      entries: [
+        { currency: "ARS", expected: 2585250.04, parsed: 2585250.04, diff: 0 },
+        { currency: "USD", expected: 691.71, parsed: 691.71, diff: 0 },
+      ],
+    });
   });
 });
