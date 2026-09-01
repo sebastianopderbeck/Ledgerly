@@ -1,6 +1,12 @@
 import type { PayslipDTO } from "@ledgerly/shared";
+import {capitalize} from "@mui/material";
 
-export const byPeriodo = (a: PayslipDTO, b: PayslipDTO): number => a.periodo.localeCompare(b.periodo);
+export type PeriodoOrden = "asc" | "desc";
+
+export const byPeriodo = (a: PayslipDTO, b: PayslipDTO, orden: PeriodoOrden = "desc"): number =>
+  orden === "asc" ? a.periodo.localeCompare(b.periodo) : b.periodo.localeCompare(a.periodo);
+
+export const byPeriodoAsc = (a: PayslipDTO, b: PayslipDTO): number => byPeriodo(a, b, "asc");
 
 const MONTHS_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -37,12 +43,13 @@ export function sumDescuento(
   }
   return { ars, usd };
 }
-
+const ROWS = ["RETENCION 4º CATEGORÍA", /*"Plus Feriado", "PRESENTISMO", "LEY 19032", "JUBILACION", "OBRA SOCIAL", "S.E.C.", "F.A.E.C.Y.S."*/]
 export function uniqueConceptLabels(payslips: PayslipDTO[]): string[] {
   const labels: string[] = [];
   for (const payslip of payslips) {
     for (const concepto of payslip.conceptos) {
-      if (!labels.includes(concepto.label)) labels.push(concepto.label);
+
+      if (!labels.includes(concepto.label) && ROWS.includes(concepto.label)) labels.push(concepto.label);
     }
   }
   return labels;
@@ -54,7 +61,7 @@ export function buildCompositionData(payslips: PayslipDTO[]): {
   labels: string[];
   rows: Record<string, number | string>[];
 } {
-  const sorted = [...payslips].sort(byPeriodo);
+  const sorted = [...payslips].sort(byPeriodoAsc);
   const labels = uniqueConceptLabels(sorted);
   const rows = sorted.map((payslip) => {
     const row: Record<string, number | string> = { month: payslip.periodo };

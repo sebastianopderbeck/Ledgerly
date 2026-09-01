@@ -102,6 +102,7 @@ export function toPayslipDTO(doc: HydratedDocument<PayslipDoc>): PayslipDTO {
   return {
     id: doc._id.toString(),
     periodo: doc.periodo,
+    tipo: doc.tipo as PayslipDTO["tipo"],
     fechaPago: doc.fechaPago.toISOString().slice(0, 10),
     cuil: doc.cuil,
     conceptos: doc.conceptos.map((c) => ({ codigo: c.codigo, label: c.label, tipo: c.tipo as PayslipDTO["conceptos"][number]["tipo"], monto: c.monto })),

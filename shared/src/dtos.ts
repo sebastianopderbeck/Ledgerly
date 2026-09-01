@@ -170,6 +170,7 @@ export const payslipConceptoSchema = z.object({
 export const payslipDtoSchema = z.object({
   id: z.string(),
   periodo: z.string(),
+  tipo: z.enum(["mensual", "sac"]),
   fechaPago: z.string(),
   cuil: z.string(),
   conceptos: z.array(payslipConceptoSchema),
@@ -193,6 +194,7 @@ export const payslipSummaryDtoSchema = z.object({
   variacionNetoMensual: z.number(),
   porcentajeDescuentos: z.number(),
   netoAcumuladoAnio: z.number(),
+  recibosAnio: z.number().int(),
 });
 
 export const oficialRateDtoSchema = z.object({

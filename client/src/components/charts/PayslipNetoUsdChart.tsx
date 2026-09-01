@@ -5,7 +5,7 @@ import type { PayslipDTO } from "@ledgerly/shared";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
-import { byPeriodo, monthLabel } from "../../payslipConcepts.js";
+import { byPeriodoAsc, monthLabel } from "../../payslipConcepts.js";
 
 interface PayslipNetoUsdChartProps {
   payslips: PayslipDTO[];
@@ -16,7 +16,7 @@ export const PayslipNetoUsdChart = ({ payslips, monthOnly = false }: PayslipNeto
   const theme = useTheme();
   const points = payslips
     .filter((p) => p.netoUsd != null)
-    .sort(byPeriodo)
+    .sort(byPeriodoAsc)
     .map((p) => ({ x: p.periodo, y: p.netoUsd as number }));
 
   if (points.length === 0) return <Typography color="text.secondary">Sin datos de dólar</Typography>;

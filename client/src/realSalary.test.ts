@@ -3,7 +3,7 @@ import type { InflationRateDTO, PayslipDTO } from "@ledgerly/shared";
 import { deflateToLatest } from "./realSalary.js";
 
 const payslip = (periodo: string, neto: number): PayslipDTO => ({
-  id: periodo, periodo, fechaPago: `${periodo}-05`, cuil: "20-1-3", conceptos: [],
+  id: periodo, periodo, tipo: "mensual", fechaPago: `${periodo}-05`, cuil: "20-1-3", conceptos: [],
   remunerativo: neto, noRemunerativo: 0, descuentos: 0, brutoTotal: neto, neto,
   costoTotalEmpleador: null, tipoCambioUsd: null, tipoCambioSource: null, netoUsd: null,
 });

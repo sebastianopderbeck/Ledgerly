@@ -16,6 +16,7 @@ payslipsRouter.get("/summary", asyncHandler(async (_req, res) => {
   const summary = computePayslipSummary(
     docs.map((p) => ({
       periodo: p.periodo,
+      tipo: p.tipo as "mensual" | "sac",
       neto: p.neto,
       brutoTotal: p.brutoTotal,
       descuentos: p.descuentos,

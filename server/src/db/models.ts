@@ -117,6 +117,7 @@ const payslipConceptoSchema = new Schema(
 const payslipSchema = new Schema(
   {
     periodo: { type: String, required: true, index: true },
+    tipo: { type: String, required: true, enum: ["mensual", "sac"], default: "mensual" },
     fechaPago: { type: Date, required: true },
     cuil: { type: String, required: true },
     conceptos: { type: [payslipConceptoSchema], default: [] },
@@ -133,7 +134,7 @@ const payslipSchema = new Schema(
   },
   { timestamps: { createdAt: "uploadedAt", updatedAt: false } },
 );
-payslipSchema.index({ cuil: 1, periodo: 1 }, { unique: true });
+payslipSchema.index({ cuil: 1, periodo: 1, tipo: 1 }, { unique: true });
 
 const inflationRateSchema = new Schema({
   periodo: { type: String, required: true, unique: true, index: true },

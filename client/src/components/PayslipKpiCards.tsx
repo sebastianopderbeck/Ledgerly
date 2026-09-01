@@ -71,7 +71,7 @@ export const PayslipKpiCards = () => {
       <Kpi label="Último neto" value={data.ultimoNeto} format={money} sub={variacionSub} icon={<PaymentsIcon />} color="primary" />
       <Kpi label="Neto en USD" value={data.ultimoNetoUsd ?? 0} format={usd} sub={data.ultimoNetoUsd != null ? data.ultimoPeriodo : "sin tipo de cambio"} icon={<AttachMoneyIcon />} color="warning" />
       <Kpi label="Descuentos" value={data.porcentajeDescuentos * 100} format={percent} sub="sobre el bruto" icon={<PercentIcon />} color="secondary" />
-      <Kpi label={`Acumulado ${anio}`} value={data.netoAcumuladoAnio} format={money} sub={`${data.periodos} recibos`} icon={<SavingsIcon />} color="success" />
+      <Kpi label={`Acumulado ${anio}`} value={data.netoAcumuladoAnio} format={money} sub={`${data.recibosAnio} recibos`} icon={<SavingsIcon />} color="success" />
     </MotionBox>
   );
 };

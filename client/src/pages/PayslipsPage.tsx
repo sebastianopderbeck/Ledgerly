@@ -27,7 +27,7 @@ export const PayslipsPage = () => {
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const activeYear = selectedYear ?? years[years.length - 1] ?? ALL;
   const filtered = useMemo(() => {
-    const base = payslips.filter((p) => !CHART_EXCLUDED_PERIODS.includes(p.periodo));
+    const base = payslips.filter((p) => p.tipo === "mensual" && !CHART_EXCLUDED_PERIODS.includes(p.periodo));
     return activeYear === ALL ? base : base.filter((p) => p.periodo.slice(0, 4) === activeYear);
   }, [payslips, activeYear]);
   const monthOnly = activeYear !== ALL;
@@ -90,11 +90,11 @@ export const PayslipsPage = () => {
         <ChartCard title="Composición del recibo por mes"><PayslipCompositionChart payslips={filtered} monthOnly={monthOnly} /></ChartCard>
       </MotionBox>
 
-      <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>
-      <PayslipsTable />
-
       <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>Descuentos acumulados</Typography>
       <PayslipDescuentoKpis payslips={payslips} />
+
+      <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>
+      <PayslipsTable />
     </>
   );
 };

@@ -11,9 +11,9 @@ export async function importPayslip(input: {
   extracted?: ExtractedPdf;
 }): Promise<{ status: "imported" | "duplicate"; payslipId: string }> {
   const sourceHash = createHash("sha256").update(input.data).digest("hex");
-  const { payslip } = await parsePayslip(input.data, input.extracted);
+  const { payslip } = await parsePayslip(input.data, input.extracted, input.fileName);
 
-  const existing = await PayslipModel.findOne({ cuil: payslip.cuil, periodo: payslip.periodo });
+  const existing = await PayslipModel.findOne({ cuil: payslip.cuil, periodo: payslip.periodo, tipo: payslip.tipo });
   if (existing && !input.replace) return { status: "duplicate", payslipId: existing._id.toString() };
   if (existing && input.replace) await PayslipModel.deleteOne({ _id: existing._id });
 
@@ -21,6 +21,7 @@ export async function importPayslip(input: {
 
   const created = await PayslipModel.create({
     periodo: payslip.periodo,
+    tipo: payslip.tipo,
     fechaPago: new Date(payslip.fechaPago),
     cuil: payslip.cuil,
     conceptos: payslip.conceptos,

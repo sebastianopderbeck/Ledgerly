@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Box, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Box, Chip, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import type { PayslipDTO } from "@ledgerly/shared";
 import { usePayslips, usePatchPayslipRate } from "../api/hooks.js";
@@ -63,37 +63,37 @@ export const PayslipsTable = () => {
         <TableHead>
           <TableRow>
             <TableCell>Período</TableCell>
-            {conceptLabels.map((label) => (
-              <TableCell key={label} align="right">{label}</TableCell>
-            ))}
-            <TableCell align="right">Remunerativo</TableCell>
-            <TableCell align="right">Descuentos</TableCell>
-            <TableCell align="right">Neto</TableCell>
             <TableCell align="right">Bruto</TableCell>
-            <TableCell align="right">Costo empleador</TableCell>
-            <TableCell align="right">TC oficial</TableCell>
+            <TableCell align="right">Neto</TableCell>
             <TableCell align="right">Neto (USD)</TableCell>
+              {conceptLabels.map((label) => (
+                  <TableCell key={label} align="right">{label}</TableCell>
+              ))}
+            <TableCell align="right">Descuentos</TableCell>
+            <TableCell align="right">TC oficial</TableCell>
           </TableRow>
         </TableHead>
         <MotionTableBody variants={staggerContainer} initial="hidden" animate="visible">
           {rows.map((p) => (
             <MotionTableRow key={p.id} variants={fadeUpItem}>
-              <TableCell>{p.periodo}</TableCell>
-              {conceptLabels.map((label) => {
-                const monto = montoOf(p, label);
-                return (
-                  <TableCell key={label} align="right">
-                    {monto != null ? formatMoney(monto, "ARS") : dash}
-                  </TableCell>
-                );
-              })}
-              <TableCell align="right">{formatMoney(p.remunerativo, "ARS")}</TableCell>
-              <TableCell align="right">{formatMoney(p.descuentos, "ARS")}</TableCell>
-              <TableCell align="right">{formatMoney(p.neto, "ARS")}</TableCell>
+              <TableCell sx={{ whiteSpace: "nowrap" }}>
+                {p.periodo}
+                {p.tipo === "sac" && <Chip label="SAC" size="small" color="secondary" variant="outlined" sx={{ ml: 1 }} />}
+              </TableCell>
               <TableCell align="right">{formatMoney(p.brutoTotal, "ARS")}</TableCell>
-              <TableCell align="right">{p.costoTotalEmpleador != null ? formatMoney(p.costoTotalEmpleador, "ARS") : dash}</TableCell>
-              <TableCell align="right"><RateCell payslip={p} /></TableCell>
+              <TableCell align="right">{formatMoney(p.neto, "ARS")}</TableCell>
               <TableCell align="right">{p.netoUsd != null ? formatMoney(p.netoUsd, "USD") : dash}</TableCell>
+                {conceptLabels.map((label) => {
+                    const monto = montoOf(p, label);
+                    return (
+                        <TableCell key={label} align="right">
+                            {monto != null ? formatMoney(monto, "ARS") : dash}
+                        </TableCell>
+                    );
+                })}
+
+                <TableCell align="right">{formatMoney(p.descuentos, "ARS")}</TableCell>
+              <TableCell align="right"><RateCell payslip={p} /></TableCell>
             </MotionTableRow>
           ))}
         </MotionTableBody>
