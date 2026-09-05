@@ -10,7 +10,7 @@ Vite + React 18 + MUI · Express + MongoDB.
 ```bash
 bun install
 cp .env.example .env
-docker compose up -d       # MongoDB en localhost:27017
+docker compose up -d       # MongoDB en localhost:27018
 bun run seed               # reglas de categoría base
 bun run dev                # API :4000 + SPA :5173
 ```
