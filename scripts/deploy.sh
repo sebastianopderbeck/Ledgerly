@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_DIR/scripts/service-common.sh"
-HEALTH_TIMEOUT_SECONDS=45
+HEALTH_TIMEOUT_SECONDS="${LEDGERLY_HEALTH_TIMEOUT:-45}"
+ERR_LOG="$LOG_DIR/server.err.log"
 
 listener_pid() {
   lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -n 1
@@ -71,13 +72,17 @@ cd "$PROD_DIR"
 MONGOMS_DISABLE_POSTINSTALL=1 bun install --frozen-lockfile
 bun run build
 
-: > "$LOG_DIR/server.err.log"
+: > "$ERR_LOG"
 OLD_PID="$(listener_pid || true)"
 launchctl kickstart -k "$DOMAIN/$LABEL"
 
 if ! wait_for_new_server; then
-  tail -n 30 "$LOG_DIR/server.err.log" >&2
-  fail "El servidor no respondió en ${HEALTH_TIMEOUT_SECONDS}s. Para volver atrás: bun run deploy $PREVIOUS"
+  tail -n 30 "$ERR_LOG" >&2
+  CAUSE="$(grep -m 1 -E '^[[:alnum:]]*Error' "$ERR_LOG" || true)"
+  if [[ -n "$CAUSE" ]]; then
+    echo "Causa: $CAUSE" >&2
+  fi
+  fail "El servidor no respondió en ${HEALTH_TIMEOUT_SECONDS}s (log completo: $ERR_LOG). Para volver atrás: bun run deploy $PREVIOUS"
 fi
 
 ADDRESSES="$(listen_addresses || true)"

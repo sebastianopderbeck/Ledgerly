@@ -662,7 +662,7 @@ docker stop ledgerly-mongo
 bun run deploy; echo "exit=$?"
 ```
 
-Expected: tras ~45 s, las últimas líneas de `server.err.log` con `MongooseServerSelectionError`, la línea `✖ El servidor no respondió en 45s. Para volver atrás: bun run deploy <sha>` y `exit=1`.
+Expected: tras ~45 s, las últimas líneas de `server.err.log`, `Causa: MongooseServerSelectionError: connect ECONNREFUSED …:27018`, la línea `✖ El servidor no respondió en 45s (log completo: …/server.err.log). Para volver atrás: bun run deploy <sha>` y `exit=1`.
 
 Luego:
 

@@ -20,6 +20,17 @@ case "$1" in
   enable) rm -f "$STUB/disabled" ;;
   disable) touch "$STUB/disabled" ;;
   kickstart)
+    if [[ -f "$STUB/crash" ]]; then
+      {
+        echo "file:///app/node_modules/mongoose/lib/connection.js:1169"
+        echo "    err = new ServerSelectionError();"
+        echo "MongooseServerSelectionError: connect ECONNREFUSED 127.0.0.1:27018"
+        for i in $(seq 1 40); do echo "    detalle $i"; done
+        echo "Node.js v20.19.6"
+      } >> "$HOME/Library/Logs/Ledgerly/server.err.log"
+      rm -f "$STUB/listen"
+      exit 0
+    fi
     nohup sleep 300 >/dev/null 2>&1 &
     echo $! > "$STUB/pid"
     echo $! >> "$STUB/spawned"
@@ -179,6 +190,16 @@ run_install
 check "exit 0" '[[ $CODE -eq 0 ]]'
 check "enable antes de bootstrap" '[[ "$(grep -nE "^(enable|bootstrap) " "$STUB/launchctl.log" | head -n1)" == *"enable "* ]]'
 check "publicado" '[[ "$OUT" == *"✔ Publicado"* ]]'
+cleanup_spawned
+
+echo "8. si el server no arranca, el deploy muestra la causa y dónde está el log"
+setup con-host t8; install_prod
+touch "$STUB/crash"
+OUT="$(LEDGERLY_HEALTH_TIMEOUT=2 bash "$T/repo/scripts/deploy.sh" origin/main 2>&1)"; CODE=$?
+check "exit 1" '[[ $CODE -eq 1 ]]'
+check "causa visible" '[[ "$OUT" == *"Causa: MongooseServerSelectionError: connect ECONNREFUSED"* ]]'
+check "ruta del log" '[[ "$OUT" == *"Library/Logs/Ledgerly/server.err.log"* ]]'
+check "comando de rollback" '[[ "$OUT" == *"Para volver atrás: bun run deploy"* ]]'
 cleanup_spawned
 
 rm -rf "$ROOT"

@@ -171,7 +171,9 @@ Se corre desde el repo de desarrollo con `bun run deploy`. Opera sobre `LEDGERLY
    y que `http://127.0.0.1:4100/api/health` responda `ok`. Exigir el PID nuevo evita dar por bueno
    el deploy contra el proceso viejo mientras muere. Los 45 segundos superan los 30 que tarda
    Mongoose en rendirse si Mongo no responde, así el error llega al log antes de mostrarlo. Si no
-   lo logra, sale con error y muestra las últimas 30 líneas de `server.err.log`.
+   lo logra, sale con error, muestra las últimas 30 líneas de `server.err.log`, la primera línea de
+   error como `Causa:` (las trazas de Mongoose superan las 30 líneas y el nombre del error quedaba
+   afuera) y la ruta del log completo.
 8. **Guarda de privacidad**, última línea de defensa (los chequeos de los pasos 1 y 3 ya previenen
    los casos conocidos): verifica con `lsof` que el puerto escuche **solo** en `127.0.0.1`. Si
    escucha en otra interfaz, `launchctl disable` (persiste entre reinicios: el servicio no vuelve a
