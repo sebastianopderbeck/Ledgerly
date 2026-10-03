@@ -2,6 +2,7 @@ import { Accordion, AccordionDetails, AccordionSummary, Box, Chip, CircularProgr
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useFutureInstallmentsDetail, type StatFilters } from "../api/hooks.js";
 import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
+import { yearsLabel } from "../filters/globalFilters.js";
 import { useGlobalFilters } from "../filters/useGlobalFilters.js";
 import { useInstallmentYearOptions } from "../filters/useYearOptions.js";
 import { formatMoney, formatMonthLabel } from "../format.js";
@@ -29,6 +30,7 @@ export const InstallmentsPage = () => {
   const plural = (n: number, singular: string) => `${n} ${singular}${n === 1 ? "" : "s"}`;
   const mesesLabel = months.length === 1 ? "1 mes" : `${months.length} meses`;
   const money = (value: number) => formatMoney(value, filters.currency);
+  const emptyLabel = years ? `No hay cuotas que venzan en ${yearsLabel(years)}` : "Sin cuotas pendientes";
 
   return (
     <>
@@ -36,7 +38,7 @@ export const InstallmentsPage = () => {
       <FiltersBar fields={INSTALLMENT_FIELDS} yearOptions={yearOptions} />
 
       {isLoading && <CircularProgress />}
-      {!isLoading && months.length === 0 && <Typography color="text.secondary">Sin cuotas pendientes</Typography>}
+      {!isLoading && months.length === 0 && <Typography color="text.secondary">{emptyLabel}</Typography>}
 
       {!isLoading && months.length > 0 && (
         <>

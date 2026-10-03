@@ -40,6 +40,11 @@ export const yearOptionsWith = (options: string[], selection: YearSelection): st
   return uniqueSorted([...options, ...selected, currentYear()]).reverse();
 };
 
+export const yearsLabel = (years: string[]): string => {
+  if (years.length <= 1) return years.join("");
+  return `${years.slice(0, -1).join(", ")} y ${years[years.length - 1]}`;
+};
+
 export const yearsOf = (values: string[]): string[] => uniqueSorted(values.map((value) => value.slice(0, 4)));
 
 export const writeYears = (params: URLSearchParams, selection: YearSelection): void => {

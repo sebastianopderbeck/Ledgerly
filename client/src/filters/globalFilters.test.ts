@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   ALL_YEARS, filterInYears, globalSearch, matchesYears, parseYears, resolveYearChange,
-  writeYears, yearOptionsWith, yearsForApi, yearsOf, type YearSelection,
+  writeYears, yearOptionsWith, yearsForApi, yearsLabel, yearsOf, type YearSelection,
 } from "./globalFilters.js";
 
 const ALL: YearSelection = { kind: "all" };
@@ -94,6 +94,14 @@ describe("yearOptionsWith", () => {
 describe("yearsOf", () => {
   it("extrae los años únicos ordenados", () => {
     expect(yearsOf(["2026-01", "2025-12-31", "2026-03"])).toEqual(["2025", "2026"]);
+  });
+});
+
+describe("yearsLabel", () => {
+  it("nombra uno, dos o varios años en castellano", () => {
+    expect(yearsLabel(["2025"])).toBe("2025");
+    expect(yearsLabel(["2025", "2026"])).toBe("2025 y 2026");
+    expect(yearsLabel(["2024", "2025", "2026"])).toBe("2024, 2025 y 2026");
   });
 });
 

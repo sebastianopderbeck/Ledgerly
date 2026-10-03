@@ -56,6 +56,11 @@ describe("DashboardPage", () => {
     expect(urlOf("/stats/by-category")).toContain(`year=${thisYear}`);
   });
 
+  it("la deuda en cuotas aclara en qué años vence", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/?year=2025&year=2026" });
+    expect(await screen.findByText("vence en 2025 y 2026")).toBeInTheDocument();
+  });
+
   it("con year=all no manda year", async () => {
     renderWithProviders(<DashboardPage />, { route: "/?year=all" });
     await waitFor(() => expect(urlOf("/stats/summary")).toBeDefined());
