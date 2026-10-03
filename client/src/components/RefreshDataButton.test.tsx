@@ -31,6 +31,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const cssFor = (element: Element): string => {
+  const classes = Array.from(element.classList).filter((name) => name.startsWith("css-"));
+  const rules = Array.from(document.querySelectorAll("style"))
+    .map((style) => style.textContent ?? "")
+    .join("\n")
+    .split("}");
+  return rules.filter((rule) => classes.some((name) => rule.includes(`.${name}`))).join("}");
+};
+
 describe("RefreshDataButton", () => {
   it("pide la actualización al servidor cuando se hace click", async () => {
     renderWithProviders(<RefreshDataButton />);
@@ -76,5 +85,18 @@ describe("RefreshDataButton", () => {
     settle(jsonResponse({ error: "argentinadatos no responde" }, 502));
 
     await waitFor(() => expect(screen.getByText("argentinadatos no responde")).toBeInTheDocument());
+  });
+
+  it("el aviso reserva el lugar de la barra inferior y la zona segura del iPhone", async () => {
+    renderWithProviders(<RefreshDataButton />);
+
+    fireEvent.click(screen.getByLabelText("actualizar datos"));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    settle(jsonResponse(summary));
+
+    await waitFor(() => expect(document.querySelector(".MuiSnackbar-root")).toBeInTheDocument());
+    const css = cssFor(document.querySelector(".MuiSnackbar-root")!);
+    expect(css).toContain("env(safe-area-inset-bottom)");
+    expect(css).toContain("64px");
   });
 });
