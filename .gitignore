@@ -5,3 +5,4 @@ dist/
 .superpowers/
 /examples
 *.pdf
+/.claude/worktrees
