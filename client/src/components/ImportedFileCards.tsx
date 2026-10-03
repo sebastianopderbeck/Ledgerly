@@ -6,6 +6,7 @@ import { formatLocalDate } from "../format.js";
 import { IMPORTED_FILE_KIND_LABELS, importedFileDeleteMessage } from "../importedFiles.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { RecordCard, recordListSx, type RecordField } from "./RecordCard.js";
+import { iconTapTargetSx } from "./tapTarget.js";
 
 interface ImportedFileCardsProps {
   rows: ImportedFileDTO[];
@@ -53,7 +54,7 @@ export const ImportedFileCards = ({ rows, onDelete }: ImportedFileCardsProps) =>
       meta={file.description}
       badge={<FileBadges file={file} />}
       action={(
-        <IconButton edge="end" aria-label={`borrar ${file.fileName}`} onClick={() => setPending(file)}>
+        <IconButton edge="end" aria-label={`borrar ${file.fileName}`} onClick={() => setPending(file)} sx={iconTapTargetSx}>
           <DeleteIcon />
         </IconButton>
       )}

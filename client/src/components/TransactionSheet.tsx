@@ -6,6 +6,7 @@ import { formatMoney } from "../format.js";
 import { installmentLabel } from "../transactionInstallment.js";
 import { BottomSheet } from "./BottomSheet.js";
 import { RecordFields, type RecordField } from "./RecordCard.js";
+import { tapTargetSx } from "./tapTarget.js";
 
 interface TransactionSheetProps {
   transaction: TransactionDTO | null;
@@ -61,8 +62,8 @@ const TransactionForm = ({ transaction, onClose, onSave, onDelete }: Transaction
         sx={{ mt: 2.5 }}
       />
       <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
-        <Button fullWidth color="error" onClick={remove}>Borrar</Button>
-        <Button fullWidth variant="contained" disabled={!changed} onClick={save}>Guardar</Button>
+        <Button fullWidth color="error" onClick={remove} sx={tapTargetSx}>Borrar</Button>
+        <Button fullWidth variant="contained" disabled={!changed} onClick={save} sx={tapTargetSx}>Guardar</Button>
       </Box>
     </>
   );

@@ -7,6 +7,7 @@ import { installmentLabel } from "../transactionInstallment.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { MOBILE_NAV_HEIGHT } from "./layout/MobileBottomNav.js";
 import { TransactionSheet } from "./TransactionSheet.js";
+import { MIN_TAP_SIZE, tapTargetSx } from "./tapTarget.js";
 import { useSheetTarget } from "./useSheetTarget.js";
 import { useTransactionSelection } from "./useTransactionSelection.js";
 
@@ -123,9 +124,9 @@ export const TransactionsList = ({ rows, onCategoryChange, onDelete }: Transacti
 
   return (
     <Box component="section" aria-label="movimientos" sx={sectionSx}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 40, mb: 1 }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: MIN_TAP_SIZE, mb: 1 }}>
         <Typography variant="subtitle2" color="text.secondary">{countLabel}</Typography>
-        {canStartSelecting && <Button size="small" onClick={startSelecting}>Seleccionar</Button>}
+        {canStartSelecting && <Button size="small" onClick={startSelecting} sx={tapTargetSx}>Seleccionar</Button>}
       </Box>
       {isEmpty && <Typography color="text.secondary">No hay movimientos con estos filtros.</Typography>}
       <List disablePadding>{items}</List>

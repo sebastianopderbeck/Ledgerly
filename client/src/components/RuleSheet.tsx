@@ -2,6 +2,7 @@ import { useState, type ChangeEvent } from "react";
 import { Box, Button, MenuItem, TextField } from "@mui/material";
 import type { CategoryRuleDTO } from "@ledgerly/shared";
 import { BottomSheet } from "./BottomSheet.js";
+import { tapTargetSx } from "./tapTarget.js";
 
 export type MatchType = CategoryRuleDTO["matchType"];
 
@@ -73,7 +74,9 @@ const RuleForm = ({ rule, onClose, onSave, onDelete }: RuleFormProps) => {
       slotProps={{ htmlInput: { inputMode: "numeric" } }}
     />
   );
-  const deleteButton = rule && <Button fullWidth color="error" onClick={() => onDelete(rule)}>Borrar</Button>;
+  const deleteButton = rule && (
+    <Button fullWidth color="error" onClick={() => onDelete(rule)} sx={tapTargetSx}>Borrar</Button>
+  );
 
   return (
     <Box sx={{ display: "grid", gap: 2, pt: 1 }}>
@@ -85,7 +88,7 @@ const RuleForm = ({ rule, onClose, onSave, onDelete }: RuleFormProps) => {
       <TextField label="Categoría" value={category} onChange={changeCategory} fullWidth />
       <Box sx={{ display: "flex", gap: 1 }}>
         {deleteButton}
-        <Button fullWidth variant="contained" disabled={!valid} onClick={save}>Guardar</Button>
+        <Button fullWidth variant="contained" disabled={!valid} onClick={save} sx={tapTargetSx}>Guardar</Button>
       </Box>
     </Box>
   );

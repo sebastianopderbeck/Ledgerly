@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { cssFor } from "../testing/cssFor.js";
 import { RateSheet, RateValue, canSaveRate, parseRate } from "./RateSheet.js";
 
 afterEach(cleanup);
@@ -80,6 +81,13 @@ describe("RateSheet", () => {
     rerender(<RateSheet open title={title} formKey="sac" current={1100} onSave={noop} onClose={noop} />);
     expect(rateInput(title)).toHaveValue("1100");
   });
+
+  it("Cancelar y Guardar miden al menos 44px de alto para el pulgar", () => {
+    render(<RateSheet open title="TC cuota 6" formKey="c6" current={1350} onSave={noop} onClose={noop} />);
+    const cancel = within(screen.getByRole("dialog", { name: "TC cuota 6" })).getByRole("button", { name: "Cancelar" });
+    expect(cssFor(cancel)).toContain("min-height:44px");
+    expect(cssFor(saveButton())).toContain("min-height:44px");
+  });
 });
 
 describe("RateValue", () => {
@@ -89,5 +97,12 @@ describe("RateValue", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "editar TC cuota 6" }));
     expect(onEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("el lápiz mide al menos 44x44px para el pulgar", () => {
+    render(<RateValue rate={1350} editLabel="editar TC cuota 6" onEdit={noop} />);
+    const pencil = screen.getByRole("button", { name: "editar TC cuota 6" });
+    expect(cssFor(pencil)).toContain("min-width:44px");
+    expect(cssFor(pencil)).toContain("min-height:44px");
   });
 });

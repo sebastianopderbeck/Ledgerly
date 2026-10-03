@@ -2,6 +2,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { Box, Button, Card, CardContent, Collapse, Typography } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { MIN_TAP_SIZE } from "./tapTarget.js";
 
 export interface RecordField {
   label: string;
@@ -79,7 +80,7 @@ export const RecordCard = ({ title, label = title, meta, badge, action, highligh
               onClick={toggle}
               aria-expanded={expanded}
               endIcon={<ExpandMoreIcon sx={chevronSx(expanded)} />}
-              sx={{ mt: 1, ml: -1 }}
+              sx={{ mt: 1, ml: -1, minHeight: MIN_TAP_SIZE }}
             >
               {toggleLabel}
             </Button>
