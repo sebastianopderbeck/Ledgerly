@@ -50,6 +50,19 @@ const FilterHarness = ({ onDelete }: { onDelete: (ids: string[]) => void }) => {
   );
 };
 
+const fillers = Array.from({ length: 49 }, (_unused, index) => tx(`f${index}`, `RELLENO ${index}`));
+
+const PushPastPageHarness = ({ onDelete }: { onDelete: (ids: string[]) => void }) => {
+  const [pushed, setPushed] = useState(false);
+  const shown = pushed ? [rows[0], ...fillers, rows[2]] : rows;
+  return (
+    <>
+      <button onClick={() => setPushed(true)}>filtrar</button>
+      <TransactionsList rows={shown} onCategoryChange={vi.fn()} onDelete={onDelete} />
+    </>
+  );
+};
+
 const row = (merchant: string) => screen.getByRole("button", { name: new RegExp(merchant) });
 
 const confirmDialog = () => screen.getByRole("dialog", { name: "Borrar movimientos" });
@@ -157,6 +170,21 @@ describe("TransactionsList", () => {
     const bar = screen.getByRole("toolbar", { name: "selección" });
     await userEvent.click(within(bar).getByRole("button", { name: "Borrar (1)" }));
     expect(within(confirmDialog()).getByText(/¿borrar este movimiento\?/i)).toBeInTheDocument();
+    await userEvent.click(within(confirmDialog()).getByRole("button", { name: "Borrar" }));
+    expect(onDelete).toHaveBeenCalledWith(["1"]);
+  });
+
+  it("si una fila marcada queda detrás de «Ver más», la selección y el borrado la ignoran", async () => {
+    const onDelete = vi.fn();
+    renderWithProviders(<PushPastPageHarness onDelete={onDelete} />);
+    await userEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "seleccionar MERCADOLIBRE" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "seleccionar NOTEBOOK" }));
+    await userEvent.click(screen.getByRole("button", { name: "filtrar" }));
+    expect(screen.queryByRole("checkbox", { name: "seleccionar NOTEBOOK" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver más" })).toBeInTheDocument();
+    const bar = screen.getByRole("toolbar", { name: "selección" });
+    await userEvent.click(within(bar).getByRole("button", { name: "Borrar (1)" }));
     await userEvent.click(within(confirmDialog()).getByRole("button", { name: "Borrar" }));
     expect(onDelete).toHaveBeenCalledWith(["1"]);
   });

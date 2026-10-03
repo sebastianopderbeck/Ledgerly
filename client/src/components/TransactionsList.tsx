@@ -102,8 +102,9 @@ export const TransactionsList = ({ rows, onCategoryChange, onDelete }: Transacti
   }, [close]);
   const cancelDelete = useCallback(() => setPendingIds(null), []);
 
-  const rowIds = useMemo(() => new Set(rows.map((row) => row.id)), [rows]);
-  const visibleSelected = selected.filter((id) => rowIds.has(id));
+  const visibleRows = useMemo(() => rows.slice(0, visibleCount), [rows, visibleCount]);
+  const visibleIds = useMemo(() => new Set(visibleRows.map((row) => row.id)), [visibleRows]);
+  const visibleSelected = selected.filter((id) => visibleIds.has(id));
 
   const askDeleteSelected = () => setPendingIds(visibleSelected);
   const confirmDelete = () => {
@@ -112,7 +113,6 @@ export const TransactionsList = ({ rows, onCategoryChange, onDelete }: Transacti
     stopSelecting();
   };
 
-  const visibleRows = rows.slice(0, visibleCount);
   const hasMore = rows.length > visibleRows.length;
   const isEmpty = rows.length === 0;
   const canStartSelecting = !selecting && !isEmpty;
