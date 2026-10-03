@@ -49,7 +49,7 @@ Decisiones de detalle tomadas al planificar; no cambian lo acordado:
 
 ## Review Focus
 
-1. **Serie corta** (un solo año en Sueldo, con `monthOnly`; 3 cuotas): en mobile se ven todos los meses, sin raleo. → test en Task 1 (`thinTicks`) y en Task 4 (DolarReal con 3 meses).
+1. **Serie corta** (hasta 6 meses, p. ej. 3 cuotas): en mobile se ven todos los meses, sin raleo. → test en Task 1 (`thinTicks`) y en Task 4 (DolarReal con 3 meses).
 2. **Serie larga** (Contexto desde 2025, crédito con muchas cuotas): en mobile, a lo sumo 6 etiquetas y siempre aparece el último mes, que es el que la persona quiere leer. → tests en Task 1 y Task 4.
 3. **Pantalla que cruza los 900px con el gráfico montado** (iPad que rota): la leyenda pasa de nivo a `ChartLegend` y viceversa, sin quedar duplicada ni desaparecer. → test en Task 6.
 4. **Nombres largos** (comercios, categorías) a 375px: las barras horizontales cortan a 11 caracteres con "…" y ninguna página de gráficos genera scroll horizontal. → test de `truncateLabel` en Task 1 y chequeo de `scrollWidth` en Task 9.

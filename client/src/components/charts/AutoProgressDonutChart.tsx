@@ -25,7 +25,7 @@ export const AutoProgressDonutChart = () => {
     id: slice.id,
     label: slice.label,
     color: colors[index],
-    value: `${slice.value} cuotas`,
+    value: slice.value === 1 ? "1 cuota" : `${slice.value} cuotas`,
   }));
 
   return (

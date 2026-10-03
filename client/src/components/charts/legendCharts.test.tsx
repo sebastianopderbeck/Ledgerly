@@ -9,6 +9,7 @@ import { formatMoney } from "../../format.js";
 import type { RaceSerie } from "../../macroSignals.js";
 import { CategoryPie } from "./CategoryPie.js";
 import { MacroRaceChart } from "./MacroRaceChart.js";
+import { AutoProgressDonutChart } from "./AutoProgressDonutChart.js";
 
 vi.mock("@nivo/pie", async () => ({ ResponsivePie: (await import("../../testing/nivoProbe.js")).NivoProbe }));
 vi.mock("@nivo/line", async () => ({ ResponsiveLine: (await import("../../testing/nivoProbe.js")).NivoProbe }));
@@ -137,5 +138,22 @@ describe("carrera de indicadores", () => {
     renderWithProviders(<MacroRaceChart series={race} />);
     expect(legendList()).not.toBeInTheDocument();
     expect(chart()).toMatchObject({ legends: 1, tickValues: null, margin: { top: 16, right: 24, bottom: 84, left: 56 } });
+  });
+});
+
+describe("avance del plan del auto", () => {
+  it("en mobile dice 1 cuota en singular y el resto en plural", async () => {
+    const summary = {
+      grupo: "3684", orden: "97", plan: "K", modelo: "C3 AIRCROSS", cuotasPagadas: 1, cuotasTotales: 120,
+      porcentajeAvance: 0.0083, totalPagado: 268551.23, valorActualAuto: 41580000, totalPagadoUsd: 268.55,
+      ultimaCuota: 1, fechaUltimoVencimiento: "2026-07-10",
+    };
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify(summary), { status: 200, headers: { "Content-Type": "application/json" } })));
+    emulateMobile();
+    renderWithProviders(<AutoProgressDonutChart />);
+    const items = within(await screen.findByRole("list", { name: "referencias" })).getAllByRole("listitem");
+    expect(within(items[0]).getByText("1 cuota")).toBeInTheDocument();
+    expect(within(items[1]).getByText("119 cuotas")).toBeInTheDocument();
   });
 });
