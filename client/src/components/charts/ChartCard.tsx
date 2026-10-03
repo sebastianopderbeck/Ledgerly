@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Card, CardContent, Typography } from "@mui/material";
 import { MotionBox } from "../motion/motion.js";
 import { fadeUpItem } from "../motion/variants.js";
+import { compactCardContentSx } from "../compactCardContentSx.js";
 
 interface ChartCardProps {
   title: string;
@@ -10,7 +11,7 @@ interface ChartCardProps {
 
 export const ChartCard = ({ title, children }: ChartCardProps) => (
   <MotionBox variants={fadeUpItem}>
-    <Card><CardContent>
+    <Card><CardContent sx={compactCardContentSx}>
       <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
       {children}
     </CardContent></Card>
