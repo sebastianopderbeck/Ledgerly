@@ -4,6 +4,7 @@ import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { buildCardCycleBarData, type CardCycleEntry } from "../../cardCycle.js";
+import { LegendSwatch } from "./ChartLegend.js";
 
 interface CardCycleChartProps {
   cards: CardCycleEntry[];
@@ -34,7 +35,7 @@ export const CardCycleChart = ({ cards }: CardCycleChartProps) => {
         axisBottom={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
         tooltip={({ id, color, value }) => (
           <div style={{ ...chartTheme.tooltip?.container, display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: color, display: "inline-block" }} />
+            <LegendSwatch color={color} />
             <span>
               {id}: <strong>{formatMoney(Number(value), "ARS")}</strong>
             </span>

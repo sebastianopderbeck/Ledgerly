@@ -5,6 +5,7 @@ import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { buildCompositionData, monthLabel, rawKey } from "../../payslipConcepts.js";
+import { LegendSwatch } from "./ChartLegend.js";
 
 interface PayslipCompositionChartProps {
   payslips: PayslipDTO[];
@@ -40,7 +41,7 @@ export const PayslipCompositionChart = ({ payslips, monthOnly = false }: Payslip
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
         tooltip={({ id, color, data: row }) => (
           <div style={{ ...chartTheme.tooltip?.container, display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: color, display: "inline-block" }} />
+            <LegendSwatch color={color} />
             <span>
               {id}: <strong>{formatMoney(Number(row[rawKey(String(id))] ?? 0), "ARS")}</strong>
             </span>
