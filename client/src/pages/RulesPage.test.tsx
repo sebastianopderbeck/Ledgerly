@@ -44,6 +44,14 @@ describe("RulesPage", () => {
       expect(JSON.parse(patch!.body!)).toMatchObject({ category: "Viajes", pattern: "UBER", matchType: "contains", priority: 10 });
     });
   });
+
+  it("«Reaplicar a todo» manda el POST directo, sin confirmación", async () => {
+    renderWithProviders(<RulesPage />, { route: "/rules" });
+    await userEvent.click(await screen.findByRole("button", { name: "Reaplicar a todo" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(calls.filter((call) => call.method === "POST").map((call) => call.url))
+      .toEqual(["/api/category-rules/apply"]));
+  });
 });
 
 const sent = (method: string) => calls
@@ -104,5 +112,25 @@ describe("RulesPage en mobile", () => {
     expect(within(confirm).getByText(/¿borrar la regla «UBER»\?/i)).toBeInTheDocument();
     await userEvent.click(within(confirm).getByRole("button", { name: "Borrar" }));
     await waitFor(() => expect(sent("DELETE")).toEqual([{ url: "/api/category-rules/r1", body: undefined }]));
+  });
+
+  it("«Reaplicar a todo» pide confirmación y Cancelar no manda nada", async () => {
+    renderWithProviders(<RulesPage />, { route: "/rules" });
+    await userEvent.click(await screen.findByRole("button", { name: "Reaplicar a todo" }));
+    const confirm = screen.getByRole("dialog", { name: "Reaplicar reglas" });
+    expect(within(confirm).getByText(/recategoriza.*todos los movimientos que coinciden con alguna regla/i)).toBeInTheDocument();
+    expect(within(confirm).getByText(/a mano/i)).toBeInTheDocument();
+    expect(sent("POST")).toEqual([]);
+    await userEvent.click(within(confirm).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Reaplicar reglas" })).not.toBeInTheDocument());
+    expect(sent("POST")).toEqual([]);
+  });
+
+  it("«Reaplicar a todo» manda el POST una sola vez al confirmar", async () => {
+    renderWithProviders(<RulesPage />, { route: "/rules" });
+    await userEvent.click(await screen.findByRole("button", { name: "Reaplicar a todo" }));
+    expect(sent("POST")).toEqual([]);
+    await userEvent.click(within(screen.getByRole("dialog", { name: "Reaplicar reglas" })).getByRole("button", { name: "Reaplicar" }));
+    await waitFor(() => expect(sent("POST")).toEqual([{ url: "/api/category-rules/apply", body: undefined }]));
   });
 });
