@@ -2,6 +2,8 @@ import { createContext, useContext, useMemo } from "react";
 import { createTheme, alpha, type Theme } from "@mui/material/styles";
 import { useStoredState } from "./useStoredState.js";
 
+const mobileMedia = createTheme().breakpoints.down("md");
+
 type Mode = "light" | "dark";
 interface ColorModeContextValue { mode: Mode; toggle: () => void; theme: Theme; }
 
@@ -89,8 +91,8 @@ function buildTheme(mode: Mode): Theme {
     shape: { borderRadius: 14 },
     typography: {
       fontFamily: '"Poppins", "Segoe UI", system-ui, -apple-system, sans-serif',
-      h4: { fontWeight: 700, letterSpacing: "-0.02em" },
-      h5: { fontWeight: 700, letterSpacing: "-0.01em" },
+      h4: { fontWeight: 700, letterSpacing: "-0.02em", [mobileMedia]: { fontSize: "1.625rem" } },
+      h5: { fontWeight: 700, letterSpacing: "-0.01em", [mobileMedia]: { fontSize: "1.25rem" } },
       h6: { fontWeight: 600, letterSpacing: "-0.01em" },
       subtitle1: { fontWeight: 600 },
       subtitle2: { fontWeight: 600 },
@@ -136,10 +138,12 @@ function buildTheme(mode: Mode): Theme {
             borderRadius: 18,
             boxShadow: t.cardShadow,
             transition: "transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
-            "&:hover": {
-              transform: "translateY(-3px)",
-              boxShadow: t.cardHoverShadow,
-              borderColor: alpha(t.primary, 0.45),
+            "@media (hover: hover)": {
+              "&:hover": {
+                transform: "translateY(-3px)",
+                boxShadow: t.cardHoverShadow,
+                borderColor: alpha(t.primary, 0.45),
+              },
             },
           },
         },
