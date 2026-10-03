@@ -1,6 +1,6 @@
 const YEAR_PATTERN = /^\d{4}$/;
 
-export interface YearExpr { $in: [{ $year: string }, number[]] }
+export interface YearDateRange { date: { $gte: Date; $lt: Date } }
 
 export function parseYears(raw: unknown): number[] | null {
   const values = Array.isArray(raw) ? raw : [raw];
@@ -15,6 +15,8 @@ export function monthInYears(month: string, years: number[] | null): boolean {
   return years === null || years.includes(Number(month.slice(0, 4)));
 }
 
-export function yearExpr(field: string, years: number[]): YearExpr {
-  return { $in: [{ $year: `$${field}` }, years] };
+export function yearDateRanges(years: number[]): YearDateRange[] {
+  return years.map((year) => ({
+    date: { $gte: new Date(Date.UTC(year, 0, 1)), $lt: new Date(Date.UTC(year + 1, 0, 1)) },
+  }));
 }

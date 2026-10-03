@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { monthInYears, parseYears, yearExpr } from "./yearFilter.js";
+import { monthInYears, parseYears, yearDateRanges } from "./yearFilter.js";
 
 describe("parseYears", () => {
   it("acepta un año suelto", () => {
@@ -32,8 +32,11 @@ describe("monthInYears", () => {
   });
 });
 
-describe("yearExpr", () => {
-  it("arma un $in sobre el $year del campo", () => {
-    expect(yearExpr("date", [2025, 2026])).toEqual({ $in: [{ $year: "$date" }, [2025, 2026]] });
+describe("yearDateRanges", () => {
+  it("arma un rango [1/1, 1/1 del año siguiente) en UTC por año", () => {
+    expect(yearDateRanges([2025, 2026])).toEqual([
+      { date: { $gte: new Date("2025-01-01T00:00:00.000Z"), $lt: new Date("2026-01-01T00:00:00.000Z") } },
+      { date: { $gte: new Date("2026-01-01T00:00:00.000Z"), $lt: new Date("2027-01-01T00:00:00.000Z") } },
+    ]);
   });
 });

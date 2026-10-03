@@ -3,7 +3,7 @@ import type { FilterQuery } from "mongoose";
 import { HttpError, asyncHandler } from "../errors.js";
 import { TransactionModel, type TransactionDoc } from "../../db/models.js";
 import { toTransactionDTO } from "../mappers.js";
-import { parseYears, yearExpr } from "../yearFilter.js";
+import { parseYears, yearDateRanges } from "../yearFilter.js";
 
 function buildFilter(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   const filter: FilterQuery<TransactionDoc> = {};
@@ -23,7 +23,7 @@ function buildFilter(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
     if (typeof q.to === "string") filter.date.$lte = new Date(q.to);
   }
   const years = parseYears(q.year);
-  if (years) filter.$expr = yearExpr("date", years);
+  if (years) filter.$or = yearDateRanges(years);
   return filter;
 }
 
