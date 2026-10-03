@@ -5,6 +5,8 @@ import { TransactionModel, type TransactionDoc } from "../../db/models.js";
 import { toTransactionDTO } from "../mappers.js";
 import { parseYears, yearDateRanges } from "../yearFilter.js";
 
+const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 function buildFilter(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   const filter: FilterQuery<TransactionDoc> = {};
   if (typeof q.currency === "string") filter.currency = q.currency;
@@ -16,7 +18,7 @@ function buildFilter(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   if (categories.length) filter.category = { $in: categories };
   if (q.installment === "true") filter.isInstallment = true;
   else if (q.installment === "false") filter.isInstallment = false;
-  if (typeof q.search === "string") filter.merchant = { $regex: q.search, $options: "i" };
+  if (typeof q.search === "string") filter.merchant = { $regex: escapeRegex(q.search), $options: "i" };
   if (typeof q.from === "string" || typeof q.to === "string") {
     filter.date = {};
     if (typeof q.from === "string") filter.date.$gte = new Date(q.from);

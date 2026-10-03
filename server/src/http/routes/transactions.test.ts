@@ -53,6 +53,28 @@ describe("GET /api/transactions", () => {
     const categories = res.body.items.map((t: { category: string }) => t.category).sort();
     expect(categories).toEqual(["Compras", "Sin categoría"]);
   });
+  it("busca el comercio sin distinguir mayúsculas", async () => {
+    const res = await request(app).get("/api/transactions?search=mercado");
+    expect(res.body.total).toBe(1);
+    expect(res.body.items[0].merchant).toBe("MERCADOLIBRE");
+  });
+  it("busca los caracteres especiales tal cual y no como expresión regular", async () => {
+    const base = await StatementModel.findOne({});
+    const shared = {
+      statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-06"), categorySource: "rule",
+      category: "Impuestos", amount: 100, currency: "ARS", direction: "debit", type: "tax", isInstallment: false,
+      installmentCurrent: null, installmentTotal: null, comprobante: null,
+    };
+    await TransactionModel.insertMany([
+      { ...shared, descriptionRaw: "DB.RG 5617 30% ( )", merchant: "DB.RG 5617 30% ( )", fingerprint: "f4" },
+      { ...shared, descriptionRaw: "DBXRG 5617", merchant: "DBXRG 5617", fingerprint: "f5" },
+    ]);
+    const paren = await request(app).get(`/api/transactions?search=${encodeURIComponent("(")}`);
+    expect(paren.status).toBe(200);
+    expect(paren.body.items.map((t: { merchant: string }) => t.merchant)).toEqual(["DB.RG 5617 30% ( )"]);
+    const dot = await request(app).get(`/api/transactions?search=${encodeURIComponent("DB.RG")}`);
+    expect(dot.body.items.map((t: { merchant: string }) => t.merchant)).toEqual(["DB.RG 5617 30% ( )"]);
+  });
   it("categories devuelve las categorías distintas ordenadas", async () => {
     const res = await request(app).get("/api/transactions/categories");
     expect(res.body).toEqual(["Compras", "Sin categoría"]);
