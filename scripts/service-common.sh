@@ -4,6 +4,10 @@ LOG_DIR="$HOME/Library/Logs/Ledgerly"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 DOMAIN="gui/$(id -u)"
 REQUIRED_HOST="127.0.0.1"
+AUTO_LABEL="com.ledgerly.auto-deploy"
+AUTO_PLIST="$HOME/Library/LaunchAgents/$AUTO_LABEL.plist"
+AUTO_LOG="$LOG_DIR/auto-deploy.log"
+DEPLOY_BUSY=75
 
 fail() {
   echo "✖ $*" >&2

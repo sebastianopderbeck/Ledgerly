@@ -39,6 +39,14 @@ stop_exposed_server() {
 }
 
 [[ -d "$PROD_DIR/.git" ]] || fail "No existe $PROD_DIR. Corré primero: bun run service:install"
+
+if [[ -z "${LEDGERLY_DEPLOY_LOCKED:-}" ]]; then
+  CODE=0
+  LEDGERLY_DEPLOY_LOCKED=1 lockf -s -t 0 "$PROD_DIR/.git/ledgerly-deploy.lock" bash "${BASH_SOURCE[0]}" "$@" || CODE=$?
+  ((CODE != DEPLOY_BUSY)) || echo "✖ Ya hay un deploy en curso. Probá de nuevo cuando termine" >&2
+  exit "$CODE"
+fi
+
 launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 ||
   fail "El servicio $LABEL no está cargado. Corré: bun run service:install"
 NODE_BIN="$(plutil -extract ProgramArguments.2 raw "$PLIST")"
