@@ -5,13 +5,18 @@ import { useFutureInstallmentsDetail, type StatFilters } from "../../api/hooks.j
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { truncateLabel, useChartLayout } from "./useChartLayout.js";
 
 const TOP_LIMIT = 8;
+const DESKTOP_MARGIN = { top: 8, right: 24, bottom: 32, left: 136 };
+const MOBILE_MARGIN = { top: 8, right: 24, bottom: 8, left: 96 };
+const DESKTOP_LABEL_MAX = 16;
+const MOBILE_LABEL_MAX = 11;
 
 export const InstallmentsByMerchantChart = (filters: StatFilters) => {
   const theme = useTheme();
+  const { isMobile } = useChartLayout();
   const { data } = useFutureInstallmentsDetail(filters);
-  const truncate = (label: string) => (label.length > 16 ? `${label.slice(0, 15)}…` : label);
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -30,6 +35,7 @@ export const InstallmentsByMerchantChart = (filters: StatFilters) => {
   if (chartData.length === 0) return <Typography color="text.secondary">Sin cuotas pendientes</Typography>;
 
   const color = seriesColor(theme.palette.mode, 1);
+  const labelMax = isMobile ? MOBILE_LABEL_MAX : DESKTOP_LABEL_MAX;
 
   return (
     <Box sx={{ height: 260 }}>
@@ -40,7 +46,7 @@ export const InstallmentsByMerchantChart = (filters: StatFilters) => {
         indexBy="merchant"
         layout="horizontal"
         colors={[color]}
-        margin={{ top: 8, right: 24, bottom: 32, left: 136 }}
+        margin={isMobile ? MOBILE_MARGIN : DESKTOP_MARGIN}
         padding={0.3}
         borderRadius={6}
         enableGridY={false}
@@ -48,8 +54,8 @@ export const InstallmentsByMerchantChart = (filters: StatFilters) => {
         label={(bar) => formatMoneyCompact(Number(bar.value), filters.currency)}
         labelSkipWidth={44}
         labelTextColor={theme.palette.background.paper}
-        axisBottom={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), filters.currency) }}
-        axisLeft={{ tickSize: 0, tickPadding: 8, format: truncate }}
+        axisBottom={isMobile ? null : { tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), filters.currency) }}
+        axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => truncateLabel(String(value), labelMax) }}
         motionConfig="gentle"
       />
     </Box>
