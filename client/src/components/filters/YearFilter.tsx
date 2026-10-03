@@ -2,13 +2,14 @@ import type { ReactNode } from "react";
 import { Checkbox, ListItemText, MenuItem, TextField } from "@mui/material";
 import { ALL_YEARS, resolveYearChange, yearOptionsWith } from "../../filters/globalFilters.js";
 import { useGlobalFilters } from "../../filters/useGlobalFilters.js";
+import { selectedValues } from "./selectedValues.js";
 
 interface YearFilterProps { options: string[]; }
 
 const ALL_LABEL = "Todos";
 
 const renderSelected = (selected: unknown): ReactNode => {
-  const values = selected as string[];
+  const values = selectedValues(selected);
   return values.includes(ALL_YEARS) ? ALL_LABEL : values.join(", ");
 };
 
@@ -22,7 +23,7 @@ export const YearFilter = ({ options }: YearFilterProps) => {
     <TextField
       select label="Año" size="small" sx={{ minWidth: 160 }}
       value={value}
-      onChange={(event) => setYears(resolveYearChange(yearSelection, event.target.value as unknown as string[]))}
+      onChange={(event) => setYears(resolveYearChange(yearSelection, selectedValues(event.target.value)))}
       SelectProps={{ multiple: true, renderValue: renderSelected }}
     >
       <MenuItem value={ALL_YEARS}>

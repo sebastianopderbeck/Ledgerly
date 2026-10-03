@@ -1,6 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { MenuItem, TextField } from "@mui/material";
 import { useCategories } from "../../api/hooks.js";
+import { selectedValues } from "./selectedValues.js";
 
 export const TransactionFilters = () => {
   const [params, setParams] = useSearchParams();
@@ -25,8 +26,8 @@ export const TransactionFilters = () => {
       <TextField
         select label="Categorías" size="small" sx={{ minWidth: 220 }}
         value={params.getAll("category")}
-        onChange={(event) => setMulti("category", event.target.value as unknown as string[])}
-        SelectProps={{ multiple: true, renderValue: (selected) => (selected as string[]).join(", ") }}
+        onChange={(event) => setMulti("category", selectedValues(event.target.value))}
+        SelectProps={{ multiple: true, renderValue: (selected) => selectedValues(selected).join(", ") }}
       >
         {categories.map((category) => (
           <MenuItem key={category} value={category}>{category}</MenuItem>
