@@ -5,12 +5,15 @@ import { useFutureInstallmentsDetail, type StatFilters } from "../../api/hooks.j
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { categoricalPalette } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { ChartLegend, type ChartLegendItem } from "./ChartLegend.js";
+import { useChartLayout } from "./useChartLayout.js";
 
 const MAX_CATEGORIES = 7;
 const OTHER_LABEL = "Otras";
 
 export const InstallmentsByCategoryChart = (filters: StatFilters) => {
   const theme = useTheme();
+  const { isMobile, seriesMargin, bottomTicks } = useChartLayout();
   const { data } = useFutureInstallmentsDetail(filters);
 
   const { rows, keys } = useMemo(() => {
@@ -43,36 +46,41 @@ export const InstallmentsByCategoryChart = (filters: StatFilters) => {
   const palette = categoricalPalette(theme.palette.mode);
   const colors = keys.map((key, index) => (key === OTHER_LABEL ? theme.palette.text.disabled : palette[index % palette.length]));
 
+  const legendItems: ChartLegendItem[] = keys.map((key, index) => ({ id: key, label: key, color: colors[index] }));
+
   return (
-    <Box sx={{ height: 260 }}>
-      <ResponsiveBar
-        data={rows}
-        theme={nivoTheme(theme)}
-        keys={keys}
-        indexBy="month"
-        colors={colors}
-        margin={{ top: 8, right: 128, bottom: 56, left: 64 }}
-        padding={0.3}
-        borderRadius={3}
-        enableLabel={false}
-        enableGridX={false}
-        valueFormat={(value) => formatMoney(value, filters.currency)}
-        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45 }}
-        axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), filters.currency) }}
-        legends={[{
-          dataFrom: "keys",
-          anchor: "right",
-          direction: "column",
-          translateX: 120,
-          itemWidth: 110,
-          itemHeight: 20,
-          itemsSpacing: 2,
-          symbolShape: "circle",
-          symbolSize: 10,
-          itemTextColor: theme.palette.text.secondary,
-        }]}
-        motionConfig="gentle"
-      />
-    </Box>
+    <>
+      <Box sx={{ height: 260 }}>
+        <ResponsiveBar
+          data={rows}
+          theme={nivoTheme(theme)}
+          keys={keys}
+          indexBy="month"
+          colors={colors}
+          margin={seriesMargin({ top: 8, right: isMobile ? 24 : 128, bottom: 56, left: 64 })}
+          padding={0.3}
+          borderRadius={3}
+          enableLabel={false}
+          enableGridX={false}
+          valueFormat={(value) => formatMoney(value, filters.currency)}
+          axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45, tickValues: bottomTicks(rows.map((row) => row.month)) }}
+          axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), filters.currency) }}
+          legends={isMobile ? [] : [{
+            dataFrom: "keys",
+            anchor: "right",
+            direction: "column",
+            translateX: 120,
+            itemWidth: 110,
+            itemHeight: 20,
+            itemsSpacing: 2,
+            symbolShape: "circle",
+            symbolSize: 10,
+            itemTextColor: theme.palette.text.secondary,
+          }]}
+          motionConfig="gentle"
+        />
+      </Box>
+      {isMobile && <ChartLegend items={legendItems} />}
+    </>
   );
 };
