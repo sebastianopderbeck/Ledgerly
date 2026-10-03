@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
+import { emulateMobile } from "../testing/viewport.js";
 import { CreditsPage } from "./CreditsPage.js";
 
 const coupon = (id: string, cuotaNro: number, fechaDebito: string) => ({
@@ -30,6 +31,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("CreditsPage", () => {
@@ -66,5 +68,51 @@ describe("CreditsPage", () => {
     const listbox = await screen.findByRole("listbox");
     expect(within(listbox).getByRole("option", { name: "2025" })).toBeInTheDocument();
     expect(within(listbox).getByRole("option", { name: "2026" })).toBeInTheDocument();
+  });
+});
+
+const patches = () => vi.mocked(fetch).mock.calls
+  .filter(([, init]) => init?.method === "PATCH")
+  .map(([url, init]) => ({ url: String(url), body: JSON.parse(String(init?.body)) as unknown }));
+
+const openRateSheet = async (cuota: number) => {
+  const card = await screen.findByRole("article", { name: `Cuota ${cuota}` });
+  await userEvent.click(within(card).getByRole("button", { name: "Ver detalle" }));
+  await userEvent.click(within(card).getByRole("button", { name: `editar TC cuota ${cuota}` }));
+  return screen.getByRole("dialog", { name: `TC cuota ${cuota}` });
+};
+
+describe("CreditsPage en mobile", () => {
+  beforeEach(() => emulateMobile());
+
+  it("muestra el detalle mes a mes como tarjetas, sin tabla", async () => {
+    renderWithProviders(<CreditsPage />, { route: "/credits?year=all" });
+    expect(await screen.findByRole("article", { name: "Cuota 1" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Cuota 6" })).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+  });
+
+  it("cambiar el TC desde la hoja manda el PATCH del cupón", async () => {
+    renderWithProviders(<CreditsPage />, { route: "/credits?year=all" });
+    const sheet = await openRateSheet(6);
+    const input = within(sheet).getByRole("textbox", { name: "TC oficial" });
+    expect(input).toHaveValue("1350");
+    await userEvent.clear(input);
+    await userEvent.type(input, "1415,5");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(patches()).toEqual([{ url: "/api/credits/coupons/2", body: { tipoCambioUsd: 1415.5 } }]));
+  });
+
+  it("un TC igual al actual o de 0 no manda nada", async () => {
+    renderWithProviders(<CreditsPage />, { route: "/credits?year=all" });
+    const sheet = await openRateSheet(6);
+    const save = within(sheet).getByRole("button", { name: "Guardar" });
+    expect(save).toBeDisabled();
+    const input = within(sheet).getByRole("textbox", { name: "TC oficial" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "0");
+    fireEvent.click(save);
+    expect(patches()).toEqual([]);
   });
 });
