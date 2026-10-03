@@ -1,8 +1,8 @@
-import { NavLink, useSearchParams } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Tooltip } from "@mui/material";
-import { globalSearch } from "../../filters/globalFilters.js";
 import { NAV_ITEMS } from "./navItems.js";
 import { sidebarItemSx } from "./sidebarItemSx.js";
+import { useNavSearch } from "./useNavSearch.js";
 
 interface SidebarNavProps {
   collapsed?: boolean;
@@ -10,8 +10,7 @@ interface SidebarNavProps {
 }
 
 export const SidebarNav = ({ collapsed = false, onNavigate }: SidebarNavProps) => {
-  const [params] = useSearchParams();
-  const search = globalSearch(params);
+  const search = useNavSearch();
 
   return (
     <Box component="nav" aria-label="principal" sx={{ flexGrow: 1, overflowX: "hidden", overflowY: "auto", px: 1.5 }}>
