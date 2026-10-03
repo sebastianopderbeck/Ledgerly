@@ -11,6 +11,7 @@ write_stubs() {
   cat > "$STUB/bin/launchctl" <<'EOF'
 #!/usr/bin/env bash
 echo "$*" >> "$STUB/launchctl.log"
+[[ "$*" == *auto-deploy* ]] && { [[ "$1" != print ]]; exit; }
 case "$1" in
   print) [[ -f "$STUB/loaded" ]] ;;
   bootout)
@@ -20,7 +21,8 @@ case "$1" in
   enable) rm -f "$STUB/disabled" ;;
   disable) touch "$STUB/disabled" ;;
   kickstart)
-    if [[ -f "$STUB/crash" ]]; then
+    if [[ -f "$STUB/crash" || -f "$STUB/crash_once" ]]; then
+      rm -f "$STUB/crash_once"
       {
         echo "file:///app/node_modules/mongoose/lib/connection.js:1169"
         echo "    err = new ServerSelectionError();"
@@ -56,6 +58,7 @@ fi
 EOF
   printf '#!/usr/bin/env bash\necho %s\n' "'{\"status\":\"ok\"}'" > "$STUB/bin/curl"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB/bin/bun"
+  printf '#!/usr/bin/env bash\necho "$*" >> "$STUB/notify.log"\n' > "$STUB/bin/osascript"
   chmod +x "$STUB/bin/"*
 }
 
@@ -124,6 +127,25 @@ run_install() {
   OUT="$(bash "$T/repo/scripts/install-service.sh" 2>&1)"; CODE=$?
 }
 
+run_auto() {
+  OUT="$(bash "$T/repo/scripts/auto-deploy.sh" 2>&1)"; CODE=$?
+}
+
+push_commit() {
+  echo "// $1" >> "$T/work/server/src/index.ts"
+  git -C "$T/work" add -A && git -C "$T/work" -c user.email=t@t -c user.name=t commit -qm "$1"
+  git -C "$T/work" push -q origin HEAD:main
+  PUSHED="$(git -C "$T/work" rev-parse HEAD)"
+}
+
+prod_head() {
+  git -C "$LEDGERLY_PROD_DIR" rev-parse HEAD
+}
+
+kickstarts() {
+  cat "$STUB/launchctl.log" 2>/dev/null | grep -c kickstart
+}
+
 cleanup_spawned() {
   [[ -f "$STUB/spawned" ]] && xargs kill 2>/dev/null < "$STUB/spawned"
   true
@@ -190,6 +212,8 @@ run_install
 check "exit 0" '[[ $CODE -eq 0 ]]'
 check "enable antes de bootstrap" '[[ "$(grep -nE "^(enable|bootstrap) " "$STUB/launchctl.log" | head -n1)" == *"enable "* ]]'
 check "publicado" '[[ "$OUT" == *"✔ Publicado"* ]]'
+check "avisa que falta el deploy automático" '[[ "$OUT" == *"deploy automático queda sin instalar"* ]]'
+check "sin plist de deploy automático" '[[ ! -f "$HOME/Library/LaunchAgents/com.ledgerly.auto-deploy.plist" ]]'
 cleanup_spawned
 
 echo "8. si el server no arranca, el deploy muestra la causa y dónde está el log"
@@ -200,6 +224,84 @@ check "exit 1" '[[ $CODE -eq 1 ]]'
 check "causa visible" '[[ "$OUT" == *"Causa: MongooseServerSelectionError: connect ECONNREFUSED"* ]]'
 check "ruta del log" '[[ "$OUT" == *"Library/Logs/Ledgerly/server.err.log"* ]]'
 check "comando de rollback" '[[ "$OUT" == *"Para volver atrás: bun run deploy"* ]]'
+cleanup_spawned
+
+echo "9. sin cambios en origin/main el deploy automático no hace nada"
+setup con-host t9; install_prod
+run_auto
+check "exit 0" '[[ $CODE -eq 0 ]]'
+check "sin salida" '[[ -z "$OUT" ]]'
+check "sin kickstart" '[[ "$(kickstarts)" == 0 ]]'
+cleanup_spawned
+
+echo "10. un push a main se publica solo y avisa"
+setup con-host t10; install_prod
+push_commit "nuevo"
+run_auto
+check "exit 0" '[[ $CODE -eq 0 ]]'
+check "clon en el commit pusheado" '[[ "$(prod_head)" == "$PUSHED" ]]'
+check "notificación de publicado" 'grep -q "Publicado" "$STUB/notify.log"'
+run_auto
+check "el chequeo siguiente no vuelve a publicar" '[[ "$(kickstarts)" == 1 ]]'
+cleanup_spawned
+
+echo "11. si el deploy falla vuelve al commit anterior y no reintenta"
+setup con-host t11; install_prod
+BEFORE="$(prod_head)"
+push_commit "roto"
+touch "$STUB/crash_once"
+OUT="$(LEDGERLY_HEALTH_TIMEOUT=2 bash "$T/repo/scripts/auto-deploy.sh" 2>&1)"; CODE=$?
+check "exit 1" '[[ $CODE -eq 1 ]]'
+check "volvió al commit anterior" '[[ "$(prod_head)" == "$BEFORE" ]]'
+check "notificación de falla" 'grep -q "Falló el deploy" "$STUB/notify.log"'
+run_auto
+check "no reintenta el commit roto" '[[ "$(kickstarts)" == 2 ]]'
+cleanup_spawned
+
+echo "12. un rollback manual se mantiene hasta el próximo push"
+setup con-host t12; install_prod
+BEFORE="$(prod_head)"
+push_commit "v2"
+run_auto
+run_deploy "$BEFORE"
+run_auto
+check "sigue en el commit del rollback" '[[ "$(prod_head)" == "$BEFORE" ]]'
+push_commit "v3"
+run_auto
+check "el push siguiente se publica" '[[ "$(prod_head)" == "$PUSHED" ]]'
+cleanup_spawned
+
+echo "13. con un deploy en curso, el automático espera al próximo chequeo"
+setup con-host t13; install_prod
+push_commit "v2"
+lockf -t 0 "$LEDGERLY_PROD_DIR/.git/ledgerly-deploy.lock" bash -c 'touch "$STUB/held"; until [[ -f "$STUB/release" ]]; do sleep 0.1; done' &
+HOLDER=$!
+until [[ -f "$STUB/held" ]]; do sleep 0.1; done
+run_deploy origin/main
+check "deploy manual exit 75" '[[ $CODE -eq 75 ]]'
+check "mensaje en curso" '[[ "$OUT" == *"Ya hay un deploy en curso"* ]]'
+run_auto
+check "automático exit 0" '[[ $CODE -eq 0 ]]'
+check "todavía sin publicar" '[[ "$(prod_head)" != "$PUSHED" ]]'
+touch "$STUB/release"; wait "$HOLDER"
+run_auto
+check "publica cuando se libera" '[[ "$(prod_head)" == "$PUSHED" ]]'
+cleanup_spawned
+
+echo "14. install-service instala el deploy automático cuando origin/main lo tiene"
+setup con-host t14
+mkdir -p "$T/work/scripts"
+cp "$REPO_SRC/scripts/auto-deploy.sh" "$T/work/scripts/"
+push_commit "auto-deploy"
+run_install
+AUTO_PLIST="$HOME/Library/LaunchAgents/com.ledgerly.auto-deploy.plist"
+check "exit 0" '[[ $CODE -eq 0 ]]'
+check "plist válido" 'plutil -lint "$AUTO_PLIST" >/dev/null'
+check "corre el script del clon" '[[ "$(plutil -extract ProgramArguments.1 raw "$AUTO_PLIST")" == "$LEDGERLY_PROD_DIR/scripts/auto-deploy.sh" ]]'
+check "cada 60 segundos" '[[ "$(plutil -extract StartInterval raw "$AUTO_PLIST")" == 60 ]]'
+check "PATH con lsof" '[[ "$(plutil -extract EnvironmentVariables.PATH raw "$AUTO_PLIST")" == *":/usr/sbin"* ]]'
+check "bootstrap del agente" 'grep -q "^bootstrap .*com.ledgerly.auto-deploy.plist" "$STUB/launchctl.log"'
+check "mensaje instalado" '[[ "$OUT" == *"✔ Deploy automático"* ]]'
 cleanup_spawned
 
 rm -rf "$ROOT"
