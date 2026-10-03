@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { Box, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import type { AutoCouponDTO } from "@ledgerly/shared";
-import { useAutoCoupons, usePatchAutoRate } from "../api/hooks.js";
+import { usePatchAutoRate } from "../api/hooks.js";
+import { useAutoCouponsInYears } from "../filters/useInYears.js";
 import { byCuotaNro, uniqueConceptLabels } from "../autoConcepts.js";
 import { formatMoney } from "../format.js";
 import { MotionTableBody, MotionTableRow } from "./motion/motion.js";
@@ -47,7 +48,7 @@ const RateCell = ({ coupon }: { coupon: AutoCouponDTO }) => {
 };
 
 export const AutoCouponsTable = () => {
-  const { data } = useAutoCoupons();
+  const { data } = useAutoCouponsInYears();
   if (!data || data.length === 0) return null;
 
   const rows = [...data].sort(byCuotaNro);

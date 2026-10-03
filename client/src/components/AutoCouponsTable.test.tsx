@@ -26,14 +26,14 @@ afterEach(() => { vi.restoreAllMocks(); patchSpy.mockReset(); });
 
 describe("AutoCouponsTable", () => {
   it("muestra columnas de conceptos y Pagado (USD)", async () => {
-    renderWithProviders(<AutoCouponsTable />);
+    renderWithProviders(<AutoCouponsTable />, { route: "/?year=all" });
     await waitFor(() => expect(screen.getByText("Pagado (USD)")).toBeInTheDocument());
     expect(screen.getByText("ANTICIPO ALICUOTA (AL)")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /tc oficial/i })).toBeInTheDocument();
   });
 
   it("editar el TC dispara un PATCH a /auto/coupons", async () => {
-    renderWithProviders(<AutoCouponsTable />);
+    renderWithProviders(<AutoCouponsTable />, { route: "/?year=all" });
     await waitFor(() => expect(screen.getByText("Pagado (USD)")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /editar tc cuota 2/i }));
     const input = screen.getByRole("spinbutton", { name: /tc cuota 2/i });

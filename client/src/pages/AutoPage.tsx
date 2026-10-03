@@ -1,5 +1,8 @@
+import { useMemo } from "react";
 import { CircularProgress, Typography } from "@mui/material";
 import { useAutoCoupons } from "../api/hooks.js";
+import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
+import { yearsOf } from "../filters/globalFilters.js";
 import { AutoKpiCards } from "../components/AutoKpiCards.js";
 import { AutoCouponsTable } from "../components/AutoCouponsTable.js";
 import { MotionBox } from "../components/motion/motion.js";
@@ -11,9 +14,12 @@ import { CarValueChart } from "../components/charts/CarValueChart.js";
 import { AutoProgressDonutChart } from "../components/charts/AutoProgressDonutChart.js";
 import { AutoCouponUsdChart } from "../components/charts/AutoCouponUsdChart.js";
 
+const AUTO_FIELDS: FilterField[] = ["year"];
+
 export const AutoPage = () => {
   const { data, isLoading } = useAutoCoupons();
   const coupons = data ?? [];
+  const yearOptions = useMemo(() => yearsOf((data ?? []).map((coupon) => coupon.fechaVencimiento)), [data]);
 
   return (
     <>
@@ -28,6 +34,7 @@ export const AutoPage = () => {
 
       {!isLoading && coupons.length > 0 && (
         <>
+          <FiltersBar fields={AUTO_FIELDS} yearOptions={yearOptions} />
           <AutoKpiCards />
           <MotionBox
             variants={staggerContainer}

@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { Box, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import type { MortgageCouponDTO } from "@ledgerly/shared";
-import { useCreditCoupons, usePatchCouponRate } from "../api/hooks.js";
+import { usePatchCouponRate } from "../api/hooks.js";
+import { useCreditCouponsInYears } from "../filters/useInYears.js";
 import { formatMoney, formatUva } from "../format.js";
 import { MotionTableBody, MotionTableRow } from "./motion/motion.js";
 import { fadeUpItem, staggerContainer } from "./motion/variants.js";
@@ -46,7 +47,7 @@ const RateCell = ({ coupon }: { coupon: MortgageCouponDTO }) => {
 };
 
 export const MortgageCouponsTable = () => {
-  const { data } = useCreditCoupons();
+  const { data } = useCreditCouponsInYears();
   if (!data || data.length === 0) return null;
 
   const rows = [...data].sort((a, b) => a.cuotaNro - b.cuotaNro);

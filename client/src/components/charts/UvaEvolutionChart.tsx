@@ -1,14 +1,14 @@
 import { ResponsiveLine } from "@nivo/line";
 import { linearGradientDef } from "@nivo/core";
 import { Box, Typography, useTheme } from "@mui/material";
-import { useCreditCoupons } from "../../api/hooks.js";
+import { useCreditCouponsInYears } from "../../filters/useInYears.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 
 export const UvaEvolutionChart = () => {
   const theme = useTheme();
-  const { data } = useCreditCoupons();
+  const { data } = useCreditCouponsInYears();
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
   const points = [...data]

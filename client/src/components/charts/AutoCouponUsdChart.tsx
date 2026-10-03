@@ -1,7 +1,7 @@
 import { ResponsiveLine } from "@nivo/line";
 import { linearGradientDef } from "@nivo/core";
 import { Box, Typography, useTheme } from "@mui/material";
-import { useAutoCoupons } from "../../api/hooks.js";
+import { useAutoCouponsInYears } from "../../filters/useInYears.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
@@ -9,7 +9,7 @@ import { byCuotaNro } from "../../autoConcepts.js";
 
 export const AutoCouponUsdChart = () => {
   const theme = useTheme();
-  const { data } = useAutoCoupons();
+  const { data } = useAutoCouponsInYears();
   const points = (data ?? [])
     .filter((c) => c.totalUsd != null)
     .sort(byCuotaNro)
