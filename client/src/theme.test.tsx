@@ -31,3 +31,19 @@ describe("useColorModeState", () => {
     expect(result.current.mode).toBe("dark");
   });
 });
+
+describe("tema en pantallas chicas", () => {
+  it("achica h4 y h5 por debajo de 900px sin cambiar el tamaño de compu", () => {
+    const { result } = renderHook(() => useColorModeState());
+    const { typography } = result.current.theme;
+    expect(typography.h4).toMatchObject({ fontSize: "2.125rem", "@media (max-width:899.95px)": { fontSize: "1.625rem" } });
+    expect(typography.h5).toMatchObject({ fontSize: "1.5rem", "@media (max-width:899.95px)": { fontSize: "1.25rem" } });
+  });
+
+  it("el efecto al pasar el mouse por una tarjeta solo aplica en dispositivos con hover", () => {
+    const { result } = renderHook(() => useColorModeState());
+    const root = result.current.theme.components?.MuiCard?.styleOverrides?.root;
+    expect(root).toHaveProperty(["@media (hover: hover)", "&:hover", "transform"], "translateY(-3px)");
+    expect(root).not.toHaveProperty(["&:hover"]);
+  });
+});

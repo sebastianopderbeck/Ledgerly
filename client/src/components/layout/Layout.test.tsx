@@ -1,22 +1,12 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { Link } from "react-router-dom";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
+import { emulateDesktop, emulateMobile } from "../../testing/viewport.js";
 import { Layout } from "./Layout.js";
 import { NAV_ITEMS } from "./navItems.js";
 
 const SECTIONS = [/dashboard/i, /cuotas/i, /créditos/i, /auto/i, /sueldo/i, /contexto/i, /movimientos/i, /reglas/i, /importar/i];
-
-const emulateViewport = (matches: boolean) =>
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    matches,
-    media: query,
-    onchange: null,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
 
 const renderLayout = (route = "/") => renderWithProviders(<Layout><div>contenido</div></Layout>, { route });
 
@@ -86,20 +76,114 @@ describe("Layout", () => {
     expect(screen.queryByText("Movimientos")).not.toBeInTheDocument();
   });
 
-  it("en desktop no ofrece la hamburguesa", () => {
-    emulateViewport(true);
+  it("en compu no muestra la barra inferior", () => {
+    emulateDesktop();
     renderLayout();
+    expect(screen.queryByRole("button", { name: "Más" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "colapsar menú" })).toBeInTheDocument();
+  });
+});
+
+const cssFor = (element: Element): string => {
+  const classes = Array.from(element.classList).filter((name) => name.startsWith("css-"));
+  const rules = Array.from(document.querySelectorAll("style"))
+    .map((style) => style.textContent ?? "")
+    .join("\n")
+    .split("}");
+  return rules.filter((rule) => classes.some((name) => rule.includes(`.${name}`))).join("}");
+};
+
+const moreSheet = () => screen.queryByRole("dialog", { name: "Más secciones" });
+
+describe("Layout en mobile", () => {
+  beforeEach(() => emulateMobile());
+
+  const moreButton = () => within(mainNavigation()).getByRole("button", { name: "Más" });
+
+  it("la barra inferior muestra Inicio, Cuotas, Movimientos, Importar y Más", () => {
+    renderLayout();
+    const links = within(mainNavigation()).getAllByRole("link").map((link) => link.textContent);
+    expect(links).toEqual(["Inicio", "Cuotas", "Movimientos", "Importar"]);
+    expect(moreButton()).toBeInTheDocument();
+  });
+
+  it("no monta la sidebar de compu", () => {
+    renderLayout();
+    expect(screen.queryByRole("button", { name: "colapsar menú" })).not.toBeInTheDocument();
     expect(within(quickActions()).queryByLabelText("abrir menú")).not.toBeInTheDocument();
   });
 
-  it("en pantallas chicas abre la navegación desde la hamburguesa y la cierra al navegar", async () => {
-    emulateViewport(false);
+  it("marca la sección actual de la barra y deja «Más» sin marcar", () => {
+    renderLayout("/transactions");
+    expect(within(mainNavigation()).getByRole("link", { name: "Movimientos" })).toHaveAttribute("aria-current", "page");
+    expect(moreButton()).not.toHaveAttribute("aria-current");
+  });
+
+  it("en una sección de «Más», marca «Más» como actual", () => {
+    renderLayout("/credits");
+    expect(moreButton()).toHaveAttribute("aria-current", "page");
+    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("los links de la barra conservan los filtros globales y descartan los de Movimientos", () => {
+    renderLayout("/transactions?year=2025&currency=USD&category=Compras");
+    expect(within(mainNavigation()).getByRole("link", { name: "Cuotas" })).toHaveAttribute("href", "/installments?year=2025&currency=USD");
+  });
+
+  it("«Más» abre el resto de las secciones y la hoja se cierra al elegir una", async () => {
     renderLayout();
-    expect(screen.queryByRole("navigation", { name: /principal/i })).not.toBeInTheDocument();
+    fireEvent.click(moreButton());
+    const sheet = screen.getByRole("dialog", { name: "Más secciones" });
+    fireEvent.click(within(sheet).getByRole("link", { name: "Sueldo" }));
+    await waitFor(() => expect(moreSheet()).not.toBeInTheDocument());
+    expect(moreButton()).toHaveAttribute("aria-current", "page");
+  });
 
-    fireEvent.click(within(quickActions()).getByLabelText("abrir menú"));
-    fireEvent.click(within(mainNavigation()).getByRole("link", { name: /sueldo/i }));
+  it("si la ruta cambia con «Más» abierto (gesto de volver), la hoja se cierra", async () => {
+    renderWithProviders(<Layout><Link to="/auto">ir a auto</Link></Layout>);
+    fireEvent.click(moreButton());
+    expect(moreSheet()).toBeInTheDocument();
+    fireEvent.click(screen.getByText("ir a auto"));
+    await waitFor(() => expect(moreSheet()).not.toBeInTheDocument());
+  });
 
-    await waitFor(() => expect(screen.queryByRole("navigation", { name: /principal/i })).not.toBeInTheDocument());
+  it("con teclado, «Más» indica si está abierto y el foco vuelve a él al cerrar con Escape", async () => {
+    renderLayout();
+    const more = moreButton();
+    expect(more).toHaveAttribute("aria-haspopup", "dialog");
+    expect(more).toHaveAttribute("aria-expanded", "false");
+    more.focus();
+    fireEvent.click(more);
+    expect(more).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Más secciones" }), { key: "Escape" });
+    await waitFor(() => expect(more).toHaveFocus());
+    expect(more).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("si la pantalla pasa a tamaño compu con «Más» abierto, no queda nada tapando la app", async () => {
+    renderLayout();
+    fireEvent.click(moreButton());
+    emulateDesktop();
+    await waitFor(() => expect(moreSheet()).not.toBeInTheDocument());
+    expect(document.querySelector(".MuiBackdrop-root")).not.toBeInTheDocument();
+    expect(document.body.style.overflow).not.toBe("hidden");
+    expect(screen.getByRole("button", { name: "colapsar menú" })).toBeInTheDocument();
+  });
+
+  it("la barra, el contenido y la pill reservan la zona segura del iPhone", () => {
+    renderLayout();
+    expect(cssFor(mainNavigation())).toContain("env(safe-area-inset-bottom)");
+    expect(cssFor(screen.getByRole("main").firstElementChild!)).toContain("env(safe-area-inset-bottom)");
+    expect(cssFor(quickActions())).toContain("env(safe-area-inset-top)");
+  });
+
+  it("la franja de la barra de estado es oscura también en modo claro", () => {
+    localStorage.setItem("ledgerly.colorMode", JSON.stringify("light"));
+    renderLayout();
+    const scrim = Array.from(document.querySelectorAll("[aria-hidden]")).find(
+      (element) => cssFor(element).includes("height:env(safe-area-inset-top)"),
+    );
+    expect(scrim).toBeDefined();
+    expect(cssFor(scrim!)).toMatch(/background-color:\s*#0b0f19/i);
   });
 });
