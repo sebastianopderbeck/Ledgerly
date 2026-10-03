@@ -14,7 +14,7 @@ export interface ChartLayout {
   bottomTicks: <T>(values: T[]) => T[] | undefined;
 }
 
-const MOBILE_SERIES_LEFT = 48;
+const MOBILE_SERIES_LEFT = 56;
 const MOBILE_MAX_TICKS = 6;
 
 export const thinTicks = <T,>(values: T[], max: number): T[] => {

@@ -48,7 +48,7 @@ describe("series por mes en mobile", () => {
   it("angosta solo el margen izquierdo", () => {
     emulateMobile();
     renderWithProviders(<DolarRealChart dolarReal={dolarReal(14)} />);
-    expect(chart().margin).toEqual({ top: 16, right: 24, bottom: 64, left: 48 });
+    expect(chart().margin).toEqual({ top: 16, right: 24, bottom: 64, left: 56 });
   });
 
   it("también ralea las barras", () => {
@@ -57,7 +57,7 @@ describe("series por mes en mobile", () => {
     const { tickValues, margin } = chart();
     expect(tickValues!.length).toBeLessThanOrEqual(6);
     expect(tickValues!.at(-1)).toBe("2026-02");
-    expect(margin).toEqual({ top: 16, right: 24, bottom: 64, left: 48 });
+    expect(margin).toEqual({ top: 16, right: 24, bottom: 64, left: 56 });
   });
 });
 

@@ -118,7 +118,7 @@ describe("carrera de indicadores", () => {
     expect(items).toEqual(["Dólar", "UVA", "Plazo fijo"]);
     const { legends, margin, tickValues } = chart();
     expect(legends).toBe(0);
-    expect(margin).toEqual({ top: 16, right: 24, bottom: 64, left: 48 });
+    expect(margin).toEqual({ top: 16, right: 24, bottom: 64, left: 56 });
     expect(tickValues!.length).toBeLessThanOrEqual(6);
     expect(tickValues!.at(-1)).toBe("2026-02");
   });

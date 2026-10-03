@@ -67,7 +67,7 @@ describe("useChartLayout", () => {
     emulateMobile();
     const { result } = renderHook(() => useChartLayout());
     expect(result.current.isMobile).toBe(true);
-    expect(result.current.seriesMargin(margin)).toEqual({ top: 16, right: 24, bottom: 64, left: 48 });
+    expect(result.current.seriesMargin(margin)).toEqual({ top: 16, right: 24, bottom: 64, left: 56 });
     expect(result.current.bottomTicks(months(24))).toEqual(["m4", "m8", "m12", "m16", "m20", "m24"]);
   });
 });
