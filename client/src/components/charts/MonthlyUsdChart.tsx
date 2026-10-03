@@ -24,7 +24,7 @@ export const MonthlyUsdChart = (filters: StatFilters) => {
         data={series}
         theme={nivoTheme(theme)}
         colors={[color]}
-        margin={seriesMargin({ top: 16, right: 24, bottom: 40, left: 64 })}
+        margin={seriesMargin({ top: 16, right: 24, bottom: isMobile ? 64 : 40, left: 64 })}
         xScale={{ type: "point" }}
         yScale={{ type: "linear", min: 0, max: "auto" }}
         curve="monotoneX"
@@ -41,7 +41,7 @@ export const MonthlyUsdChart = (filters: StatFilters) => {
         ])]}
         fill={[{ match: "*", id: "usdArea" }]}
         enableGridX={false}
-        axisBottom={{ tickSize: 0, tickPadding: 10, tickValues: bottomTicks(points.map((d) => d.month)) }}
+        axisBottom={{ tickSize: 0, tickPadding: 10, ...(isMobile ? { tickRotation: -45 } : {}), tickValues: bottomTicks(points.map((d) => d.month)) }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "USD") }}
         yFormat={(value) => formatMoney(Number(value), "USD")}
         useMesh

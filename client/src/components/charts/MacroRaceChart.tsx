@@ -17,6 +17,7 @@ export const MacroRaceChart = ({ series }: MacroRaceChartProps) => {
 
   if (series.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
+  const months = [...new Set(series.flatMap((serie) => serie.data.map((point) => point.x)))].sort();
   const colors = series.map((_serie, slot) => seriesColor(theme.palette.mode, slot));
   const legendItems: ChartLegendItem[] = series.map((serie, slot) => ({
     id: serie.id,
@@ -38,7 +39,7 @@ export const MacroRaceChart = ({ series }: MacroRaceChartProps) => {
           lineWidth={3}
           pointSize={0}
           enableGridX={false}
-          axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45, tickValues: bottomTicks(series[0].data.map((point) => point.x)) }}
+          axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45, tickValues: bottomTicks(months) }}
           axisLeft={{ tickSize: 0, tickPadding: 8 }}
           yFormat={(value) => Number(value).toFixed(0)}
           legends={isMobile ? [] : [{

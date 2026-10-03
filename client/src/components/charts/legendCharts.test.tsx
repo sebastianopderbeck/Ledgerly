@@ -123,6 +123,15 @@ describe("carrera de indicadores", () => {
     expect(tickValues!.at(-1)).toBe("2026-02");
   });
 
+  it("en mobile toma los meses de todas las series, no solo de la primera", () => {
+    emulateMobile();
+    const [first, ...rest] = race;
+    renderWithProviders(<MacroRaceChart series={[{ ...first, data: first.data.slice(0, 10) }, ...rest]} />);
+    const { tickValues } = chart();
+    expect(tickValues!.length).toBeLessThanOrEqual(6);
+    expect(tickValues!.at(-1)).toBe("2026-02");
+  });
+
   it("en compu queda como siempre", () => {
     emulateDesktop();
     renderWithProviders(<MacroRaceChart series={race} />);
