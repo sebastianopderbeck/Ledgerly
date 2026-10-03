@@ -6,10 +6,9 @@ import { useNavSearch } from "./useNavSearch.js";
 
 interface SidebarNavProps {
   collapsed?: boolean;
-  onNavigate?: () => void;
 }
 
-export const SidebarNav = ({ collapsed = false, onNavigate }: SidebarNavProps) => {
+export const SidebarNav = ({ collapsed = false }: SidebarNavProps) => {
   const search = useNavSearch();
 
   return (
@@ -23,7 +22,6 @@ export const SidebarNav = ({ collapsed = false, onNavigate }: SidebarNavProps) =
                 to={{ pathname: to, search }}
                 end={to === "/"}
                 aria-label={label}
-                onClick={onNavigate}
                 sx={sidebarItemSx(collapsed)}
               >
                 <ListItemIcon><Icon fontSize="small" /></ListItemIcon>
