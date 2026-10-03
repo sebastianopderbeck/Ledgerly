@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, waitFor, cleanup } from "@testing-library/react";
+import { screen, waitFor, cleanup, within } from "@testing-library/react";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { TransactionsPage } from "./TransactionsPage.js";
 
@@ -12,7 +12,8 @@ const tx = {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-    const body = url.includes("/transactions/categories") ? ["Compras", "Salud"]
+    const body = url.includes("/stats/monthly") ? [{ month: "2025-11", total: 1, count: 1 }, { month: "2026-05", total: 1, count: 1 }]
+      : url.includes("/transactions/categories") ? ["Compras", "Salud"]
       : url.includes("/transactions") ? { items: [tx], total: 1, page: 1, pageSize: 50 }
       : {};
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -66,5 +67,16 @@ describe("TransactionsPage", () => {
     renderWithProviders(<TransactionsPage />, { route: "/transactions?year=all" });
     await waitFor(() => expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument());
     expect(listUrl()).not.toContain("year=");
+  });
+
+  it("el menú de Año sigue abierto al elegir varios años", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderWithProviders(<TransactionsPage />, { route: "/transactions?year=2026" });
+    await waitFor(() => expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("combobox", { name: /año/i }));
+    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "2025" }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes("year=2025&year=2026"))).toBe(true));
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument();
   });
 });
