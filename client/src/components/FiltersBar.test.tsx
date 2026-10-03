@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigationType } from "react-router-dom";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { emulateDesktop, emulateMobile } from "../testing/viewport.js";
 import { FiltersBar, type FilterField } from "./FiltersBar.js";
@@ -21,11 +21,14 @@ const LocationProbe = () => {
   return <output data-testid="search">{search}</output>;
 };
 
+const NavigationTypeProbe = () => <output data-testid="navigation-type">{useNavigationType()}</output>;
+
 const renderBar = (fields: FilterField[], route = "/", yearOptions = ["2025", "2026"]) =>
   renderWithProviders(
     <>
       <FiltersBar fields={fields} yearOptions={yearOptions} />
       <LocationProbe />
+      <NavigationTypeProbe />
     </>,
     { route },
   );
@@ -136,6 +139,15 @@ describe("FiltersBar", () => {
     expect(labels).toEqual(["Año", "Moneda", "Tarjeta", "Mes", "Categorías", "Cuotas", "Buscar comercio"]);
   });
 
+  it("en compu el buscador no lleva las pistas de teclado del celular", () => {
+    emulateDesktop();
+    renderBar(["transaction"], "/transactions");
+    const search = screen.getByRole("textbox", { name: "Buscar comercio" });
+    for (const name of ["enterkeyhint", "autocorrect", "autocapitalize", "spellcheck"]) {
+      expect(search).not.toHaveAttribute(name);
+    }
+  });
+
   it("en compu sigue mostrando los campos en línea, sin botón Filtros", () => {
     emulateDesktop();
     renderBar(["year", "currency"]);
@@ -171,6 +183,19 @@ describe("FiltersBar en mobile", () => {
     renderBar(DASHBOARD, "/?year=2026&currency=ARS");
     expect(filtersButton("Filtros")).toBeInTheDocument();
     expect(screen.getByText("2026 · ARS")).toBeInTheDocument();
+  });
+
+  it("con todo en su default el contador está oculto, no muestra un cero", () => {
+    const { container } = renderBar(DASHBOARD, "/?year=2026&currency=ARS");
+    expect(container.querySelector(".MuiBadge-badge")).toHaveClass("MuiBadge-invisible");
+  });
+
+  it("con filtros activos el contador muestra el número y no se lee aparte del nombre del botón", () => {
+    const { container } = renderBar(DASHBOARD, "/?year=2025&currency=USD&cardLabel=ICBC");
+    const badge = container.querySelector(".MuiBadge-badge");
+    expect(badge).not.toHaveClass("MuiBadge-invisible");
+    expect(badge).toHaveTextContent("3");
+    expect(badge).toHaveAttribute("aria-hidden", "true");
   });
 
   it("el contador y el resumen solo miran los campos de la sección", () => {
@@ -210,6 +235,30 @@ describe("FiltersBar en mobile", () => {
     await waitFor(() => expect(filtersSheet()).not.toBeInTheDocument());
     expect(filtersButton("Filtros, 2 activos")).toBeInTheDocument();
     expect(screen.getByText("2026 · USD · ICBC")).toBeInTheDocument();
+  });
+
+  it("el buscador y la hoja reemplazan la entrada del historial en vez de sumar una", async () => {
+    renderBar(TRANSACTIONS, "/transactions");
+    await userEvent.type(screen.getByRole("textbox", { name: "Buscar comercio" }), "ub");
+    expect(screen.getByTestId("navigation-type")).toHaveTextContent("REPLACE");
+    await userEvent.click(filtersButton("Filtros, 1 activo"));
+    await chooseInSheet(/moneda/i, "USD");
+    expect(currentParams().get("currency")).toBe("USD");
+    expect(screen.getByTestId("navigation-type")).toHaveTextContent("REPLACE");
+  });
+
+  it("el buscador pide teclado de búsqueda sin autocorregir y Enter lo cierra sin tocar la URL", async () => {
+    renderBar(TRANSACTIONS, "/transactions");
+    const search = screen.getByRole("textbox", { name: "Buscar comercio" });
+    expect(search).toHaveAttribute("enterkeyhint", "search");
+    expect(search).toHaveAttribute("autocorrect", "off");
+    expect(search).toHaveAttribute("autocapitalize", "none");
+    expect(search).toHaveAttribute("spellcheck", "false");
+    await userEvent.type(search, "uber");
+    const before = screen.getByTestId("search").textContent;
+    await userEvent.keyboard("{Enter}");
+    expect(search).not.toHaveFocus();
+    expect(screen.getByTestId("search").textContent).toBe(before);
   });
 
   it("con la hoja abierta, la navegación inferior queda tapada y «Listo» está en la hoja", async () => {

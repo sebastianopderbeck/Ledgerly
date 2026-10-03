@@ -38,7 +38,7 @@ export const MobileFiltersBar = ({ fields, yearOptions }: MobileFiltersBarProps)
         </Badge>
         <Typography variant="body2" color="text.secondary" noWrap sx={summarySx}>{summary}</Typography>
       </Box>
-      {showsSearch && <Box sx={{ mt: 2 }}><SearchFilter fullWidth /></Box>}
+      {showsSearch && <Box sx={{ mt: 2 }}><SearchFilter fullWidth touch /></Box>}
       <FiltersSheet open={open} onClose={closeSheet} fields={fields} yearOptions={yearOptions} />
     </Box>
   );
