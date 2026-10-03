@@ -4,7 +4,8 @@ import { formatMoney } from "../format.js";
 import { sumDescuento } from "../payslipConcepts.js";
 import { MotionBox } from "./motion/motion.js";
 import { CountUp } from "./motion/CountUp.js";
-import { fadeUpItem, staggerContainer } from "./motion/variants.js";
+import { fadeUpItem } from "./motion/variants.js";
+import { KpiGrid } from "./KpiGrid.js";
 
 interface DescuentoKpiSpec {
   label: string;
@@ -25,12 +26,7 @@ export const PayslipDescuentoKpis = ({ payslips }: PayslipDescuentoKpisProps) =>
   const totals = SPECS.map((spec) => ({ label: spec.label, ...sumDescuento(payslips, spec.match) }));
 
   return (
-    <MotionBox
-      variants={staggerContainer}
-      initial="hidden"
-      animate="visible"
-      sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2, mb: 3 }}
-    >
+    <KpiGrid cardCount={3}>
       {totals.map((total) => (
         <MotionBox key={total.label} variants={fadeUpItem}>
           <Card>
@@ -48,6 +44,6 @@ export const PayslipDescuentoKpis = ({ payslips }: PayslipDescuentoKpisProps) =>
           </Card>
         </MotionBox>
       ))}
-    </MotionBox>
+    </KpiGrid>
   );
 };
