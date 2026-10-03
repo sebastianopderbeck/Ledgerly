@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent } from "react";
 import { Box, Button, Typography } from "@mui/material";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
+import { useIsMobile } from "../useIsMobile.js";
 
 interface FileDropzoneProps { onFile: (file: File) => void; disabled?: boolean; }
 
@@ -8,6 +9,7 @@ const isPdf = (file: File): boolean =>
   file.type === "application/pdf" || /\.pdf$/i.test(file.name);
 
 export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) => {
+  const isMobile = useIsMobile();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [rejected, setRejected] = useState(false);
@@ -28,6 +30,8 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
     if (file) handleFile(file);
   };
 
+  const buttonLabel = isMobile ? "Elegir PDF" : "Elegir archivo";
+
   return (
     <Box
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -35,14 +39,20 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
       onDrop={handleDrop}
       sx={{
         border: "2px dashed", borderColor: dragging ? "primary.main" : "divider",
-        borderRadius: 2, p: 5, textAlign: "center", mb: 3,
+        borderRadius: 2, p: { xs: 3, md: 5 }, textAlign: "center", mb: 3,
         opacity: disabled ? 0.6 : 1,
       }}
     >
       <UploadFileIcon fontSize="large" color="action" />
-      <Typography sx={{ my: 1 }}>Arrastrá el PDF del resumen o</Typography>
-      <Button variant="contained" disabled={disabled} onClick={() => inputRef.current?.click()}>
-        Elegir archivo
+      {!isMobile && <Typography sx={{ my: 1 }}>Arrastrá el PDF del resumen o</Typography>}
+      <Button
+        variant="contained"
+        disabled={disabled}
+        fullWidth={isMobile}
+        onClick={() => inputRef.current?.click()}
+        sx={{ mt: { xs: 1, md: 0 } }}
+      >
+        {buttonLabel}
       </Button>
       {rejected && (
         <Typography color="error" variant="body2" sx={{ mt: 2 }}>
