@@ -1,4 +1,4 @@
-import type { AutoCouponDTO, CategoryRuleDTO, InflationRateDTO, MortgageCouponDTO, PayslipDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
+import type { AutoCouponDTO, CategoryRuleDTO, ImportedFileDTO, InflationRateDTO, MortgageCouponDTO, PayslipDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
 import type { AutoCouponDoc, CategoryRuleDoc, InflationRateDoc, MortgageCouponDoc, PayslipDoc, StatementDoc, TransactionDoc } from "../db/models.js";
 import type { HydratedDocument } from "mongoose";
 
@@ -120,4 +120,56 @@ export function toPayslipDTO(doc: HydratedDocument<PayslipDoc>): PayslipDTO {
 
 export function toInflationRateDTO(doc: HydratedDocument<InflationRateDoc>): InflationRateDTO {
   return { periodo: doc.periodo, variacionMensual: doc.variacionMensual };
+}
+
+const uploadedAtIso = (doc: object): string => (doc as { uploadedAt: Date }).uploadedAt.toISOString();
+
+const movementsLabel = (count: number): string => `${count} ${count === 1 ? "movimiento" : "movimientos"}`;
+
+export function statementToImportedFileDTO(doc: HydratedDocument<StatementDoc>, transactionCount: number): ImportedFileDTO {
+  return {
+    id: doc._id.toString(),
+    kind: "statement",
+    fileName: doc.sourceFileName,
+    uploadedAt: uploadedAtIso(doc),
+    documentDate: isoDate(doc.closingDate ?? null),
+    description: `${doc.cardLabel} · ${movementsLabel(transactionCount)}`,
+    needsReview: doc.needsReview,
+  };
+}
+
+export function mortgageCouponToImportedFileDTO(doc: HydratedDocument<MortgageCouponDoc>): ImportedFileDTO {
+  return {
+    id: doc._id.toString(),
+    kind: "coupon",
+    fileName: doc.sourceFileName,
+    uploadedAt: uploadedAtIso(doc),
+    documentDate: isoDate(doc.fechaDebito),
+    description: `Préstamo ${doc.prestamoNro} · cuota ${doc.cuotaNro}`,
+    needsReview: false,
+  };
+}
+
+export function autoCouponToImportedFileDTO(doc: HydratedDocument<AutoCouponDoc>): ImportedFileDTO {
+  return {
+    id: doc._id.toString(),
+    kind: "auto",
+    fileName: doc.sourceFileName,
+    uploadedAt: uploadedAtIso(doc),
+    documentDate: isoDate(doc.fechaVencimiento),
+    description: `Grupo ${doc.grupo} · cuota ${doc.cuotaNro}`,
+    needsReview: false,
+  };
+}
+
+export function payslipToImportedFileDTO(doc: HydratedDocument<PayslipDoc>): ImportedFileDTO {
+  return {
+    id: doc._id.toString(),
+    kind: "payslip",
+    fileName: doc.sourceFileName,
+    uploadedAt: uploadedAtIso(doc),
+    documentDate: isoDate(doc.fechaPago),
+    description: doc.tipo === "sac" ? `Período ${doc.periodo} · SAC` : `Período ${doc.periodo}`,
+    needsReview: false,
+  };
 }

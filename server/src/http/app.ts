@@ -12,6 +12,7 @@ import { inflationRouter } from "./routes/inflation.js";
 import { fxRouter } from "./routes/fx.js";
 import { macroRouter } from "./routes/macro.js";
 import { importRouter } from "./routes/import.js";
+import { importsRouter } from "./routes/imports.js";
 
 export function createApp(): express.Express {
   const app = express();
@@ -32,6 +33,7 @@ export function createApp(): express.Express {
   app.use("/api/fx", fxRouter);
   app.use("/api/macro", macroRouter);
   app.use("/api/import", importRouter);
+  app.use("/api/imports", importsRouter);
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "No encontrado")));
   app.use(errorMiddleware);
