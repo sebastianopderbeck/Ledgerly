@@ -7,7 +7,7 @@ import { representativeRateDate, consumptionMonth } from "../../stats/monthlyUsd
 import { latestStatementIdsPerIssuer } from "../../stats/lastStatement.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import type { Currency, MonthlyUsdStat } from "@ledgerly/shared";
-import { parseYears, yearExpr } from "../yearFilter.js";
+import { monthInYears, parseYears, yearExpr } from "../yearFilter.js";
 
 function baseMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   const currency = q.currency === "USD" ? "USD" : "ARS";
@@ -102,9 +102,11 @@ statsRouter.get("/monthly-usd", asyncHandler(async (req, res) => {
     const month = consumptionMonth(statement.closingDate.toISOString().slice(0, 10));
     totalArsByMonth.set(month, (totalArsByMonth.get(month) ?? 0) + (statement.totals?.saldoActual?.ars ?? 0));
   }
+  const years = parseYears(q.year);
+  const months = [...totalArsByMonth.keys()].filter((month) => monthInYears(month, years)).sort();
   const today = new Date().toISOString().slice(0, 10);
   const result: MonthlyUsdStat[] = [];
-  for (const month of [...totalArsByMonth.keys()].sort()) {
+  for (const month of months) {
     const totalArs = totalArsByMonth.get(month)!;
     const rate = await fetchOficialRate(representativeRateDate(month, today));
     result.push({ month, totalArs, rate, totalUsd: rate ? totalArs / rate : null });
@@ -132,7 +134,8 @@ statsRouter.get("/future-installments", asyncHandler(async (req, res) => {
     amount: t.amount, currency: t.currency as Currency,
     isInstallment: t.isInstallment, installmentCurrent: t.installmentCurrent ?? null, installmentTotal: t.installmentTotal ?? null,
   }));
-  res.json(computeFutureInstallments(mapped, currency));
+  const years = parseYears(req.query.year);
+  res.json(computeFutureInstallments(mapped, currency).filter((row) => monthInYears(row.month, years)));
 }));
 
 statsRouter.get("/future-installments/detail", asyncHandler(async (req, res) => {
@@ -144,7 +147,8 @@ statsRouter.get("/future-installments/detail", asyncHandler(async (req, res) => 
     isInstallment: t.isInstallment, installmentCurrent: t.installmentCurrent ?? null, installmentTotal: t.installmentTotal ?? null,
     merchant: t.merchant, category: t.category,
   }));
-  res.json(computeFutureInstallmentsDetail(mapped, currency));
+  const years = parseYears(req.query.year);
+  res.json(computeFutureInstallmentsDetail(mapped, currency).filter((row) => monthInYears(row.month, years)));
 }));
 
 statsRouter.get("/summary", asyncHandler(async (req, res) => {
@@ -156,17 +160,22 @@ statsRouter.get("/summary", asyncHandler(async (req, res) => {
   ]);
   const cardLabel = q.cardLabel;
   const installmentTxs = await latestStatementInstallmentTxs(q);
+  const installments = installmentTxs.map((t) => ({
+    date: t.date.toISOString().slice(0, 10),
+    amount: t.amount, currency: t.currency as Currency,
+    isInstallment: t.isInstallment, installmentCurrent: t.installmentCurrent ?? null, installmentTotal: t.installmentTotal ?? null,
+  }));
+  const years = parseYears(q.year);
+  const futureInstallmentTotal = years === null
+    ? remainingInstallmentDebt(installments, currency)
+    : computeFutureInstallments(installments, currency)
+      .filter((row) => monthInYears(row.month, years))
+      .reduce((acc, row) => acc + row.total, 0);
   res.json({
     currency,
     totalPurchases: agg?.totalPurchases ?? 0,
     transactionCount: agg?.transactionCount ?? 0,
     statementCount: await StatementModel.countDocuments(typeof cardLabel === "string" ? { cardLabel } : {}),
-    futureInstallmentTotal: remainingInstallmentDebt(
-      installmentTxs.map((t) => ({
-        amount: t.amount, currency: t.currency as Currency,
-        isInstallment: t.isInstallment, installmentCurrent: t.installmentCurrent ?? null, installmentTotal: t.installmentTotal ?? null,
-      })),
-      currency,
-    ),
+    futureInstallmentTotal,
   });
 }));
