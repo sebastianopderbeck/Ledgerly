@@ -28,7 +28,7 @@ const barSx: SxProps<Theme> = {
 const itemSx: SxProps<Theme> = {
   height: MOBILE_NAV_HEIGHT,
   minWidth: 0,
-  px: 0.5,
+  px: 0,
   display: "grid",
   alignContent: "center",
   justifyItems: "center",
