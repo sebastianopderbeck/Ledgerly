@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import type { CategoryStat } from "@ledgerly/shared";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
 import { emulateDesktop, emulateMobile } from "../../testing/viewport.js";
 import { probeOf } from "../../testing/nivoProbe.js";
@@ -32,6 +34,27 @@ const legendList = () => screen.queryByRole("list", { name: "referencias" });
 
 const chart = () => probeOf(screen.getByTestId("nivo-chart"));
 
+const cssColor = (color: string) => {
+  const element = document.createElement("span");
+  element.style.backgroundColor = color;
+  return element.style.backgroundColor;
+};
+
+interface PieWithFilterProps {
+  first: CategoryStat[];
+  next: CategoryStat[];
+}
+
+const PieWithFilter = ({ first, next }: PieWithFilterProps) => {
+  const [data, setData] = useState(first);
+  return (
+    <>
+      <button type="button" onClick={() => setData(next)}>cambiar filtro</button>
+      <CategoryPie data={data} currency="ARS" />
+    </>
+  );
+};
+
 describe("torta de categorías", () => {
   it("en mobile lista las categorías con su monto debajo y no usa la leyenda de nivo", () => {
     emulateMobile();
@@ -55,6 +78,26 @@ describe("torta de categorías", () => {
     renderWithProviders(<CategoryPie data={[]} currency="ARS" />);
     expect(screen.getByText("Sin datos")).toBeInTheDocument();
     expect(legendList()).not.toBeInTheDocument();
+  });
+
+  it("en mobile la leyenda usa los mismos colores que las porciones aunque cambien los datos", () => {
+    emulateMobile();
+    renderWithProviders(
+      <PieWithFilter
+        first={categories}
+        next={[
+          { category: "Servicios", total: 900, count: 2 },
+          { category: "Farmacia", total: 700, count: 1 },
+          { category: "Compras", total: 300, count: 1 },
+        ]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "cambiar filtro" }));
+    const swatchColors = within(legendList()!).getAllByTestId("legend-swatch").map((swatch) => swatch.style.backgroundColor);
+    const sliceColors = (chart().colors ?? []).map((color) => cssColor(String(color)));
+    expect(swatchColors).toHaveLength(3);
+    expect(sliceColors).toHaveLength(3);
+    expect(sliceColors).toEqual(swatchColors);
   });
 
   it("si la pantalla pasa a tamaño compu, la leyenda vuelve a nivo sin duplicarse", () => {

@@ -22,10 +22,11 @@ export const CategoryPie = ({ data, currency }: CategoryPieProps) => {
 
   const palette = categoricalPalette(theme.palette.mode);
   const chartData = data.map((d) => ({ id: d.category, label: d.category, value: d.total }));
+  const sliceColors = chartData.map((_slice, index) => palette[index % palette.length]);
   const legendItems: ChartLegendItem[] = chartData.map((slice, index) => ({
     id: slice.id,
     label: slice.label,
-    color: palette[index % palette.length],
+    color: sliceColors[index],
     value: formatMoney(slice.value, currency),
   }));
 
@@ -35,7 +36,7 @@ export const CategoryPie = ({ data, currency }: CategoryPieProps) => {
         <ResponsivePie
           data={chartData}
           theme={nivoTheme(theme)}
-          colors={palette}
+          colors={isMobile ? sliceColors : palette}
           margin={isMobile ? MOBILE_MARGIN : DESKTOP_MARGIN}
           innerRadius={0.6}
           padAngle={1.2}
