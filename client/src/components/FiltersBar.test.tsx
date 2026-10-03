@@ -127,4 +127,10 @@ describe("FiltersBar", () => {
     expect(currentParams().getAll("year")).toEqual(["2026"]);
     expect(currentParams().get("from")).toBeNull();
   });
+
+  it("en compu muestra los campos en línea, en el orden de siempre", () => {
+    const { container } = renderBar(["year", "currency", "card", "month", "transaction"], "/transactions");
+    const labels = Array.from(container.querySelectorAll("label"), (label) => label.textContent);
+    expect(labels).toEqual(["Año", "Moneda", "Tarjeta", "Mes", "Categorías", "Cuotas", "Buscar comercio"]);
+  });
 });

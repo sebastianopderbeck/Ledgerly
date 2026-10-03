@@ -1,9 +1,12 @@
 import { useSearchParams } from "react-router-dom";
 import { MenuItem, TextField } from "@mui/material";
 import { useCategories } from "../../api/hooks.js";
+import { SearchFilter } from "./SearchFilter.js";
 import { selectedValues } from "./selectedValues.js";
 
-export const TransactionFilters = () => {
+interface TransactionFiltersProps { withSearch?: boolean; }
+
+export const TransactionFilters = ({ withSearch = true }: TransactionFiltersProps) => {
   const [params, setParams] = useSearchParams();
   const { data } = useCategories();
   const categories = Array.isArray(data) ? data : [];
@@ -41,10 +44,7 @@ export const TransactionFilters = () => {
         <MenuItem value="true">Solo cuotas</MenuItem>
         <MenuItem value="false">Sin cuotas</MenuItem>
       </TextField>
-      <TextField
-        label="Buscar comercio" size="small"
-        value={params.get("search") ?? ""} onChange={(event) => set("search", event.target.value)}
-      />
+      {withSearch && <SearchFilter />}
     </>
   );
 };
