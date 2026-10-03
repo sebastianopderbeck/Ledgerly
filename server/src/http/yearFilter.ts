@@ -1,0 +1,20 @@
+const YEAR_PATTERN = /^\d{4}$/;
+
+export interface YearExpr { $in: [{ $year: string }, number[]] }
+
+export function parseYears(raw: unknown): number[] | null {
+  const values = Array.isArray(raw) ? raw : [raw];
+  const years = values
+    .filter((value): value is string => typeof value === "string" && YEAR_PATTERN.test(value))
+    .map(Number);
+  const unique = [...new Set(years)].sort((a, b) => a - b);
+  return unique.length > 0 ? unique : null;
+}
+
+export function monthInYears(month: string, years: number[] | null): boolean {
+  return years === null || years.includes(Number(month.slice(0, 4)));
+}
+
+export function yearExpr(field: string, years: number[]): YearExpr {
+  return { $in: [{ $year: `$${field}` }, years] };
+}
