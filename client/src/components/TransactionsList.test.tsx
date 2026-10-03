@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { useState } from "react";
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { TransactionDTO } from "@ledgerly/shared";
@@ -36,6 +37,17 @@ const setup = (items: TransactionDTO[] = rows) => {
   const onDelete = vi.fn();
   renderWithProviders(<TransactionsList rows={items} onCategoryChange={onCategoryChange} onDelete={onDelete} />);
   return { onCategoryChange, onDelete };
+};
+
+const FilterHarness = ({ onDelete }: { onDelete: (ids: string[]) => void }) => {
+  const [filtered, setFiltered] = useState(false);
+  const shown = filtered ? rows.filter((item) => item.id !== "3") : rows;
+  return (
+    <>
+      <button onClick={() => setFiltered(true)}>filtrar</button>
+      <TransactionsList rows={shown} onCategoryChange={vi.fn()} onDelete={onDelete} />
+    </>
+  );
 };
 
 const row = (merchant: string) => screen.getByRole("button", { name: new RegExp(merchant) });
@@ -132,5 +144,20 @@ describe("TransactionsList", () => {
     await userEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
     expect(cssFor(screen.getByRole("toolbar", { name: "selección" }))).toContain("bottom:calc(64px + env(safe-area-inset-bottom))");
     expect(cssFor(screen.getByRole("region", { name: "movimientos" }))).toContain("padding-bottom:64px");
+  });
+
+  it("si un filtro oculta filas marcadas, la selección y el borrado las ignoran", async () => {
+    const onDelete = vi.fn();
+    renderWithProviders(<FilterHarness onDelete={onDelete} />);
+    await userEvent.click(screen.getByRole("button", { name: "Seleccionar" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "seleccionar MERCADOLIBRE" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "seleccionar NOTEBOOK" }));
+    expect(screen.getByRole("button", { name: "Borrar (2)" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "filtrar" }));
+    const bar = screen.getByRole("toolbar", { name: "selección" });
+    await userEvent.click(within(bar).getByRole("button", { name: "Borrar (1)" }));
+    expect(within(confirmDialog()).getByText(/¿borrar este movimiento\?/i)).toBeInTheDocument();
+    await userEvent.click(within(confirmDialog()).getByRole("button", { name: "Borrar" }));
+    expect(onDelete).toHaveBeenCalledWith(["1"]);
   });
 });

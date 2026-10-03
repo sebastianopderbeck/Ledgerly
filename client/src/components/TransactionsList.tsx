@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Box, Button, Checkbox, Chip, List, ListItem, ListItemButton, Typography } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import type { TransactionDTO } from "@ledgerly/shared";
@@ -102,7 +102,10 @@ export const TransactionsList = ({ rows, onCategoryChange, onDelete }: Transacti
   }, [close]);
   const cancelDelete = useCallback(() => setPendingIds(null), []);
 
-  const askDeleteSelected = () => setPendingIds(selected);
+  const rowIds = useMemo(() => new Set(rows.map((row) => row.id)), [rows]);
+  const visibleSelected = selected.filter((id) => rowIds.has(id));
+
+  const askDeleteSelected = () => setPendingIds(visibleSelected);
   const confirmDelete = () => {
     if (pendingIds) onDelete(pendingIds);
     setPendingIds(null);
@@ -114,14 +117,14 @@ export const TransactionsList = ({ rows, onCategoryChange, onDelete }: Transacti
   const isEmpty = rows.length === 0;
   const canStartSelecting = !selecting && !isEmpty;
   const countLabel = rows.length === 1 ? "1 movimiento" : `${rows.length} movimientos`;
-  const deleteLabel = `Borrar (${selected.length})`;
+  const deleteLabel = `Borrar (${visibleSelected.length})`;
   const sectionSx: SxProps<Theme> = { pb: selecting ? `${SELECTION_BAR_HEIGHT}px` : 0 };
   const items = visibleRows.map((row) => (
     <TransactionRow
       key={row.id}
       row={row}
       selecting={selecting}
-      selected={selected.includes(row.id)}
+      selected={visibleSelected.includes(row.id)}
       onOpen={show}
       onToggle={toggle}
     />
@@ -139,7 +142,7 @@ export const TransactionsList = ({ rows, onCategoryChange, onDelete }: Transacti
       {selecting && (
         <Box role="toolbar" aria-label="selección" sx={selectionBarSx}>
           <Button fullWidth onClick={stopSelecting}>Cancelar</Button>
-          <Button fullWidth variant="contained" color="error" disabled={selected.length === 0} onClick={askDeleteSelected}>
+          <Button fullWidth variant="contained" color="error" disabled={visibleSelected.length === 0} onClick={askDeleteSelected}>
             {deleteLabel}
           </Button>
         </Box>
