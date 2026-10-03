@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import { ColorModeProvider, useColorModeState } from "./theme.js";
+import { useThemeColorMeta } from "./useThemeColorMeta.js";
 import { Layout } from "./components/layout/Layout.js";
 import { PageTransition } from "./components/motion/PageTransition.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
@@ -38,6 +39,7 @@ const AnimatedRoutes = () => {
 
 export const App = () => {
   const colorMode = useColorModeState();
+  useThemeColorMeta(colorMode.theme.palette.background.default);
   return (
     <ColorModeProvider value={colorMode}>
       <ThemeProvider theme={colorMode.theme}>
