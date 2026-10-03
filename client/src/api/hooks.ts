@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
-  ImportResultUnionDTO, InflationRateDTO, MacroRefreshDTO, MacroSeriesDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, SummaryStat, TransactionDTO,
+  ImportResultUnionDTO, ImportedFileDTO, InflationRateDTO, MacroRefreshDTO, MacroSeriesDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, SummaryStat, TransactionDTO,
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
 
@@ -46,10 +46,15 @@ export function useImportFile() {
   });
 }
 
-export function useDeleteStatement() {
+export function useImportedFiles() {
+  return useQuery({ queryKey: ["imports"], queryFn: () => apiFetch<ImportedFileDTO[]>("/imports") });
+}
+
+export function useDeleteImportedFile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiFetch<void>(`/statements/${id}`, { method: "DELETE" }),
+    mutationFn: ({ kind, id }: Pick<ImportedFileDTO, "kind" | "id">) =>
+      apiFetch<void>(`/imports/${kind}/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries(),
   });
 }

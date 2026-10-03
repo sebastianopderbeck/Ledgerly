@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material";
 import type { ImportResultUnionDTO } from "@ledgerly/shared";
-import { useDeleteStatement, useStatements, useImportFile } from "../api/hooks.js";
+import { useImportFile } from "../api/hooks.js";
 import { FileDropzone } from "../components/FileDropzone.js";
+import { ImportedFilesSection } from "../components/ImportedFilesSection.js";
 import { ReconciliationBanner } from "../components/ReconciliationBanner.js";
-import { StatementList } from "../components/StatementList.js";
 
 export const ImportPage = () => {
   const upload = useImportFile();
-  const del = useDeleteStatement();
-  const statements = useStatements();
   const [last, setLast] = useState<ImportResultUnionDTO | null>(null);
   const [lastFile, setLastFile] = useState<File | null>(null);
 
@@ -85,8 +83,8 @@ export const ImportPage = () => {
         </Alert>
       )}
 
-      <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>Resúmenes importados</Typography>
-      {statements.data && <StatementList statements={statements.data} onDelete={(id) => del.mutate(id)} />}
+      <Typography variant="h6" component="h2" sx={{ mt: 4, mb: 2 }}>Archivos importados</Typography>
+      <ImportedFilesSection />
     </>
   );
 };

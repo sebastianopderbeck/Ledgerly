@@ -286,6 +286,18 @@ export const importResultUnionSchema = z.discriminatedUnion("kind", [
   payslipImportResultSchema,
 ]);
 
+export const importedFileKindSchema = z.enum(["statement", "coupon", "auto", "payslip"]);
+
+export const importedFileDtoSchema = z.object({
+  id: z.string(),
+  kind: importedFileKindSchema,
+  fileName: z.string(),
+  uploadedAt: z.string(),
+  documentDate: z.string().nullable(),
+  description: z.string(),
+  needsReview: z.boolean(),
+});
+
 export type TransactionDTO = z.infer<typeof transactionDtoSchema>;
 export type StatementDTO = z.infer<typeof statementDtoSchema>;
 export type CategoryRuleDTO = z.infer<typeof categoryRuleDtoSchema>;
@@ -300,6 +312,8 @@ export type SummaryStat = z.infer<typeof summaryStatSchema>;
 export type MortgageCouponDTO = z.infer<typeof mortgageCouponDtoSchema>;
 export type CreditSummaryDTO = z.infer<typeof creditSummaryDtoSchema>;
 export type ImportResultUnionDTO = z.infer<typeof importResultUnionSchema>;
+export type ImportedFileKind = z.infer<typeof importedFileKindSchema>;
+export type ImportedFileDTO = z.infer<typeof importedFileDtoSchema>;
 export type AutoConceptDTO = z.infer<typeof autoConceptSchema>;
 export type AutoCouponDTO = z.infer<typeof autoCouponDtoSchema>;
 export type AutoSummaryDTO = z.infer<typeof autoSummaryDtoSchema>;

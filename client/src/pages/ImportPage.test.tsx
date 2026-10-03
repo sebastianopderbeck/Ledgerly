@@ -10,7 +10,7 @@ function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
 }
 
 beforeEach(() => {
-  mockFetch((url) => (url.includes("/statements") ? [] : {}));
+  mockFetch((url) => (url.includes("/imports") ? [] : {}));
 });
 afterEach(() => {
   cleanup();
@@ -22,6 +22,21 @@ describe("ImportPage", () => {
     renderWithProviders(<ImportPage />);
     expect(screen.getByText(/importar resumen/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /elegir archivo/i })).toBeInTheDocument();
+  });
+
+  it("lista los archivos importados de todos los tipos", async () => {
+    mockFetch((url) => (url.includes("/imports")
+      ? [
+        { id: "s1", kind: "statement", fileName: "visa-julio.pdf", uploadedAt: "2026-07-05T12:00:00.000Z",
+          documentDate: "2026-07-02", description: "Visa ****1234 · 3 movimientos", needsReview: false },
+        { id: "p1", kind: "payslip", fileName: "recibo-junio.pdf", uploadedAt: "2026-07-04T12:00:00.000Z",
+          documentDate: "2026-06-30", description: "Período 2026-06", needsReview: false },
+      ]
+      : {}));
+    renderWithProviders(<ImportPage />);
+    expect(screen.getByRole("heading", { name: "Archivos importados" })).toBeInTheDocument();
+    expect(await screen.findByText("visa-julio.pdf")).toBeInTheDocument();
+    expect(screen.getByText("recibo-junio.pdf")).toBeInTheDocument();
   });
 
   it("sube un archivo y muestra el resultado", async () => {
