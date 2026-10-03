@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import { ColorModeProvider, useColorModeState } from "./theme.js";
-import { Layout } from "./components/Layout.js";
+import { Layout } from "./components/layout/Layout.js";
 import { PageTransition } from "./components/motion/PageTransition.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { ImportPage } from "./pages/ImportPage.js";

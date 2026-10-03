@@ -22,7 +22,7 @@ interface ModeTokens {
   cardGradient: string;
   cardShadow: string;
   cardHoverShadow: string;
-  appBarBg: string;
+  glassBg: string;
   scrollThumb: string;
 }
 
@@ -44,7 +44,7 @@ const DARK: ModeTokens = {
   cardGradient: "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0))",
   cardShadow: "0 1px 2px rgba(0,0,0,0.4)",
   cardHoverShadow: "0 16px 40px -18px rgba(0,0,0,0.75)",
-  appBarBg: "rgba(11,15,25,0.72)",
+  glassBg: "rgba(11,15,25,0.72)",
   scrollThumb: "rgba(255,255,255,0.14)",
 };
 
@@ -66,7 +66,7 @@ const LIGHT: ModeTokens = {
   cardGradient: "linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0))",
   cardShadow: "0 1px 2px rgba(15,23,42,0.06)",
   cardHoverShadow: "0 16px 40px -20px rgba(15,23,42,0.28)",
-  appBarBg: "rgba(244,247,251,0.78)",
+  glassBg: "rgba(244,247,251,0.78)",
   scrollThumb: "rgba(15,23,42,0.18)",
 };
 
@@ -111,15 +111,14 @@ function buildTheme(mode: Mode): Theme {
           "*::-webkit-scrollbar-track": { backgroundColor: "transparent" },
         },
       },
-      MuiAppBar: {
-        defaultProps: { elevation: 0, color: "transparent" },
+      MuiDrawer: {
         styleOverrides: {
-          root: {
-            backgroundColor: t.appBarBg,
+          paper: {
+            backgroundColor: t.glassBg,
             backdropFilter: "blur(14px)",
             WebkitBackdropFilter: "blur(14px)",
             backgroundImage: "none",
-            borderBottom: `1px solid ${t.divider}`,
+            borderRight: `1px solid ${t.divider}`,
             color: t.textPrimary,
           },
         },
