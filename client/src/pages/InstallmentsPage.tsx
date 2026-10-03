@@ -16,10 +16,12 @@ import { InstallmentsByMerchantChart } from "../components/charts/InstallmentsBy
 import { PendingInstallmentsByCategoryChart } from "../components/charts/PendingInstallmentsByCategoryChart.js";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
 import { Kpi } from "../components/Kpi.js";
+import { useIsMobile } from "../useIsMobile.js";
 
 const INSTALLMENT_FIELDS: FilterField[] = ["year", "currency", "card"];
 
 export const InstallmentsPage = () => {
+  const isMobile = useIsMobile();
   const { years, currency, cardLabel } = useGlobalFilters();
   const yearOptions = useInstallmentYearOptions(currency, cardLabel);
   const filters: StatFilters = { currency, cardLabel, year: years };
@@ -75,26 +77,30 @@ export const InstallmentsPage = () => {
                     </Stack>
                   </AccordionSummary>
                   <AccordionDetails sx={{ pt: 0 }}>
-                    {m.items.map((item, index) => (
-                      <Stack
-                        key={`${item.merchant}-${item.purchaseDate}-${item.installmentNumber}`}
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        sx={{ py: 1, borderTop: index === 0 ? "none" : "1px solid", borderColor: "divider", gap: 2 }}
-                      >
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography noWrap>{item.merchant}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {item.category} · compra {item.purchaseDate}
-                          </Typography>
-                        </Box>
-                        <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
-                          <Chip size="small" variant="outlined" label={`cuota ${item.installmentNumber}/${item.installmentTotal}`} />
-                          <Typography sx={{ fontWeight: 600 }}>{formatMoney(item.amount, filters.currency)}</Typography>
+                    {m.items.map((item, index) => {
+                      const chip = <Chip size="small" variant="outlined" label={`cuota ${item.installmentNumber}/${item.installmentTotal}`} />;
+                      return (
+                        <Stack
+                          key={`${item.merchant}-${item.purchaseDate}-${item.installmentNumber}`}
+                          direction="row"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          sx={{ py: 1, borderTop: index === 0 ? "none" : "1px solid", borderColor: "divider", gap: 2 }}
+                        >
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography noWrap>{item.merchant}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {item.category} · compra {item.purchaseDate}
+                            </Typography>
+                            {isMobile && <Box sx={{ mt: 0.5 }}>{chip}</Box>}
+                          </Box>
+                          <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
+                            {!isMobile && chip}
+                            <Typography sx={{ fontWeight: 600 }}>{formatMoney(item.amount, filters.currency)}</Typography>
+                          </Stack>
                         </Stack>
-                      </Stack>
-                    ))}
+                      );
+                    })}
                   </AccordionDetails>
                 </Accordion>
               </MotionBox>

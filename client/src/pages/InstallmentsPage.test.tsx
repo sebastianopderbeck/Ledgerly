@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
+import { emulateDesktop, emulateMobile } from "../testing/viewport.js";
 import { InstallmentsPage } from "./InstallmentsPage.js";
 
 const item = (n: number) => ({
@@ -22,11 +23,27 @@ beforeEach(() => {
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const detailUrl = () => vi.mocked(fetch).mock.calls.map((call) => String(call[0])).find((url) => url.includes("/stats/future-installments/detail"));
 
 describe("InstallmentsPage", () => {
+  it("en mobile el chip de la cuota va debajo del comercio", async () => {
+    emulateMobile();
+    renderWithProviders(<InstallmentsPage />, { route: "/installments" });
+    const chip = (await screen.findByText("cuota 3/4")).closest(".MuiChip-root")!;
+    expect(chip.parentElement!.parentElement).toHaveTextContent("MERCADOLIBRE");
+    expect(chip.parentElement!.parentElement).not.toHaveTextContent(/1\.500/);
+  });
+
+  it("en compu el chip de la cuota queda al lado del monto", async () => {
+    emulateDesktop();
+    renderWithProviders(<InstallmentsPage />, { route: "/installments" });
+    const chip = (await screen.findByText("cuota 3/4")).closest(".MuiChip-root")!;
+    expect(chip.parentElement).not.toHaveTextContent("MERCADOLIBRE");
+    expect(chip.parentElement).toHaveTextContent(/1\.500/);
+  });
+
   it("muestra el KPI de cuotas pendientes y la torta por categoría", async () => {
     renderWithProviders(<InstallmentsPage />, { route: "/installments" });
     expect(await screen.findByText("Cuotas pendientes")).toBeInTheDocument();
