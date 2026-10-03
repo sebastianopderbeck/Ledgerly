@@ -7,6 +7,7 @@ import { representativeRateDate, consumptionMonth } from "../../stats/monthlyUsd
 import { latestStatementIdsPerIssuer } from "../../stats/lastStatement.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import type { Currency, MonthlyUsdStat } from "@ledgerly/shared";
+import { parseYears, yearExpr } from "../yearFilter.js";
 
 function baseMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   const currency = q.currency === "USD" ? "USD" : "ARS";
@@ -17,6 +18,8 @@ function baseMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
     if (typeof q.from === "string") match.date.$gte = new Date(q.from);
     if (typeof q.to === "string") match.date.$lte = new Date(q.to);
   }
+  const years = parseYears(q.year);
+  if (years) match.$expr = yearExpr("date", years);
   return match;
 }
 

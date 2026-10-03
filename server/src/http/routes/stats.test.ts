@@ -215,4 +215,39 @@ describe("stats", () => {
     const usd = await request(app).get("/api/stats/last-statement/by-category?currency=USD");
     expect(usd.body).toEqual([{ category: "Dolar", total: 40, count: 1 }]);
   });
+
+  it("monthly y by-category con year dejan afuera los otros años", async () => {
+    const s = await StatementModel.findOne({});
+    await TransactionModel.create({
+      statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2024-03-01"), descriptionRaw: "C",
+      merchant: "COTO", category: "Supermercado", categorySource: "rule", amount: 700, currency: "ARS",
+      direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+      comprobante: "9", fingerprint: "f-2024",
+    });
+    const monthly = await request(app).get("/api/stats/monthly?currency=ARS&year=2025&year=2026");
+    expect(monthly.body).toEqual([{ month: "2026-05", total: 2000, count: 2 }]);
+    const byCategory = await request(app).get("/api/stats/by-category?currency=ARS&year=2024");
+    expect(byCategory.body).toEqual([{ category: "Supermercado", total: 700, count: 1 }]);
+  });
+
+  it("year respeta el borde de año (31/12 vs 1/1)", async () => {
+    const s = await StatementModel.findOne({});
+    await TransactionModel.insertMany([
+      { statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2025-12-31"), descriptionRaw: "D",
+        merchant: "FIN DE AÑO", category: "Compras", categorySource: "rule", amount: 100, currency: "ARS",
+        direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+        comprobante: "10", fingerprint: "f-1231" },
+      { statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-01-01"), descriptionRaw: "E",
+        merchant: "AÑO NUEVO", category: "Compras", categorySource: "rule", amount: 200, currency: "ARS",
+        direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+        comprobante: "11", fingerprint: "f-0101" },
+    ]);
+    const res = await request(app).get("/api/stats/monthly?currency=ARS&year=2025");
+    expect(res.body).toEqual([{ month: "2025-12", total: 100, count: 1 }]);
+  });
+
+  it("year inválido no filtra", async () => {
+    const res = await request(app).get("/api/stats/monthly?currency=ARS&year=abc");
+    expect(res.body).toEqual([{ month: "2026-05", total: 2000, count: 2 }]);
+  });
 });

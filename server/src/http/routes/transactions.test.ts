@@ -114,6 +114,20 @@ describe("GET /api/transactions", () => {
     const res = await request(app).get("/api/transactions?cardLabel=ICBC");
     expect(res.body.total).toBe(2);
   });
+
+  it("filtra por años (repetido)", async () => {
+    const base = await StatementModel.findOne({});
+    await TransactionModel.create({
+      statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2025-12-20"),
+      descriptionRaw: "DIA", merchant: "DIA", category: "Supermercado", categorySource: "rule", amount: 300, currency: "ARS",
+      direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+      comprobante: "4", fingerprint: "f-2025",
+    });
+    const only2025 = await request(app).get("/api/transactions?year=2025");
+    expect(only2025.body.items.map((t: { merchant: string }) => t.merchant)).toEqual(["DIA"]);
+    const both = await request(app).get("/api/transactions?year=2025&year=2026");
+    expect(both.body.total).toBe(3);
+  });
 });
 
 describe("PATCH /api/transactions/:id", () => {
