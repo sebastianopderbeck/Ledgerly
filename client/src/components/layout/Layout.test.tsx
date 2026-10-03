@@ -37,6 +37,12 @@ describe("Layout", () => {
     }
   });
 
+  it("los links conservan los filtros globales y descartan los de Movimientos", () => {
+    renderLayout("/transactions?year=2025&currency=USD&category=Compras&search=uber");
+    const link = within(mainNavigation()).getByRole("link", { name: /créditos/i });
+    expect(link).toHaveAttribute("href", "/credits?year=2025&currency=USD");
+  });
+
   it("marca como activa solo la sección de la ruta actual", () => {
     renderLayout("/credits");
     expect(screen.getByRole("link", { name: /créditos/i })).toHaveAttribute("aria-current", "page");
