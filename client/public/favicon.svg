@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .from { stop-color: #22d3ee; }
+    .to { stop-color: #818cf8; }
+    @media (prefers-color-scheme: light) {
+      .from { stop-color: #0891b2; }
+      .to { stop-color: #6366f1; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="14" y1="50" x2="50" y2="14">
+      <stop offset="0" class="from"/>
+      <stop offset="1" class="to"/>
+    </linearGradient>
+  </defs>
+  <path d="M12 9 V53 H54" fill="none" stroke="url(#mark)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="22" y="33" width="8" height="13" rx="4" fill="url(#mark)" opacity=".7"/>
+  <rect x="34" y="23" width="8" height="23" rx="4" fill="url(#mark)" opacity=".85"/>
+  <rect x="46" y="12" width="8" height="34" rx="4" fill="url(#mark)"/>
+</svg>
