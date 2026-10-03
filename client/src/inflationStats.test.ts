@@ -23,13 +23,14 @@ describe("accumulatedInflation", () => {
     expect(result[1].acumulado).toBeCloseTo(12.2, 6);
   });
 
-  it("con años no contiguos acumula solo los elegidos", () => {
+  it("con años no contiguos muestra solo los elegidos pero acumula también los años del medio", () => {
     const result = accumulatedInflation(
       inflation([["2024-12", 10], ["2025-01", 50], ["2026-01", 2]]),
       ["2024", "2026"],
     );
     expect(result.map((p) => p.periodo)).toEqual(["2024-12", "2026-01"]);
-    expect(result[1].acumulado).toBeCloseTo(12.2, 6);
+    expect(result[0].acumulado).toBeCloseTo(10, 6);
+    expect(result[1].acumulado).toBeCloseTo(68.3, 6);
   });
 
   it("ordena la salida por período aunque la entrada venga desordenada", () => {
