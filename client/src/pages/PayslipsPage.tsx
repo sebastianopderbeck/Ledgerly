@@ -1,6 +1,7 @@
-import { useMemo, useState, type MouseEvent } from "react";
-import { Box, CircularProgress, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
+import { useMemo } from "react";
+import { CircularProgress, Typography } from "@mui/material";
 import { usePayslips, useInflation } from "../api/hooks.js";
+import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { PayslipKpiCards } from "../components/PayslipKpiCards.js";
 import { PayslipsTable } from "../components/PayslipsTable.js";
 import { PayslipDescuentoKpis } from "../components/PayslipDescuentoKpis.js";
@@ -14,27 +15,29 @@ import { InflationAccumulatedChart } from "../components/charts/InflationAccumul
 import { PayslipCompositionChart } from "../components/charts/PayslipCompositionChart.js";
 import { PayslipGrossNetChart } from "../components/charts/PayslipGrossNetChart.js";
 import { payslipYears } from "../payslipConcepts.js";
+import { matchesYears } from "../filters/globalFilters.js";
+import { useGlobalFilters } from "../filters/useGlobalFilters.js";
 
-const ALL = "Todos";
 const CHART_EXCLUDED_PERIODS = ["2023-12"];
+const PAYSLIP_FIELDS: FilterField[] = ["year"];
 
 export const PayslipsPage = () => {
   const { data, isLoading } = usePayslips();
   const { data: inflationData } = useInflation();
+  const { yearSelection } = useGlobalFilters();
   const inflation = inflationData ?? [];
-  const payslips = data ?? [];
+  const payslips = useMemo(() => data ?? [], [data]);
   const years = useMemo(() => payslipYears(payslips), [payslips]);
-  const [selectedYear, setSelectedYear] = useState<string | null>(null);
-  const activeYear = selectedYear ?? years[years.length - 1] ?? ALL;
-  const filtered = useMemo(() => {
-    const base = payslips.filter((p) => p.tipo === "mensual" && !CHART_EXCLUDED_PERIODS.includes(p.periodo));
-    return activeYear === ALL ? base : base.filter((p) => p.periodo.slice(0, 4) === activeYear);
-  }, [payslips, activeYear]);
-  const monthOnly = activeYear !== ALL;
-
-  const handleYearChange = (_event: MouseEvent<HTMLElement>, value: string | null) => {
-    if (value !== null) setSelectedYear(value);
-  };
+  const inYears = useMemo(
+    () => payslips.filter((payslip) => matchesYears(payslip.periodo, yearSelection)),
+    [payslips, yearSelection],
+  );
+  const filtered = useMemo(
+    () => inYears.filter((payslip) => payslip.tipo === "mensual" && !CHART_EXCLUDED_PERIODS.includes(payslip.periodo)),
+    [inYears],
+  );
+  const scopeYears = yearSelection.kind === "all" ? years : yearSelection.years;
+  const monthOnly = yearSelection.kind === "years" && yearSelection.years.length === 1;
 
   if (isLoading) {
     return (
@@ -59,22 +62,9 @@ export const PayslipsPage = () => {
   return (
     <>
       <Typography variant="h4" sx={{ mb: 3 }}>Sueldo</Typography>
+      <FiltersBar fields={PAYSLIP_FIELDS} yearOptions={years} />
 
       <PayslipKpiCards />
-
-      <ToggleButtonGroup
-        size="small"
-        exclusive
-        value={activeYear}
-        onChange={handleYearChange}
-        aria-label="Filtrar gráficos por año"
-        sx={{ mb: 2, flexWrap: "wrap" }}
-      >
-        {years.map((year) => (
-          <ToggleButton key={year} value={year}>{year}</ToggleButton>
-        ))}
-        <ToggleButton key={ALL} value={ALL}>Todos</ToggleButton>
-      </ToggleButtonGroup>
 
       <MotionBox
         variants={staggerContainer}
@@ -85,7 +75,7 @@ export const PayslipsPage = () => {
         <ChartCard title="Evolución del neto en USD"><PayslipNetoUsdChart payslips={filtered} monthOnly={monthOnly} /></ChartCard>
         <ChartCard title="Evolución del neto en pesos"><PayslipNetoArsChart payslips={filtered} monthOnly={monthOnly} /></ChartCard>
         <ChartCard title="Sueldo real (pesos de hoy)"><PayslipRealArsChart payslips={filtered} inflation={inflation} monthOnly={monthOnly} /></ChartCard>
-        <ChartCard title="Inflación acumulada"><InflationAccumulatedChart inflation={inflation} year={activeYear === ALL ? null : activeYear} years={years} monthOnly={monthOnly} /></ChartCard>
+        <ChartCard title="Inflación acumulada"><InflationAccumulatedChart inflation={inflation} years={scopeYears} monthOnly={monthOnly} /></ChartCard>
         <ChartCard title="Bruto vs neto por mes"><PayslipGrossNetChart payslips={filtered} monthOnly={monthOnly} /></ChartCard>
         <ChartCard title="Composición del recibo por mes"><PayslipCompositionChart payslips={filtered} monthOnly={monthOnly} /></ChartCard>
       </MotionBox>
@@ -94,7 +84,7 @@ export const PayslipsPage = () => {
       <PayslipDescuentoKpis payslips={payslips} />
 
       <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>
-      <PayslipsTable />
+      <PayslipsTable payslips={inYears} />
     </>
   );
 };

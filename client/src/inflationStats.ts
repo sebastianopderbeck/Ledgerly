@@ -7,14 +7,10 @@ export interface AccumulatedInflationPoint {
 
 export function accumulatedInflation(
   inflation: InflationRateDTO[],
-  year: string | null,
   years: string[],
 ): AccumulatedInflationPoint[] {
-  const inScope = (periodo: string): boolean =>
-    year === null ? years.includes(periodo.slice(0, 4)) : periodo.slice(0, 4) === year;
-
   const months = inflation
-    .filter((entry) => inScope(entry.periodo))
+    .filter((entry) => years.includes(entry.periodo.slice(0, 4)))
     .sort((a, b) => a.periodo.localeCompare(b.periodo));
 
   let factor = 1;

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Box, Chip, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import type { PayslipDTO } from "@ledgerly/shared";
-import { usePayslips, usePatchPayslipRate } from "../api/hooks.js";
+import { usePatchPayslipRate } from "../api/hooks.js";
 import { byPeriodo, uniqueConceptLabels } from "../payslipConcepts.js";
 import { formatMoney } from "../format.js";
 import { MotionTableBody, MotionTableRow } from "./motion/motion.js";
@@ -48,11 +48,12 @@ const RateCell = ({ payslip }: { payslip: PayslipDTO }) => {
   );
 };
 
-export const PayslipsTable = () => {
-  const { data } = usePayslips();
-  if (!data || data.length === 0) return null;
+interface PayslipsTableProps { payslips: PayslipDTO[]; }
 
-  const rows = [...data].sort(byPeriodo);
+export const PayslipsTable = ({ payslips }: PayslipsTableProps) => {
+  if (payslips.length === 0) return null;
+
+  const rows = [...payslips].sort(byPeriodo);
   const conceptLabels = uniqueConceptLabels(rows);
   const montoOf = (payslip: PayslipDTO, label: string): number | null =>
     payslip.conceptos.find((c) => c.label === label)?.monto ?? null;
