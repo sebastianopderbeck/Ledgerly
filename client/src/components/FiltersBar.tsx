@@ -4,8 +4,9 @@ import { CurrencyFilter } from "./filters/CurrencyFilter.js";
 import { CardFilter } from "./filters/CardFilter.js";
 import { MonthFilter } from "./filters/MonthFilter.js";
 import { TransactionFilters } from "./filters/TransactionFilters.js";
+import type { FilterField } from "../filters/activeFilters.js";
 
-export type FilterField = "year" | "currency" | "card" | "month" | "transaction";
+export type { FilterField } from "../filters/activeFilters.js";
 
 interface FiltersBarProps { fields: FilterField[]; yearOptions: string[]; }
 
