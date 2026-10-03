@@ -1,5 +1,6 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { createTheme, alpha, type Theme } from "@mui/material/styles";
+import { useStoredState } from "./useStoredState.js";
 
 type Mode = "light" | "dark";
 interface ColorModeContextValue { mode: Mode; toggle: () => void; theme: Theme; }
@@ -22,7 +23,7 @@ interface ModeTokens {
   cardGradient: string;
   cardShadow: string;
   cardHoverShadow: string;
-  appBarBg: string;
+  glassBg: string;
   scrollThumb: string;
 }
 
@@ -44,7 +45,7 @@ const DARK: ModeTokens = {
   cardGradient: "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0))",
   cardShadow: "0 1px 2px rgba(0,0,0,0.4)",
   cardHoverShadow: "0 16px 40px -18px rgba(0,0,0,0.75)",
-  appBarBg: "rgba(11,15,25,0.72)",
+  glassBg: "rgba(11,15,25,0.72)",
   scrollThumb: "rgba(255,255,255,0.14)",
 };
 
@@ -66,7 +67,7 @@ const LIGHT: ModeTokens = {
   cardGradient: "linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0))",
   cardShadow: "0 1px 2px rgba(15,23,42,0.06)",
   cardHoverShadow: "0 16px 40px -20px rgba(15,23,42,0.28)",
-  appBarBg: "rgba(244,247,251,0.78)",
+  glassBg: "rgba(244,247,251,0.78)",
   scrollThumb: "rgba(15,23,42,0.18)",
 };
 
@@ -111,15 +112,14 @@ function buildTheme(mode: Mode): Theme {
           "*::-webkit-scrollbar-track": { backgroundColor: "transparent" },
         },
       },
-      MuiAppBar: {
-        defaultProps: { elevation: 0, color: "transparent" },
+      MuiDrawer: {
         styleOverrides: {
-          root: {
-            backgroundColor: t.appBarBg,
+          paper: {
+            backgroundColor: t.glassBg,
             backdropFilter: "blur(14px)",
             WebkitBackdropFilter: "blur(14px)",
             backgroundImage: "none",
-            borderBottom: `1px solid ${t.divider}`,
+            borderRight: `1px solid ${t.divider}`,
             color: t.textPrimary,
           },
         },
@@ -164,8 +164,10 @@ function buildTheme(mode: Mode): Theme {
 
 const ColorModeContext = createContext<ColorModeContextValue | null>(null);
 
+const isMode = (value: unknown): value is Mode => value === "light" || value === "dark";
+
 export function useColorModeState(): ColorModeContextValue {
-  const [mode, setMode] = useState<Mode>("dark");
+  const [mode, setMode] = useStoredState<Mode>("ledgerly.colorMode", "dark", isMode);
   const theme = useMemo(() => buildTheme(mode), [mode]);
   const toggle = () => setMode((m) => (m === "light" ? "dark" : "light"));
   return { mode, toggle, theme };

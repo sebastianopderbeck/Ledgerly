@@ -8,7 +8,8 @@ import { useAutoSummary } from "../api/hooks.js";
 import { formatMoney } from "../format.js";
 import { MotionBox } from "./motion/motion.js";
 import { CountUp } from "./motion/CountUp.js";
-import { fadeUpItem, staggerContainer } from "./motion/variants.js";
+import { fadeUpItem } from "./motion/variants.js";
+import { KpiGrid } from "./KpiGrid.js";
 
 type KpiColor = "primary" | "secondary" | "success" | "warning";
 
@@ -57,16 +58,11 @@ export const AutoKpiCards = () => {
   const usdSub = data.totalPagadoUsd > 0 ? `en ${data.cuotasPagadas} cuotas` : undefined;
 
   return (
-    <MotionBox
-      variants={staggerContainer}
-      initial="hidden"
-      animate="visible"
-      sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }, gap: 2, mb: 3 }}
-    >
+    <KpiGrid>
       <Kpi label="Total pagado" value={data.totalPagado} format={money} sub={`en ${data.cuotasPagadas} cuotas`} icon={<PaymentsIcon />} color="primary" />
       <Kpi label="Valor del auto" value={data.valorActualAuto} format={money} sub={data.modelo} icon={<DirectionsCarIcon />} color="secondary" />
       <Kpi label="Pagado en USD" value={data.totalPagadoUsd} format={usd} sub={usdSub} icon={<AttachMoneyIcon />} color="warning" />
       <Kpi label="Avance" value={data.porcentajeAvance * 100} format={percent} sub={`${data.cuotasPagadas}/${data.cuotasTotales} cuotas`} icon={<DonutLargeIcon />} color="success" />
-    </MotionBox>
+    </KpiGrid>
   );
 };

@@ -8,7 +8,8 @@ import { usePayslipSummary } from "../api/hooks.js";
 import { formatMoney } from "../format.js";
 import { MotionBox } from "./motion/motion.js";
 import { CountUp } from "./motion/CountUp.js";
-import { fadeUpItem, staggerContainer } from "./motion/variants.js";
+import { fadeUpItem } from "./motion/variants.js";
+import { KpiGrid } from "./KpiGrid.js";
 
 type KpiColor = "primary" | "secondary" | "success" | "warning";
 
@@ -62,16 +63,11 @@ export const PayslipKpiCards = () => {
   const anio = data.ultimoPeriodo.slice(0, 4);
 
   return (
-    <MotionBox
-      variants={staggerContainer}
-      initial="hidden"
-      animate="visible"
-      sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }, gap: 2, mb: 3 }}
-    >
+    <KpiGrid>
       <Kpi label="Último neto" value={data.ultimoNeto} format={money} sub={variacionSub} icon={<PaymentsIcon />} color="primary" />
       <Kpi label="Neto en USD" value={data.ultimoNetoUsd ?? 0} format={usd} sub={data.ultimoNetoUsd != null ? data.ultimoPeriodo : "sin tipo de cambio"} icon={<AttachMoneyIcon />} color="warning" />
       <Kpi label="Descuentos" value={data.porcentajeDescuentos * 100} format={percent} sub="sobre el bruto" icon={<PercentIcon />} color="secondary" />
       <Kpi label={`Acumulado ${anio}`} value={data.netoAcumuladoAnio} format={money} sub={`${data.recibosAnio} recibos`} icon={<SavingsIcon />} color="success" />
-    </MotionBox>
+    </KpiGrid>
   );
 };

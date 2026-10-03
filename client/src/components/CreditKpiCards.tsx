@@ -8,7 +8,8 @@ import { useCreditCoupons, useCreditSummary } from "../api/hooks.js";
 import { formatMoney, formatUva } from "../format.js";
 import { MotionBox } from "./motion/motion.js";
 import { CountUp } from "./motion/CountUp.js";
-import { fadeUpItem, staggerContainer } from "./motion/variants.js";
+import { fadeUpItem } from "./motion/variants.js";
+import { KpiGrid } from "./KpiGrid.js";
 
 type KpiColor = "primary" | "secondary" | "success" | "warning";
 
@@ -62,16 +63,11 @@ export const CreditKpiCards = () => {
   const interesPagadoUsdSub = interesPagadoUsd > 0 ? `≈ ${formatMoney(interesPagadoUsd, "USD")}` : undefined;
 
   return (
-    <MotionBox
-      variants={staggerContainer}
-      initial="hidden"
-      animate="visible"
-      sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }, gap: 2, mb: 3 }}
-    >
+    <KpiGrid>
       <Kpi label="Total pagado" value={data.totalPagado} format={money} sub={`en ${data.cuotasPagadas} cuotas`} icon={<PaymentsIcon />} color="primary" />
       <Kpi label="Capital pendiente" value={data.capitalPendienteUva} format={formatUva} sub={`≈ ${money(data.capitalPendientePesos)}`} icon={<AccountBalanceIcon />} color="secondary" />
       <Kpi label="Interés pagado" value={data.interesPagado} format={money} sub={interesPagadoUsdSub} icon={<TrendingUpIcon />} color="warning" />
       <Kpi label="Avance" value={data.porcentajeAvanceCapital * 100} format={percent} sub={`${data.cuotasPagadas}/${data.cuotasTotales} cuotas`} icon={<DonutLargeIcon />} color="success" />
-    </MotionBox>
+    </KpiGrid>
   );
 };
