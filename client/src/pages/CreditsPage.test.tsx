@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { flushAsync } from "../testing/flushAsync.js";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { emulateMobile } from "../testing/viewport.js";
 import { CreditsPage } from "./CreditsPage.js";
@@ -111,8 +112,13 @@ describe("CreditsPage en mobile", () => {
     expect(save).toBeDisabled();
     const input = within(sheet).getByRole("textbox", { name: "TC oficial" });
     await userEvent.clear(input);
+    await userEvent.type(input, "1350");
+    expect(save).toBeDisabled();
+    await userEvent.clear(input);
     await userEvent.type(input, "0");
+    expect(save).toBeDisabled();
     fireEvent.click(save);
+    await flushAsync();
     expect(patches()).toEqual([]);
   });
 });

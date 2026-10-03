@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, fireEvent, cleanup, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { flushAsync } from "../testing/flushAsync.js";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { emulateMobile } from "../testing/viewport.js";
 import { RulesPage } from "./RulesPage.js";
@@ -120,15 +121,18 @@ describe("RulesPage en mobile", () => {
     const confirm = screen.getByRole("dialog", { name: "Reaplicar reglas" });
     expect(within(confirm).getByText(/recategoriza.*todos los movimientos que coinciden con alguna regla/i)).toBeInTheDocument();
     expect(within(confirm).getByText(/a mano/i)).toBeInTheDocument();
+    await flushAsync();
     expect(sent("POST")).toEqual([]);
     await userEvent.click(within(confirm).getByRole("button", { name: "Cancelar" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Reaplicar reglas" })).not.toBeInTheDocument());
+    await flushAsync();
     expect(sent("POST")).toEqual([]);
   });
 
   it("«Reaplicar a todo» manda el POST una sola vez al confirmar", async () => {
     renderWithProviders(<RulesPage />, { route: "/rules" });
     await userEvent.click(await screen.findByRole("button", { name: "Reaplicar a todo" }));
+    await flushAsync();
     expect(sent("POST")).toEqual([]);
     await userEvent.click(within(screen.getByRole("dialog", { name: "Reaplicar reglas" })).getByRole("button", { name: "Reaplicar" }));
     await waitFor(() => expect(sent("POST")).toEqual([{ url: "/api/category-rules/apply", body: undefined }]));

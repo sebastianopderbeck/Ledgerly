@@ -121,6 +121,7 @@ describe("TransactionsPage en mobile", () => {
   it("si la pantalla pasa a tamaño compu con la hoja abierta, no queda nada tapando la tabla", async () => {
     renderWithProviders(<TransactionsPage />, { route: "/transactions" });
     await openSheet();
+    expect(document.body.style.overflow).toBe("hidden");
     emulateDesktop();
     await waitFor(() => expect(screen.getByRole("grid")).toBeInTheDocument());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

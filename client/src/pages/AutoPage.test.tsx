@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { flushAsync } from "../testing/flushAsync.js";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { emulateMobile } from "../testing/viewport.js";
 import { AutoPage } from "./AutoPage.js";
@@ -110,7 +111,9 @@ describe("AutoPage en mobile", () => {
     const input = within(sheet).getByRole("textbox", { name: "TC oficial" });
     await userEvent.clear(input);
     await userEvent.type(input, "-5");
+    expect(save).toBeDisabled();
     fireEvent.click(save);
+    await flushAsync();
     expect(patches()).toEqual([]);
   });
 });
