@@ -90,11 +90,10 @@ statsRouter.get("/monthly-usd", asyncHandler(async (req, res) => {
   const q = req.query as Record<string, unknown>;
   const filter: FilterQuery<StatementDoc> = {};
   if (typeof q.cardLabel === "string") filter.cardLabel = q.cardLabel;
-  if (typeof q.from === "string" || typeof q.to === "string") {
-    filter.closingDate = {};
-    if (typeof q.from === "string") filter.closingDate.$gte = new Date(q.from);
-    if (typeof q.to === "string") filter.closingDate.$lte = new Date(q.to);
-  }
+  const fromMonth = typeof q.from === "string" ? q.from.slice(0, 7) : null;
+  const toMonth = typeof q.to === "string" ? q.to.slice(0, 7) : null;
+  const inMonthRange = (month: string): boolean =>
+    (fromMonth === null || month >= fromMonth) && (toMonth === null || month <= toMonth);
   const statements = await StatementModel.find(filter).lean();
   const totalArsByMonth = new Map<string, number>();
   for (const statement of statements) {
@@ -103,7 +102,7 @@ statsRouter.get("/monthly-usd", asyncHandler(async (req, res) => {
     totalArsByMonth.set(month, (totalArsByMonth.get(month) ?? 0) + (statement.totals?.saldoActual?.ars ?? 0));
   }
   const years = parseYears(q.year);
-  const months = [...totalArsByMonth.keys()].filter((month) => monthInYears(month, years)).sort();
+  const months = [...totalArsByMonth.keys()].filter((month) => monthInYears(month, years) && inMonthRange(month)).sort();
   const today = new Date().toISOString().slice(0, 10);
   const result: MonthlyUsdStat[] = [];
   for (const month of months) {

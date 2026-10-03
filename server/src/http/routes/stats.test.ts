@@ -278,6 +278,14 @@ describe("stats", () => {
     expect(withoutYear.body.futureInstallmentTotal).toBe(3900);
   });
 
+  it("monthly-usd con Mes filtra por mes de consumo, no por fecha de cierre", async () => {
+    vi.mocked(fetchOficialRate).mockResolvedValue(1000);
+    const june = await request(app).get("/api/stats/monthly-usd?currency=ARS&from=2026-06-01&to=2026-06-30&year=2026");
+    expect(june.body).toEqual([{ month: "2026-06", totalArs: 6000, rate: 1000, totalUsd: 6 }]);
+    const july = await request(app).get("/api/stats/monthly-usd?currency=ARS&from=2026-07-01&to=2026-07-31&year=2026");
+    expect(july.body).toEqual([]);
+  });
+
   it("monthly-usd con year excluye meses de otros años sin pedir cotización", async () => {
     vi.mocked(fetchOficialRate).mockClear();
     vi.mocked(fetchOficialRate).mockResolvedValue(1000);
