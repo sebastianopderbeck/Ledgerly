@@ -5,7 +5,7 @@ import type {
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
 
-export interface StatFilters { currency: "ARS" | "USD"; from?: string; to?: string; cardLabel?: string; }
+export interface StatFilters { currency: "ARS" | "USD"; from?: string; to?: string; cardLabel?: string; year?: string[]; }
 
 function qs(params: object): string {
   const sp = new URLSearchParams();
