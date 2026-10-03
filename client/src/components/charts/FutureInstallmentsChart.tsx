@@ -4,9 +4,11 @@ import { useFutureInstallments, type StatFilters } from "../../api/hooks.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { useChartLayout } from "./useChartLayout.js";
 
 export const FutureInstallmentsChart = (filters: StatFilters) => {
   const theme = useTheme();
+  const { seriesMargin, bottomTicks } = useChartLayout();
   const { data } = useFutureInstallments(filters);
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin cuotas pendientes</Typography>;
 
@@ -21,13 +23,13 @@ export const FutureInstallmentsChart = (filters: StatFilters) => {
         keys={["total"]}
         indexBy="month"
         colors={[color]}
-        margin={{ top: 16, right: 24, bottom: 64, left: 64 }}
+        margin={seriesMargin({ top: 16, right: 24, bottom: 64, left: 64 })}
         padding={0.35}
         borderRadius={6}
         enableLabel={false}
         enableGridX={false}
         valueFormat={(value) => formatMoney(value, filters.currency)}
-        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45 }}
+        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45, tickValues: bottomTicks(chartData.map((d) => d.month)) }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), filters.currency) }}
         motionConfig="gentle"
       />

@@ -5,9 +5,11 @@ import { useMonthly, type StatFilters } from "../../api/hooks.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { useChartLayout } from "./useChartLayout.js";
 
 export const MonthlyTrendChart = (filters: StatFilters) => {
   const theme = useTheme();
+  const { seriesMargin, bottomTicks } = useChartLayout();
   const { data } = useMonthly(filters);
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
@@ -20,7 +22,7 @@ export const MonthlyTrendChart = (filters: StatFilters) => {
         data={series}
         theme={nivoTheme(theme)}
         colors={[color]}
-        margin={{ top: 16, right: 24, bottom: 40, left: 64 }}
+        margin={seriesMargin({ top: 16, right: 24, bottom: 40, left: 64 })}
         xScale={{ type: "point" }}
         yScale={{ type: "linear", min: 0, max: "auto" }}
         curve="monotoneX"
@@ -37,7 +39,7 @@ export const MonthlyTrendChart = (filters: StatFilters) => {
         ])]}
         fill={[{ match: "*", id: "monthlyArea" }]}
         enableGridX={false}
-        axisBottom={{ tickSize: 0, tickPadding: 10 }}
+        axisBottom={{ tickSize: 0, tickPadding: 10, tickValues: bottomTicks(data.map((d) => d.month)) }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), filters.currency) }}
         yFormat={(value) => formatMoney(Number(value), filters.currency)}
         useMesh

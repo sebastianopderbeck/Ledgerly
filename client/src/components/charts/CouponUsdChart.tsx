@@ -5,9 +5,11 @@ import { useCreditCouponsInYears } from "../../filters/useInYears.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { useChartLayout } from "./useChartLayout.js";
 
 export const CouponUsdChart = () => {
   const theme = useTheme();
+  const { seriesMargin, bottomTicks } = useChartLayout();
   const { data } = useCreditCouponsInYears();
   const points = (data ?? [])
     .filter((c) => c.totalUsd != null)
@@ -25,7 +27,7 @@ export const CouponUsdChart = () => {
         data={series}
         theme={nivoTheme(theme)}
         colors={[color]}
-        margin={{ top: 16, right: 24, bottom: 64, left: 64 }}
+        margin={seriesMargin({ top: 16, right: 24, bottom: 64, left: 64 })}
         xScale={{ type: "point" }}
         yScale={{ type: "linear", min: "auto", max: "auto" }}
         curve="monotoneX"
@@ -42,7 +44,7 @@ export const CouponUsdChart = () => {
         ])]}
         fill={[{ match: "*", id: "usdArea" }]}
         enableGridX={false}
-        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45 }}
+        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45, tickValues: bottomTicks(points.map((point) => point.x)) }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "USD") }}
         yFormat={(value) => formatMoney(Number(value), "USD")}
         useMesh
