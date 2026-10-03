@@ -6,6 +6,7 @@ import { formatPercent } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { mobileLineTouch } from "./ChartTooltip.js";
 import { monthLabel } from "../../payslipConcepts.js";
 import { accumulatedInflation } from "../../inflationStats.js";
 
@@ -17,7 +18,7 @@ interface InflationAccumulatedChartProps {
 
 export const InflationAccumulatedChart = ({ inflation, years, monthOnly = false }: InflationAccumulatedChartProps) => {
   const theme = useTheme();
-  const { seriesMargin, bottomTicks } = useChartLayout();
+  const { isMobile, seriesMargin, bottomTicks } = useChartLayout();
   const acc = accumulatedInflation(inflation, years);
 
   if (acc.length === 0) return <Typography color="text.secondary">Sin datos de inflación</Typography>;
@@ -59,6 +60,7 @@ export const InflationAccumulatedChart = ({ inflation, years, monthOnly = false 
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatPercent(Number(value)) }}
         yFormat={(value) => formatPercent(Number(value))}
         useMesh
+        {...(isMobile ? mobileLineTouch : {})}
         motionConfig="gentle"
       />
     </Box>

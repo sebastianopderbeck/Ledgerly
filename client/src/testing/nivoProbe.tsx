@@ -14,6 +14,9 @@ interface NivoProbeProps {
   axisBottom?: ProbeAxis | null;
   legends?: readonly unknown[];
   colors?: unknown;
+  enableSlices?: unknown;
+  tooltip?: unknown;
+  sliceTooltip?: unknown;
 }
 
 export interface ProbeReading {
@@ -22,9 +25,14 @@ export interface ProbeReading {
   tickValues: unknown[] | null;
   legends: number;
   colors: unknown[] | null;
+  enableSlices: string | undefined;
+  customTooltip: string | undefined;
 }
 
-export const NivoProbe = ({ margin, axisBottom, legends, colors }: NivoProbeProps) => (
+const hasCustomTooltip = (tooltip: unknown, sliceTooltip: unknown) =>
+  typeof tooltip === "function" || typeof sliceTooltip === "function";
+
+export const NivoProbe = ({ margin, axisBottom, legends, colors, enableSlices, tooltip, sliceTooltip }: NivoProbeProps) => (
   <div
     data-testid="nivo-chart"
     data-margin={JSON.stringify(margin ?? null)}
@@ -32,6 +40,8 @@ export const NivoProbe = ({ margin, axisBottom, legends, colors }: NivoProbeProp
     data-tick-values={JSON.stringify(axisBottom?.tickValues ?? null)}
     data-legends={String(legends?.length ?? 0)}
     data-colors={JSON.stringify(Array.isArray(colors) ? colors : null)}
+    data-enable-slices={String(enableSlices ?? "")}
+    data-custom-tooltip={hasCustomTooltip(tooltip, sliceTooltip) ? "yes" : "no"}
   />
 );
 
@@ -41,4 +51,6 @@ export const probeOf = (element: HTMLElement): ProbeReading => ({
   tickValues: JSON.parse(element.dataset.tickValues ?? "null") as unknown[] | null,
   legends: Number(element.dataset.legends),
   colors: JSON.parse(element.dataset.colors ?? "null") as unknown[] | null,
+  enableSlices: element.dataset.enableSlices,
+  customTooltip: element.dataset.customTooltip,
 });

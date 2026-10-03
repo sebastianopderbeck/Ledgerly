@@ -4,14 +4,17 @@ import type { TasaRealPoint } from "../../macroSignals.js";
 import { formatPercent } from "../../format.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { compactBarTooltip } from "./ChartTooltip.js";
 
 interface TasaRealChartProps {
   points: TasaRealPoint[];
 }
 
+const MobileBarTooltip = compactBarTooltip({ showKey: false });
+
 export const TasaRealChart = ({ points }: TasaRealChartProps) => {
   const theme = useTheme();
-  const { seriesMargin, bottomTicks } = useChartLayout();
+  const { isMobile, seriesMargin, bottomTicks } = useChartLayout();
 
   if (points.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
@@ -39,6 +42,7 @@ export const TasaRealChart = ({ points }: TasaRealChartProps) => {
           value: 0,
           lineStyle: { stroke: theme.palette.text.secondary, strokeWidth: 1 },
         }]}
+        {...(isMobile ? { tooltip: MobileBarTooltip } : {})}
         motionConfig="gentle"
       />
     </Box>

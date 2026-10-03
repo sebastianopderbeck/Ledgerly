@@ -42,24 +42,24 @@ describe("barras horizontales de comercios", () => {
   it("en mobile el top de comercios saca el eje de montos y angosta la columna de nombres", async () => {
     emulateMobile();
     renderWithProviders(<TopMerchantsChart currency="ARS" />);
-    expect(await chart()).toMatchObject({ axisBottom: "none", margin: { top: 8, right: 24, bottom: 8, left: 96 } });
+    expect(await chart()).toMatchObject({ axisBottom: "none", customTooltip: "yes", margin: { top: 8, right: 24, bottom: 8, left: 96 } });
   });
 
   it("en compu el top de comercios queda como siempre", async () => {
     emulateDesktop();
     renderWithProviders(<TopMerchantsChart currency="ARS" />);
-    expect(await chart()).toMatchObject({ axisBottom: "shown", margin: { top: 8, right: 24, bottom: 32, left: 136 } });
+    expect(await chart()).toMatchObject({ axisBottom: "shown", customTooltip: "no", margin: { top: 8, right: 24, bottom: 32, left: 136 } });
   });
 
   it("en mobile las cuotas por comercio siguen la misma regla", async () => {
     emulateMobile();
     renderWithProviders(<InstallmentsByMerchantChart currency="ARS" />);
-    expect(await chart()).toMatchObject({ axisBottom: "none", margin: { top: 8, right: 24, bottom: 8, left: 96 } });
+    expect(await chart()).toMatchObject({ axisBottom: "none", customTooltip: "yes", margin: { top: 8, right: 24, bottom: 8, left: 96 } });
   });
 
   it("en compu las cuotas por comercio quedan como siempre", async () => {
     emulateDesktop();
     renderWithProviders(<InstallmentsByMerchantChart currency="ARS" />);
-    expect(await chart()).toMatchObject({ axisBottom: "shown", margin: { top: 8, right: 24, bottom: 32, left: 136 } });
+    expect(await chart()).toMatchObject({ axisBottom: "shown", customTooltip: "no", margin: { top: 8, right: 24, bottom: 32, left: 136 } });
   });
 });

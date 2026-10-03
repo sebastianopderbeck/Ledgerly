@@ -6,6 +6,7 @@ import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { ChartLegend, type ChartLegendItem } from "./ChartLegend.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { compactBarTooltip } from "./ChartTooltip.js";
 import { byPeriodoAsc, monthLabel } from "../../payslipConcepts.js";
 
 const KEYS = ["Bruto", "Neto"];
@@ -14,6 +15,8 @@ interface PayslipGrossNetChartProps {
   payslips: PayslipDTO[];
   monthOnly?: boolean;
 }
+
+const MobileBarTooltip = compactBarTooltip({ showKey: true });
 
 export const PayslipGrossNetChart = ({ payslips, monthOnly = false }: PayslipGrossNetChartProps) => {
   const theme = useTheme();
@@ -61,6 +64,7 @@ export const PayslipGrossNetChart = ({ payslips, monthOnly = false }: PayslipGro
             symbolSize: 12,
             symbolShape: "circle",
           }]}
+          {...(isMobile ? { tooltip: MobileBarTooltip } : {})}
           motionConfig="gentle"
         />
       </Box>

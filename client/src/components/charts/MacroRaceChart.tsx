@@ -5,6 +5,7 @@ import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { ChartLegend, type ChartLegendItem } from "./ChartLegend.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { mobileLineTouch } from "./ChartTooltip.js";
 
 interface MacroRaceChartProps {
   series: RaceSerie[];
@@ -50,6 +51,7 @@ export const MacroRaceChart = ({ series }: MacroRaceChartProps) => {
             symbolShape: "circle",
           }]}
           useMesh
+          {...(isMobile ? mobileLineTouch : {})}
           motionConfig="gentle"
         />
       </Box>

@@ -7,9 +7,11 @@ import { categoricalPalette } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { ChartLegend, type ChartLegendItem } from "./ChartLegend.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { compactBarTooltip } from "./ChartTooltip.js";
 
 const MAX_CATEGORIES = 7;
 const OTHER_LABEL = "Otras";
+const MobileBarTooltip = compactBarTooltip({ showKey: true });
 
 export const InstallmentsByCategoryChart = (filters: StatFilters) => {
   const theme = useTheme();
@@ -77,6 +79,7 @@ export const InstallmentsByCategoryChart = (filters: StatFilters) => {
             symbolSize: 10,
             itemTextColor: theme.palette.text.secondary,
           }]}
+          {...(isMobile ? { tooltip: MobileBarTooltip } : {})}
           motionConfig="gentle"
         />
       </Box>

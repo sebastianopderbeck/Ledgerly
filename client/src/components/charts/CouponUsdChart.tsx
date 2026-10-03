@@ -6,10 +6,11 @@ import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { mobileLineTouch } from "./ChartTooltip.js";
 
 export const CouponUsdChart = () => {
   const theme = useTheme();
-  const { seriesMargin, bottomTicks } = useChartLayout();
+  const { isMobile, seriesMargin, bottomTicks } = useChartLayout();
   const { data } = useCreditCouponsInYears();
   const points = (data ?? [])
     .filter((c) => c.totalUsd != null)
@@ -48,6 +49,7 @@ export const CouponUsdChart = () => {
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "USD") }}
         yFormat={(value) => formatMoney(Number(value), "USD")}
         useMesh
+        {...(isMobile ? mobileLineTouch : {})}
         motionConfig="gentle"
       />
     </Box>

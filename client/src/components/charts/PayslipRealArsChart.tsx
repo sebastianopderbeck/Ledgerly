@@ -6,6 +6,7 @@ import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { mobileLineTouch } from "./ChartTooltip.js";
 import { monthLabel } from "../../payslipConcepts.js";
 import { deflateToLatest } from "../../realSalary.js";
 
@@ -17,7 +18,7 @@ interface PayslipRealArsChartProps {
 
 export const PayslipRealArsChart = ({ payslips, inflation, monthOnly = false }: PayslipRealArsChartProps) => {
   const theme = useTheme();
-  const { seriesMargin, bottomTicks } = useChartLayout();
+  const { isMobile, seriesMargin, bottomTicks } = useChartLayout();
   const real = deflateToLatest(payslips, inflation);
 
   if (real.length === 0) return <Typography color="text.secondary">Sin datos de inflación</Typography>;
@@ -68,6 +69,7 @@ export const PayslipRealArsChart = ({ payslips, inflation, monthOnly = false }: 
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
         yFormat={(value) => formatMoney(Number(value), "ARS")}
         useMesh
+        {...(isMobile ? mobileLineTouch : {})}
         motionConfig="gentle"
       />
     </Box>

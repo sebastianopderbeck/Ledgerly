@@ -51,6 +51,18 @@ describe("series por mes en mobile", () => {
     expect(chart().margin).toEqual({ top: 16, right: 24, bottom: 64, left: 56 });
   });
 
+  it("la línea muestra el mes y el valor en un tooltip compacto por columna", () => {
+    emulateMobile();
+    renderWithProviders(<DolarRealChart dolarReal={dolarReal(14)} />);
+    expect(chart()).toMatchObject({ enableSlices: "x", customTooltip: "yes" });
+  });
+
+  it("las barras usan el tooltip compacto", () => {
+    emulateMobile();
+    renderWithProviders(<TasaRealChart points={tasaReal(14)} />);
+    expect(chart().customTooltip).toBe("yes");
+  });
+
   it("también ralea las barras", () => {
     emulateMobile();
     renderWithProviders(<TasaRealChart points={tasaReal(14)} />);
@@ -68,9 +80,15 @@ describe("series por mes en compu", () => {
     expect(chart()).toMatchObject({ tickValues: null, margin: { top: 16, right: 24, bottom: 64, left: 56 } });
   });
 
+  it("la línea mantiene el tooltip de nivo sin columnas", () => {
+    emulateDesktop();
+    renderWithProviders(<DolarRealChart dolarReal={dolarReal(14)} />);
+    expect(chart()).toMatchObject({ enableSlices: "", customTooltip: "no" });
+  });
+
   it("las barras también quedan como siempre", () => {
     emulateDesktop();
     renderWithProviders(<TasaRealChart points={tasaReal(14)} />);
-    expect(chart()).toMatchObject({ tickValues: null, margin: { top: 16, right: 24, bottom: 64, left: 56 } });
+    expect(chart()).toMatchObject({ tickValues: null, customTooltip: "no", margin: { top: 16, right: 24, bottom: 64, left: 56 } });
   });
 });

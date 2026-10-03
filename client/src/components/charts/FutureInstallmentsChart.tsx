@@ -5,10 +5,13 @@ import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { compactBarTooltip } from "./ChartTooltip.js";
+
+const MobileBarTooltip = compactBarTooltip({ showKey: false });
 
 export const FutureInstallmentsChart = (filters: StatFilters) => {
   const theme = useTheme();
-  const { seriesMargin, bottomTicks } = useChartLayout();
+  const { isMobile, seriesMargin, bottomTicks } = useChartLayout();
   const { data } = useFutureInstallments(filters);
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin cuotas pendientes</Typography>;
 
@@ -31,6 +34,7 @@ export const FutureInstallmentsChart = (filters: StatFilters) => {
         valueFormat={(value) => formatMoney(value, filters.currency)}
         axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45, tickValues: bottomTicks(chartData.map((d) => d.month)) }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), filters.currency) }}
+        {...(isMobile ? { tooltip: MobileBarTooltip } : {})}
         motionConfig="gentle"
       />
     </Box>

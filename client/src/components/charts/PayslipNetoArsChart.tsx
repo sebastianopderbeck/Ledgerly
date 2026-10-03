@@ -6,6 +6,7 @@ import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { mobileLineTouch } from "./ChartTooltip.js";
 import { byPeriodoAsc, monthLabel } from "../../payslipConcepts.js";
 
 interface PayslipNetoArsChartProps {
@@ -15,7 +16,7 @@ interface PayslipNetoArsChartProps {
 
 export const PayslipNetoArsChart = ({ payslips, monthOnly = false }: PayslipNetoArsChartProps) => {
   const theme = useTheme();
-  const { seriesMargin, bottomTicks } = useChartLayout();
+  const { isMobile, seriesMargin, bottomTicks } = useChartLayout();
   if (payslips.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
   const points = [...payslips]
@@ -58,6 +59,7 @@ export const PayslipNetoArsChart = ({ payslips, monthOnly = false }: PayslipNeto
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
         yFormat={(value) => formatMoney(Number(value), "ARS")}
         useMesh
+        {...(isMobile ? mobileLineTouch : {})}
         motionConfig="gentle"
       />
     </Box>

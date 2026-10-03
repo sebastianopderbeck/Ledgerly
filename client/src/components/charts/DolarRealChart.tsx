@@ -5,6 +5,7 @@ import type { DolarReal } from "../../macroSignals.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { mobileLineTouch } from "./ChartTooltip.js";
 
 interface DolarRealChartProps {
   dolarReal: DolarReal;
@@ -12,7 +13,7 @@ interface DolarRealChartProps {
 
 export const DolarRealChart = ({ dolarReal }: DolarRealChartProps) => {
   const theme = useTheme();
-  const { seriesMargin, bottomTicks } = useChartLayout();
+  const { isMobile, seriesMargin, bottomTicks } = useChartLayout();
 
   if (dolarReal.serie.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
@@ -54,6 +55,7 @@ export const DolarRealChart = ({ dolarReal }: DolarRealChartProps) => {
         axisLeft={{ tickSize: 0, tickPadding: 8 }}
         yFormat={(value) => Number(value).toFixed(0)}
         useMesh
+        {...(isMobile ? mobileLineTouch : {})}
         motionConfig="gentle"
       />
     </Box>

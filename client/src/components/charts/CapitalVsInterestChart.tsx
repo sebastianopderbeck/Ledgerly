@@ -5,10 +5,13 @@ import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { useChartLayout } from "./useChartLayout.js";
+import { compactBarTooltip } from "./ChartTooltip.js";
+
+const MobileBarTooltip = compactBarTooltip({ showKey: true });
 
 export const CapitalVsInterestChart = () => {
   const theme = useTheme();
-  const { seriesMargin, bottomTicks } = useChartLayout();
+  const { isMobile, seriesMargin, bottomTicks } = useChartLayout();
   const { data } = useCreditCouponsInYears();
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
@@ -33,6 +36,7 @@ export const CapitalVsInterestChart = () => {
         valueFormat={(value) => formatMoney(value, "ARS")}
         axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45, tickValues: bottomTicks(rows.map((row) => row.month)) }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
+        {...(isMobile ? { tooltip: MobileBarTooltip } : {})}
         motionConfig="gentle"
       />
     </Box>
