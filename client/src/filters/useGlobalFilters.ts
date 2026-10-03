@@ -24,7 +24,8 @@ const monthRange = (month: string): { from: string; to: string } => {
 
 export const useGlobalFilters = (): GlobalFilters => {
   const [params, setParams] = useSearchParams();
-  const yearKey = params.getAll("year").join(",");
+  const monthYear = params.get("from")?.slice(0, 4) ?? "";
+  const yearKey = params.getAll("year").join(",") || monthYear;
   const yearSelection = useMemo(() => parseYears(yearKey ? yearKey.split(",") : []), [yearKey]);
 
   const update = (mutate: (next: URLSearchParams) => void) => {

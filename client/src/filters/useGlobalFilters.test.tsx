@@ -30,6 +30,17 @@ describe("useGlobalFilters", () => {
     expect(result.current.filters.cardLabel).toBeUndefined();
   });
 
+  it("sin year pero con un Mes en la URL toma el año de ese Mes", () => {
+    const { result } = renderAt("/?from=2025-11-01&to=2025-11-30");
+    expect(result.current.filters.years).toEqual(["2025"]);
+    expect(result.current.filters.from).toBe("2025-11-01");
+  });
+
+  it("con year explícito no lo pisa el Mes", () => {
+    const { result } = renderAt("/?year=2026&from=2025-11-01&to=2025-11-30");
+    expect(result.current.filters.years).toEqual(["2026"]);
+  });
+
   it("con year=all no manda años a la API", () => {
     const { result } = renderAt("/?year=all");
     expect(result.current.filters.yearSelection).toEqual({ kind: "all" });
