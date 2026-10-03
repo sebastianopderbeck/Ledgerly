@@ -8,6 +8,7 @@ import { ConfirmDialog } from "./ConfirmDialog.js";
 import { MOBILE_NAV_HEIGHT } from "./layout/MobileBottomNav.js";
 import { TransactionSheet } from "./TransactionSheet.js";
 import { useSheetTarget } from "./useSheetTarget.js";
+import { useTransactionSelection } from "./useTransactionSelection.js";
 
 interface TransactionsListProps {
   rows: TransactionDTO[];
@@ -82,49 +83,39 @@ const TransactionRow = ({ row, selecting, selected, onOpen, onToggle }: Transact
 
 export const TransactionsList = ({ rows, onCategoryChange, onDelete }: TransactionsListProps) => {
   const [visibleCount, setVisibleCount] = useState(TRANSACTIONS_PAGE_SIZE);
-  const [selecting, setSelecting] = useState(false);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [pendingIds, setPendingIds] = useState<string[] | null>(null);
   const { target, open, show, close } = useSheetTarget<TransactionDTO>();
+  const visibleRows = useMemo(() => rows.slice(0, visibleCount), [rows, visibleCount]);
+  const {
+    selecting,
+    selectedIds,
+    pendingIds,
+    startSelecting,
+    stopSelecting,
+    toggle,
+    askDelete,
+    askDeleteSelected,
+    cancelDelete,
+    confirmDelete,
+  } = useTransactionSelection(visibleRows, onDelete);
 
   const showMore = useCallback(() => setVisibleCount((count) => count + TRANSACTIONS_PAGE_SIZE), []);
-  const startSelecting = useCallback(() => setSelecting(true), []);
-  const stopSelecting = useCallback(() => {
-    setSelecting(false);
-    setSelected([]);
-  }, []);
-  const toggle = useCallback((id: string) => {
-    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
-  }, []);
   const askDeleteOne = useCallback((transaction: TransactionDTO) => {
     close();
-    setPendingIds([transaction.id]);
-  }, [close]);
-  const cancelDelete = useCallback(() => setPendingIds(null), []);
-
-  const visibleRows = useMemo(() => rows.slice(0, visibleCount), [rows, visibleCount]);
-  const visibleIds = useMemo(() => new Set(visibleRows.map((row) => row.id)), [visibleRows]);
-  const visibleSelected = selected.filter((id) => visibleIds.has(id));
-
-  const askDeleteSelected = () => setPendingIds(visibleSelected);
-  const confirmDelete = () => {
-    if (pendingIds) onDelete(pendingIds);
-    setPendingIds(null);
-    stopSelecting();
-  };
+    askDelete([transaction.id]);
+  }, [close, askDelete]);
 
   const hasMore = rows.length > visibleRows.length;
   const isEmpty = rows.length === 0;
   const canStartSelecting = !selecting && !isEmpty;
   const countLabel = rows.length === 1 ? "1 movimiento" : `${rows.length} movimientos`;
-  const deleteLabel = `Borrar (${visibleSelected.length})`;
+  const deleteLabel = `Borrar (${selectedIds.length})`;
   const sectionSx: SxProps<Theme> = { pb: selecting ? `${SELECTION_BAR_HEIGHT}px` : 0 };
   const items = visibleRows.map((row) => (
     <TransactionRow
       key={row.id}
       row={row}
       selecting={selecting}
-      selected={visibleSelected.includes(row.id)}
+      selected={selectedIds.includes(row.id)}
       onOpen={show}
       onToggle={toggle}
     />
@@ -142,7 +133,7 @@ export const TransactionsList = ({ rows, onCategoryChange, onDelete }: Transacti
       {selecting && (
         <Box role="toolbar" aria-label="selección" sx={selectionBarSx}>
           <Button fullWidth onClick={stopSelecting}>Cancelar</Button>
-          <Button fullWidth variant="contained" color="error" disabled={visibleSelected.length === 0} onClick={askDeleteSelected}>
+          <Button fullWidth variant="contained" color="error" disabled={selectedIds.length === 0} onClick={askDeleteSelected}>
             {deleteLabel}
           </Button>
         </Box>
