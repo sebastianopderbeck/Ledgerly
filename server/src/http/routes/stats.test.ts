@@ -30,6 +30,16 @@ beforeEach(async () => {
   ]);
 });
 
+async function addInstallmentCrossingYear() {
+  const s = await StatementModel.findOne({});
+  await TransactionModel.create({
+    statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-11-10"), descriptionRaw: "F",
+    merchant: "FRAVEGA", category: "Hogar", categorySource: "rule", amount: 300, currency: "ARS",
+    direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 1, installmentTotal: 4,
+    comprobante: "12", fingerprint: "f-fravega",
+  });
+}
+
 describe("stats", () => {
   it("by-category suma solo compras", async () => {
     const res = await request(app).get("/api/stats/by-category?currency=ARS");
@@ -214,5 +224,73 @@ describe("stats", () => {
 
     const usd = await request(app).get("/api/stats/last-statement/by-category?currency=USD");
     expect(usd.body).toEqual([{ category: "Dolar", total: 40, count: 1 }]);
+  });
+
+  it("monthly y by-category con year dejan afuera los otros años", async () => {
+    const s = await StatementModel.findOne({});
+    await TransactionModel.create({
+      statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2024-03-01"), descriptionRaw: "C",
+      merchant: "COTO", category: "Supermercado", categorySource: "rule", amount: 700, currency: "ARS",
+      direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+      comprobante: "9", fingerprint: "f-2024",
+    });
+    const monthly = await request(app).get("/api/stats/monthly?currency=ARS&year=2025&year=2026");
+    expect(monthly.body).toEqual([{ month: "2026-05", total: 2000, count: 2 }]);
+    const byCategory = await request(app).get("/api/stats/by-category?currency=ARS&year=2024");
+    expect(byCategory.body).toEqual([{ category: "Supermercado", total: 700, count: 1 }]);
+  });
+
+  it("year respeta el borde de año (31/12 vs 1/1)", async () => {
+    const s = await StatementModel.findOne({});
+    await TransactionModel.insertMany([
+      { statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2025-12-31"), descriptionRaw: "D",
+        merchant: "FIN DE AÑO", category: "Compras", categorySource: "rule", amount: 100, currency: "ARS",
+        direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+        comprobante: "10", fingerprint: "f-1231" },
+      { statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-01-01"), descriptionRaw: "E",
+        merchant: "AÑO NUEVO", category: "Compras", categorySource: "rule", amount: 200, currency: "ARS",
+        direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+        comprobante: "11", fingerprint: "f-0101" },
+    ]);
+    const res = await request(app).get("/api/stats/monthly?currency=ARS&year=2025");
+    expect(res.body).toEqual([{ month: "2025-12", total: 100, count: 1 }]);
+  });
+
+  it("year inválido no filtra", async () => {
+    const res = await request(app).get("/api/stats/monthly?currency=ARS&year=abc");
+    expect(res.body).toEqual([{ month: "2026-05", total: 2000, count: 2 }]);
+  });
+
+  it("future-installments y detail con year filtran por año de vencimiento", async () => {
+    await addInstallmentCrossingYear();
+    const res = await request(app).get("/api/stats/future-installments?currency=ARS&year=2027");
+    expect(res.body).toEqual([{ month: "2027-01", total: 300 }, { month: "2027-02", total: 300 }]);
+    const detail = await request(app).get("/api/stats/future-installments/detail?currency=ARS&year=2027");
+    expect(detail.body.map((m: { month: string }) => m.month)).toEqual(["2027-01", "2027-02"]);
+  });
+
+  it("summary con year suma solo las cuotas que vencen en esos años", async () => {
+    await addInstallmentCrossingYear();
+    const withYear = await request(app).get("/api/stats/summary?currency=ARS&year=2027");
+    expect(withYear.body.futureInstallmentTotal).toBe(600);
+    expect(withYear.body.totalPurchases).toBe(0);
+    const withoutYear = await request(app).get("/api/stats/summary?currency=ARS");
+    expect(withoutYear.body.futureInstallmentTotal).toBe(3900);
+  });
+
+  it("monthly-usd con Mes filtra por mes de consumo, no por fecha de cierre", async () => {
+    vi.mocked(fetchOficialRate).mockResolvedValue(1000);
+    const june = await request(app).get("/api/stats/monthly-usd?currency=ARS&from=2026-06-01&to=2026-06-30&year=2026");
+    expect(june.body).toEqual([{ month: "2026-06", totalArs: 6000, rate: 1000, totalUsd: 6 }]);
+    const july = await request(app).get("/api/stats/monthly-usd?currency=ARS&from=2026-07-01&to=2026-07-31&year=2026");
+    expect(july.body).toEqual([]);
+  });
+
+  it("monthly-usd con year excluye meses de otros años sin pedir cotización", async () => {
+    vi.mocked(fetchOficialRate).mockClear();
+    vi.mocked(fetchOficialRate).mockResolvedValue(1000);
+    const res = await request(app).get("/api/stats/monthly-usd?currency=ARS&year=2025");
+    expect(res.body).toEqual([]);
+    expect(fetchOficialRate).not.toHaveBeenCalled();
   });
 });

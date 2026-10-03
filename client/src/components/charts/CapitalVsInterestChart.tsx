@@ -1,13 +1,13 @@
 import { ResponsiveBar } from "@nivo/bar";
 import { Box, Typography, useTheme } from "@mui/material";
-import { useCreditCoupons } from "../../api/hooks.js";
+import { useCreditCouponsInYears } from "../../filters/useInYears.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 
 export const CapitalVsInterestChart = () => {
   const theme = useTheme();
-  const { data } = useCreditCoupons();
+  const { data } = useCreditCouponsInYears();
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
   const rows = [...data]

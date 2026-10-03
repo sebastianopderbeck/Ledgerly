@@ -7,19 +7,24 @@ export interface AccumulatedInflationPoint {
 
 export function accumulatedInflation(
   inflation: InflationRateDTO[],
-  year: string | null,
   years: string[],
 ): AccumulatedInflationPoint[] {
-  const inScope = (periodo: string): boolean =>
-    year === null ? years.includes(periodo.slice(0, 4)) : periodo.slice(0, 4) === year;
-
+  if (years.length === 0) return [];
+  const sortedYears = [...years].sort();
+  const firstYear = sortedYears[0];
+  const lastYear = sortedYears[sortedYears.length - 1];
   const months = inflation
-    .filter((entry) => inScope(entry.periodo))
+    .filter((entry) => {
+      const year = entry.periodo.slice(0, 4);
+      return year >= firstYear && year <= lastYear;
+    })
     .sort((a, b) => a.periodo.localeCompare(b.periodo));
 
   let factor = 1;
-  return months.map((entry) => {
-    factor *= 1 + entry.variacionMensual / 100;
-    return { periodo: entry.periodo, acumulado: (factor - 1) * 100 };
-  });
+  return months
+    .map((entry) => {
+      factor *= 1 + entry.variacionMensual / 100;
+      return { periodo: entry.periodo, acumulado: (factor - 1) * 100 };
+    })
+    .filter((point) => years.includes(point.periodo.slice(0, 4)));
 }

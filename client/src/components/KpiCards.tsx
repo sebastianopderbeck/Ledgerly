@@ -4,6 +4,7 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
 import { useSummary, useOficialRate, type StatFilters } from "../api/hooks.js";
 import { formatMoney } from "../format.js";
+import { yearsLabel } from "../filters/globalFilters.js";
 import { KpiGrid } from "./KpiGrid.js";
 import { Kpi } from "./Kpi.js";
 
@@ -16,6 +17,7 @@ export const KpiCards = (filters: StatFilters) => {
   const totalGastadoSub = filters.currency === "ARS" && rate
     ? `≈ ${formatMoney(data.totalPurchases / rate, "USD")}`
     : undefined;
+  const debtSub = filters.year ? `vence en ${yearsLabel(filters.year)}` : undefined;
   const money = (value: number) => formatMoney(value, filters.currency);
   const integer = (value: number) => String(Math.round(value));
 
@@ -24,7 +26,7 @@ export const KpiCards = (filters: StatFilters) => {
       <Kpi label="Total gastado" value={data.totalPurchases} format={money} sub={totalGastadoSub} icon={<PaymentsIcon />} color="primary" />
       <Kpi label="Movimientos" value={data.transactionCount} format={integer} icon={<ReceiptLongIcon />} color="secondary" />
       <Kpi label="Resúmenes" value={data.statementCount} format={integer} icon={<DescriptionIcon />} color="success" />
-      <Kpi label="Deuda en cuotas" value={data.futureInstallmentTotal} format={money} icon={<CreditCardIcon />} color="warning" />
+      <Kpi label="Deuda en cuotas" value={data.futureInstallmentTotal} format={money} sub={debtSub} icon={<CreditCardIcon />} color="warning" />
     </KpiGrid>
   );
 };

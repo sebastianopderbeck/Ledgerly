@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
 import { Layout } from "./Layout.js";
+import { NAV_ITEMS } from "./navItems.js";
 
 const SECTIONS = [/dashboard/i, /cuotas/i, /créditos/i, /auto/i, /sueldo/i, /contexto/i, /movimientos/i, /reglas/i, /importar/i];
 
@@ -34,6 +35,14 @@ describe("Layout", () => {
     renderLayout();
     for (const name of SECTIONS) {
       expect(within(mainNavigation()).getByRole("link", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("todos los links conservan los filtros globales y descartan los de Movimientos", () => {
+    renderLayout("/transactions?year=2025&currency=USD&category=Compras&search=uber");
+    for (const { to, label } of NAV_ITEMS) {
+      const link = within(mainNavigation()).getByRole("link", { name: label });
+      expect(link).toHaveAttribute("href", `${to}?year=2025&currency=USD`);
     }
   });
 

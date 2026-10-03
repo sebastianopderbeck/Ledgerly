@@ -1,5 +1,9 @@
+import { useMemo } from "react";
 import { CircularProgress, Typography } from "@mui/material";
 import { useCreditCoupons } from "../api/hooks.js";
+import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
+import { yearsOf } from "../filters/globalFilters.js";
+import { useCreditCouponsInYears } from "../filters/useInYears.js";
 import { CreditKpiCards } from "../components/CreditKpiCards.js";
 import { MortgageCouponsTable } from "../components/MortgageCouponsTable.js";
 import { MotionBox } from "../components/motion/motion.js";
@@ -11,9 +15,14 @@ import { UvaEvolutionChart } from "../components/charts/UvaEvolutionChart.js";
 import { AmortizationDonutChart } from "../components/charts/AmortizationDonutChart.js";
 import { CouponUsdChart } from "../components/charts/CouponUsdChart.js";
 
+const CREDIT_FIELDS: FilterField[] = ["year"];
+
 export const CreditsPage = () => {
   const { data, isLoading } = useCreditCoupons();
   const coupons = data ?? [];
+  const { data: couponsInYears } = useCreditCouponsInYears();
+  const hasDetail = (couponsInYears ?? []).length > 0;
+  const yearOptions = useMemo(() => yearsOf((data ?? []).map((coupon) => coupon.fechaDebito)), [data]);
 
   return (
     <>
@@ -28,6 +37,7 @@ export const CreditsPage = () => {
 
       {!isLoading && coupons.length > 0 && (
         <>
+          <FiltersBar fields={CREDIT_FIELDS} yearOptions={yearOptions} />
           <CreditKpiCards />
           <MotionBox
             variants={staggerContainer}
@@ -42,7 +52,7 @@ export const CreditsPage = () => {
             <ChartCard title="Valor de la cuota en USD"><CouponUsdChart /></ChartCard>
           </MotionBox>
 
-          <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>
+          {hasDetail && <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>}
           <MortgageCouponsTable />
         </>
       )}

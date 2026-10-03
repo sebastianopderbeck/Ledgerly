@@ -10,14 +10,13 @@ import { accumulatedInflation } from "../../inflationStats.js";
 
 interface InflationAccumulatedChartProps {
   inflation: InflationRateDTO[];
-  year: string | null;
   years: string[];
   monthOnly?: boolean;
 }
 
-export const InflationAccumulatedChart = ({ inflation, year, years, monthOnly = false }: InflationAccumulatedChartProps) => {
+export const InflationAccumulatedChart = ({ inflation, years, monthOnly = false }: InflationAccumulatedChartProps) => {
   const theme = useTheme();
-  const acc = accumulatedInflation(inflation, year, years);
+  const acc = accumulatedInflation(inflation, years);
 
   if (acc.length === 0) return <Typography color="text.secondary">Sin datos de inflación</Typography>;
 

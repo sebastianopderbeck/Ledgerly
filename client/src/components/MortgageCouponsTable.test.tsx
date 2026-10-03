@@ -22,13 +22,13 @@ afterEach(() => { vi.restoreAllMocks(); patchSpy.mockReset(); });
 
 describe("MortgageCouponsTable", () => {
   it("muestra columna Pagado (USD)", async () => {
-    renderWithProviders(<MortgageCouponsTable />);
+    renderWithProviders(<MortgageCouponsTable />, { route: "/?year=all" });
     await waitFor(() => expect(screen.getByText(/pagado \(usd\)/i)).toBeInTheDocument());
     expect(screen.getByRole("columnheader", { name: /tc oficial/i })).toBeInTheDocument();
   });
 
   it("editar el TC dispara un PATCH", async () => {
-    renderWithProviders(<MortgageCouponsTable />);
+    renderWithProviders(<MortgageCouponsTable />, { route: "/?year=all" });
     await waitFor(() => expect(screen.getByText(/pagado \(usd\)/i)).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /editar tc cuota 1/i }));
     const input = screen.getByRole("spinbutton", { name: /tc cuota 1/i });

@@ -1,11 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
   ImportResultUnionDTO, InflationRateDTO, MacroRefreshDTO, MacroSeriesDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, SummaryStat, TransactionDTO,
 } from "@ledgerly/shared";
 import { apiFetch } from "./client.js";
 
-export interface StatFilters { currency: "ARS" | "USD"; from?: string; to?: string; cardLabel?: string; }
+export interface StatFilters { currency: "ARS" | "USD"; from?: string; to?: string; cardLabel?: string; year?: string[]; }
 
 function qs(params: object): string {
   const sp = new URLSearchParams();
@@ -61,6 +61,7 @@ export interface TxFilters extends Partial<StatFilters> {
 export function useTransactions(filters: TxFilters) {
   return useQuery({
     queryKey: ["transactions", filters],
+    placeholderData: keepPreviousData,
     queryFn: () =>
       apiFetch<{ items: TransactionDTO[]; total: number; page: number; pageSize: number }>(`/transactions${qs(filters)}`),
   });

@@ -1,6 +1,6 @@
 import { ResponsiveBar } from "@nivo/bar";
 import { Box, Typography, useTheme } from "@mui/material";
-import { useAutoCoupons } from "../../api/hooks.js";
+import { useAutoCouponsInYears } from "../../filters/useInYears.js";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
@@ -8,7 +8,7 @@ import { byCuotaNro } from "../../autoConcepts.js";
 
 export const AutoTotalPaidByMonthChart = () => {
   const theme = useTheme();
-  const { data } = useAutoCoupons();
+  const { data } = useAutoCouponsInYears();
   if (!data || data.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
   const rows = [...data]

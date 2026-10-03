@@ -1,8 +1,10 @@
 import { Accordion, AccordionDetails, AccordionSummary, Box, Chip, CircularProgress, Stack, Typography } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { useSearchParams } from "react-router-dom";
 import { useFutureInstallmentsDetail, type StatFilters } from "../api/hooks.js";
-import { FiltersBar } from "../components/FiltersBar.js";
+import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
+import { yearsLabel } from "../filters/globalFilters.js";
+import { useGlobalFilters } from "../filters/useGlobalFilters.js";
+import { useInstallmentYearOptions } from "../filters/useYearOptions.js";
 import { formatMoney, formatMonthLabel } from "../format.js";
 import { MotionBox } from "../components/motion/motion.js";
 import { fadeUpItem, staggerContainer } from "../components/motion/variants.js";
@@ -15,12 +17,12 @@ import { PendingInstallmentsByCategoryChart } from "../components/charts/Pending
 import CreditCardIcon from "@mui/icons-material/CreditCard";
 import { Kpi } from "../components/Kpi.js";
 
+const INSTALLMENT_FIELDS: FilterField[] = ["year", "currency", "card"];
+
 export const InstallmentsPage = () => {
-  const [params] = useSearchParams();
-  const filters: StatFilters = {
-    currency: params.get("currency") === "USD" ? "USD" : "ARS",
-    cardLabel: params.get("cardLabel") ?? undefined,
-  };
+  const { years, currency, cardLabel } = useGlobalFilters();
+  const yearOptions = useInstallmentYearOptions(currency, cardLabel);
+  const filters: StatFilters = { currency, cardLabel, year: years };
   const { data, isLoading } = useFutureInstallmentsDetail(filters);
   const months = data ?? [];
   const totalFuturo = months.reduce((acc, m) => acc + m.total, 0);
@@ -28,14 +30,15 @@ export const InstallmentsPage = () => {
   const plural = (n: number, singular: string) => `${n} ${singular}${n === 1 ? "" : "s"}`;
   const mesesLabel = months.length === 1 ? "1 mes" : `${months.length} meses`;
   const money = (value: number) => formatMoney(value, filters.currency);
+  const emptyLabel = years ? `No hay cuotas que venzan en ${yearsLabel(years)}` : "Sin cuotas pendientes";
 
   return (
     <>
       <Typography variant="h4" sx={{ mb: 3 }}>Cuotas a vencer</Typography>
-      <FiltersBar showMonth={false} />
+      <FiltersBar fields={INSTALLMENT_FIELDS} yearOptions={yearOptions} />
 
       {isLoading && <CircularProgress />}
-      {!isLoading && months.length === 0 && <Typography color="text.secondary">Sin cuotas pendientes</Typography>}
+      {!isLoading && months.length === 0 && <Typography color="text.secondary">{emptyLabel}</Typography>}
 
       {!isLoading && months.length > 0 && (
         <>
