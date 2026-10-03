@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  ALL_YEARS, filterInYears, globalSearch, matchesYears, parseYears, resolveYearChange,
-  writeYears, yearOptionsWith, yearsForApi, yearsLabel, yearsOf, type YearSelection,
+  ALL_YEARS, filterInYears, globalSearch, matchesYears, parseYearKey, parseYears, resolveYearChange,
+  writeYears, yearKeyOf, yearOptionsWith, yearsForApi, yearsLabel, yearsOf, type YearSelection,
 } from "./globalFilters.js";
 
 const ALL: YearSelection = { kind: "all" };
@@ -125,5 +125,34 @@ describe("globalSearch", () => {
 
   it("sin filtros globales devuelve vacío", () => {
     expect(globalSearch(new URLSearchParams("category=Compras"))).toBe("");
+  });
+});
+
+describe("yearKeyOf", () => {
+  it("une los años de la URL", () => {
+    expect(yearKeyOf(new URLSearchParams("year=2025&year=2026"))).toBe("2025,2026");
+  });
+
+  it("sin year toma el año del Mes elegido", () => {
+    expect(yearKeyOf(new URLSearchParams("from=2025-11-01&to=2025-11-30"))).toBe("2025");
+  });
+
+  it("con year explícito no lo pisa el Mes", () => {
+    expect(yearKeyOf(new URLSearchParams("year=2026&from=2025-11-01&to=2025-11-30"))).toBe("2026");
+  });
+
+  it("sin year ni Mes queda vacío", () => {
+    expect(yearKeyOf(new URLSearchParams("currency=USD"))).toBe("");
+  });
+});
+
+describe("parseYearKey", () => {
+  it("vacío es el año actual", () => {
+    expect(parseYearKey("")).toEqual(only("2026"));
+  });
+
+  it("separa por coma y respeta all", () => {
+    expect(parseYearKey("2026,2025")).toEqual(only("2025", "2026"));
+    expect(parseYearKey("all")).toEqual(ALL);
   });
 });

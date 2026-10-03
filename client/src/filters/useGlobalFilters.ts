@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Currency } from "@ledgerly/shared";
-import { matchesYears, parseYears, writeYears, yearsForApi, type YearSelection } from "./globalFilters.js";
+import { matchesYears, parseYearKey, writeYears, yearKeyOf, yearsForApi, type YearSelection } from "./globalFilters.js";
 
 export interface GlobalFilters {
   yearSelection: YearSelection;
@@ -24,9 +24,8 @@ const monthRange = (month: string): { from: string; to: string } => {
 
 export const useGlobalFilters = (): GlobalFilters => {
   const [params, setParams] = useSearchParams();
-  const monthYear = params.get("from")?.slice(0, 4) ?? "";
-  const yearKey = params.getAll("year").join(",") || monthYear;
-  const yearSelection = useMemo(() => parseYears(yearKey ? yearKey.split(",") : []), [yearKey]);
+  const yearKey = yearKeyOf(params);
+  const yearSelection = useMemo(() => parseYearKey(yearKey), [yearKey]);
 
   const update = (mutate: (next: URLSearchParams) => void) => {
     const next = new URLSearchParams(params);
