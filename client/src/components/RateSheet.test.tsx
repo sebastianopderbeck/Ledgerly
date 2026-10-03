@@ -32,20 +32,20 @@ describe("parseRate y canSaveRate", () => {
 
 describe("RateSheet", () => {
   it("abre con el TC actual y pide el teclado decimal", () => {
-    render(<RateSheet open title="TC cuota 6" current={1350} onSave={noop} onClose={noop} />);
+    render(<RateSheet open title="TC cuota 6" formKey="c6" current={1350} onSave={noop} onClose={noop} />);
     expect(rateInput()).toHaveValue("1350");
     expect(rateInput()).toHaveAttribute("inputmode", "decimal");
   });
 
   it("sin TC cargado arranca vacía", () => {
-    render(<RateSheet open title="TC cuota 6" current={null} onSave={noop} onClose={noop} />);
+    render(<RateSheet open title="TC cuota 6" formKey="c6" current={null} onSave={noop} onClose={noop} />);
     expect(rateInput()).toHaveValue("");
   });
 
   it("guarda el TC escrito con coma, como lo escribe el teclado del iPhone en castellano", async () => {
     const onSave = vi.fn();
     const onClose = vi.fn();
-    render(<RateSheet open title="TC cuota 6" current={1350} onSave={onSave} onClose={onClose} />);
+    render(<RateSheet open title="TC cuota 6" formKey="c6" current={1350} onSave={onSave} onClose={onClose} />);
     await userEvent.clear(rateInput());
     await userEvent.type(rateInput(), "1415,5");
     await userEvent.click(saveButton());
@@ -55,7 +55,7 @@ describe("RateSheet", () => {
 
   it("no deja guardar el mismo TC ni uno menor o igual a cero", async () => {
     const onSave = vi.fn();
-    render(<RateSheet open title="TC cuota 6" current={1350} onSave={onSave} onClose={noop} />);
+    render(<RateSheet open title="TC cuota 6" formKey="c6" current={1350} onSave={onSave} onClose={noop} />);
     expect(saveButton()).toBeDisabled();
     await userEvent.clear(rateInput());
     await userEvent.type(rateInput(), "0");
@@ -65,11 +65,20 @@ describe("RateSheet", () => {
   });
 
   it("si se reabre enseguida para otro registro, muestra el TC de ese registro y no lo que se había tipeado", () => {
-    const { rerender } = render(<RateSheet open title="TC cuota 1" current={1350} onSave={noop} onClose={noop} />);
+    const { rerender } = render(<RateSheet open title="TC cuota 1" formKey="c1" current={1350} onSave={noop} onClose={noop} />);
     fireEvent.change(rateInput("TC cuota 1"), { target: { value: "999" } });
-    rerender(<RateSheet open={false} title="TC cuota 1" current={1350} onSave={noop} onClose={noop} />);
-    rerender(<RateSheet open title="TC cuota 6" current={1400} onSave={noop} onClose={noop} />);
+    rerender(<RateSheet open={false} title="TC cuota 1" formKey="c1" current={1350} onSave={noop} onClose={noop} />);
+    rerender(<RateSheet open title="TC cuota 6" formKey="c6" current={1400} onSave={noop} onClose={noop} />);
     expect(rateInput("TC cuota 6")).toHaveValue("1400");
+  });
+
+  it("si otro registro tiene el mismo título, igual arranca con el TC de ese registro", () => {
+    const title = "TC recibo 2025-12";
+    const { rerender } = render(<RateSheet open title={title} formKey="mensual" current={1000} onSave={noop} onClose={noop} />);
+    fireEvent.change(rateInput(title), { target: { value: "999" } });
+    rerender(<RateSheet open={false} title={title} formKey="mensual" current={1000} onSave={noop} onClose={noop} />);
+    rerender(<RateSheet open title={title} formKey="sac" current={1100} onSave={noop} onClose={noop} />);
+    expect(rateInput(title)).toHaveValue("1100");
   });
 });
 

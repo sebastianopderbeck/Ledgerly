@@ -52,7 +52,14 @@ export const MortgageCouponCards = () => {
   return (
     <>
       <Box sx={recordListSx}>{cards}</Box>
-      <RateSheet open={open} title={sheetTitle} current={target?.tipoCambioUsd ?? null} onSave={saveRate} onClose={close} />
+      <RateSheet
+        open={open}
+        title={sheetTitle}
+        formKey={target?.id ?? ""}
+        current={target?.tipoCambioUsd ?? null}
+        onSave={saveRate}
+        onClose={close}
+      />
     </>
   );
 };

@@ -14,6 +14,9 @@ interface PayslipCardsProps {
 
 const sacBadge = <Chip label="SAC" size="small" color="secondary" variant="outlined" />;
 
+const payslipName = (payslip: PayslipDTO): string =>
+  payslip.tipo === "sac" ? `${payslip.periodo} SAC` : payslip.periodo;
+
 const montoOf = (payslip: PayslipDTO, label: string): number | null =>
   payslip.conceptos.find((concepto) => concepto.label === label)?.monto ?? null;
 
@@ -28,7 +31,7 @@ const detailsOf = (payslip: PayslipDTO, conceptLabels: string[], onEditRate: () 
   { label: "Descuentos", value: formatMoney(payslip.descuentos, "ARS") },
   {
     label: "TC oficial",
-    value: <RateValue rate={payslip.tipoCambioUsd} editLabel={`editar TC recibo ${payslip.periodo}`} onEdit={onEditRate} />,
+    value: <RateValue rate={payslip.tipoCambioUsd} editLabel={`editar TC recibo ${payslipName(payslip)}`} onEdit={onEditRate} />,
   },
 ];
 
@@ -48,17 +51,25 @@ export const PayslipCards = ({ payslips }: PayslipCardsProps) => {
     <RecordCard
       key={payslip.id}
       title={payslip.periodo}
+      label={payslipName(payslip)}
       badge={payslip.tipo === "sac" ? sacBadge : undefined}
       highlights={highlightsOf(payslip)}
       details={detailsOf(payslip, conceptLabels, () => show(payslip))}
     />
   ));
-  const sheetTitle = target ? `TC recibo ${target.periodo}` : "TC oficial";
+  const sheetTitle = target ? `TC recibo ${payslipName(target)}` : "TC oficial";
 
   return (
     <>
       <Box sx={recordListSx}>{cards}</Box>
-      <RateSheet open={open} title={sheetTitle} current={target?.tipoCambioUsd ?? null} onSave={saveRate} onClose={close} />
+      <RateSheet
+        open={open}
+        title={sheetTitle}
+        formKey={target?.id ?? ""}
+        current={target?.tipoCambioUsd ?? null}
+        onSave={saveRate}
+        onClose={close}
+      />
     </>
   );
 };

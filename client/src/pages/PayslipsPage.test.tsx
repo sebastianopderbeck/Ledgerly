@@ -97,7 +97,7 @@ describe("PayslipsPage en mobile", () => {
       return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
     }));
     renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=all" });
-    const card = await screen.findByRole("article", { name: "2026-06" });
+    const card = await screen.findByRole("article", { name: "2026-06 SAC" });
     expect(within(card).getByText("SAC")).toBeInTheDocument();
   });
 
@@ -110,6 +110,26 @@ describe("PayslipsPage en mobile", () => {
     await userEvent.type(input, "1205,75");
     await userEvent.click(within(sheet).getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(patches()).toEqual([{ url: "/api/payslips/p2", body: { tipoCambioUsd: 1205.75 } }]));
+  });
+
+  it("el recibo SAC se distingue del mensual del mismo mes y su hoja edita su propio TC", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const body = url.includes("/payslips/summary") ? summary
+        : url.includes("/payslips") ? [payslip("p1", "2025-12"), { ...payslip("p2", "2025-12"), tipo: "sac", tipoCambioUsd: 1100 }]
+        : [];
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    }));
+    renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=all" });
+    const monthly = await openRateSheet("2025-12");
+    expect(within(monthly).getByRole("textbox", { name: "TC oficial" })).toHaveValue("1000");
+    await userEvent.click(within(monthly).getByRole("button", { name: "Cancelar" }));
+    const sac = await openRateSheet("2025-12 SAC");
+    const input = within(sac).getByRole("textbox", { name: "TC oficial" });
+    expect(input).toHaveValue("1100");
+    await userEvent.clear(input);
+    await userEvent.type(input, "1250");
+    await userEvent.click(within(sac).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(patches()).toEqual([{ url: "/api/payslips/p2", body: { tipoCambioUsd: 1250 } }]));
   });
 
   it("un TC igual al actual o vacío no manda nada", async () => {

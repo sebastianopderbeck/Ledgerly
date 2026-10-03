@@ -15,6 +15,7 @@ interface RecordFieldsProps {
 
 interface RecordCardProps {
   title: string;
+  label?: string;
   meta?: string;
   badge?: ReactNode;
   action?: ReactNode;
@@ -51,14 +52,14 @@ export const RecordFields = ({ fields, emphasis = false }: RecordFieldsProps) =>
   return <Box component="dl" sx={fieldsGridSx}>{items}</Box>;
 };
 
-export const RecordCard = ({ title, meta, badge, action, highlights, details }: RecordCardProps) => {
+export const RecordCard = ({ title, label = title, meta, badge, action, highlights, details }: RecordCardProps) => {
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((current) => !current), []);
   const toggleLabel = expanded ? "Ocultar detalle" : "Ver detalle";
   const hasDetails = details.length > 0;
 
   return (
-    <Card component="article" aria-label={title}>
+    <Card component="article" aria-label={label}>
       <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 1.5 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>

@@ -7,6 +7,7 @@ import { BottomSheet } from "./BottomSheet.js";
 interface RateSheetProps {
   open: boolean;
   title: string;
+  formKey: string;
   current: number | null;
   onSave: (rate: number) => void;
   onClose: () => void;
@@ -59,9 +60,9 @@ const RateForm = ({ current, onSave, onClose }: RateFormProps) => {
   );
 };
 
-export const RateSheet = ({ open, title, current, onSave, onClose }: RateSheetProps) => (
+export const RateSheet = ({ open, title, formKey, current, onSave, onClose }: RateSheetProps) => (
   <BottomSheet open={open} onClose={onClose} title={title}>
-    <RateForm key={title} current={current} onSave={onSave} onClose={onClose} />
+    <RateForm key={formKey} current={current} onSave={onSave} onClose={onClose} />
   </BottomSheet>
 );
 
