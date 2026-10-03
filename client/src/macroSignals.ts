@@ -1,5 +1,6 @@
 import type { CreditSummaryDTO, MacroMonth, MacroSeriesDTO } from "@ledgerly/shared";
 import { formatMonthLabel, formatPercent } from "./format.js";
+import { matchesYears, type YearSelection } from "./filters/globalFilters.js";
 
 export const DOLAR_REAL_BANDA = 10;
 export const TASA_REAL_BANDA = 2;
@@ -326,5 +327,22 @@ export function buildMacroView(
     verdict: buildVerdict(series, credit, assumptions),
     dolarReal: dolarRealSeries(series),
     tasaReal: tasaRealSeries(series),
+  };
+}
+
+export interface MacroCharts {
+  dolarReal: DolarReal;
+  tasaReal: TasaRealPoint[];
+  race: RaceSerie[];
+}
+
+export function macroChartsInYears(view: MacroView, race: RaceSerie[], selection: YearSelection): MacroCharts {
+  const inYears = (periodo: string): boolean => matchesYears(periodo, selection);
+  return {
+    dolarReal: { ...view.dolarReal, serie: view.dolarReal.serie.filter((point) => inYears(point.periodo)) },
+    tasaReal: view.tasaReal.filter((point) => inYears(point.periodo)),
+    race: race
+      .map((serie) => ({ ...serie, data: serie.data.filter((point) => inYears(point.x)) }))
+      .filter((serie) => serie.data.length > 0),
   };
 }

@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { CreditSummaryDTO, MacroSeriesDTO } from "@ledgerly/shared";
 import {
   dolarRealSeries, tasaRealSeries, inflacionInteranual, variacion12m, raceSeries,
-  defaultAssumptions, buildVerdict, buildSignals, buildMacroView, type MacroAssumptions,
+  defaultAssumptions, buildVerdict, buildSignals, buildMacroView, macroChartsInYears,
+  type MacroAssumptions, type MacroView, type RaceSerie,
 } from "./macroSignals.js";
 
 interface MesInput {
@@ -305,5 +306,36 @@ describe("buildMacroView", () => {
     expect(view.verdict.ranking).toHaveLength(3);
     expect(view.dolarReal.indiceHoy).toBeCloseTo(80, 6);
     expect(view.tasaReal).toEqual([]);
+  });
+});
+
+describe("macroChartsInYears", () => {
+  const view: MacroView = {
+    signals: [],
+    verdict: { ranking: [], resumen: "" },
+    dolarReal: {
+      serie: [{ periodo: "2025-12", indice: 100 }, { periodo: "2026-01", indice: 105 }],
+      mediana: 1, indiceHoy: 105, ultimoPeriodoConIpc: "2026-01",
+    },
+    tasaReal: [{ periodo: "2025-12", tasaReal: 1 }, { periodo: "2026-01", tasaReal: 2 }],
+  };
+  const race: RaceSerie[] = [
+    { id: "UVA", data: [{ x: "2025-12", y: 100 }, { x: "2026-01", y: 102 }] },
+    { id: "Dólar oficial", data: [{ x: "2025-12", y: 100 }] },
+  ];
+
+  it("recorta las tres series a los años elegidos sin re-basar", () => {
+    const charts = macroChartsInYears(view, race, { kind: "years", years: ["2026"] });
+    expect(charts.dolarReal.serie).toEqual([{ periodo: "2026-01", indice: 105 }]);
+    expect(charts.dolarReal.mediana).toBe(1);
+    expect(charts.tasaReal).toEqual([{ periodo: "2026-01", tasaReal: 2 }]);
+    expect(charts.race).toEqual([{ id: "UVA", data: [{ x: "2026-01", y: 102 }] }]);
+  });
+
+  it("con todos devuelve las series completas", () => {
+    const charts = macroChartsInYears(view, race, { kind: "all" });
+    expect(charts.dolarReal.serie).toHaveLength(2);
+    expect(charts.tasaReal).toHaveLength(2);
+    expect(charts.race).toHaveLength(2);
   });
 });
