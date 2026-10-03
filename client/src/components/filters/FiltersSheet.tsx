@@ -20,7 +20,7 @@ const stackSx: SxProps<Theme> = {
 };
 
 export const FiltersSheet = ({ open, onClose, fields, yearOptions }: FiltersSheetProps) => {
-  const actions = <Button variant="contained" fullWidth onClick={onClose}>Listo</Button>;
+  const actions = <Button variant="contained" fullWidth onClick={onClose} sx={{ minHeight: 44 }}>Listo</Button>;
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Filtros" actions={actions}>
