@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { DashboardPage } from "./DashboardPage.js";
 
@@ -33,7 +33,10 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) =>
     new Response(JSON.stringify(route(url)), { status: 200, headers: { "Content-Type": "application/json" } })));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+const urlOf = (path: string) => vi.mocked(fetch).mock.calls.map((call) => String(call[0])).find((url) => url.includes(path));
+const thisYear = String(new Date().getFullYear());
 
 describe("DashboardPage", () => {
   it("muestra KPIs con el total gastado", async () => {
@@ -44,5 +47,24 @@ describe("DashboardPage", () => {
     expect(await screen.findByText("A pagar al cierre")).toBeInTheDocument();
     expect(await screen.findByText("A pagar por mes en USD (al oficial)")).toBeInTheDocument();
     expect(screen.getAllByText((text) => text.includes("≈")).length).toBeGreaterThan(0);
+  });
+
+  it("por defecto pide las estadísticas del año actual", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/" });
+    await waitFor(() => expect(urlOf("/stats/summary")).toBeDefined());
+    expect(urlOf("/stats/summary")).toContain(`year=${thisYear}`);
+    expect(urlOf("/stats/by-category")).toContain(`year=${thisYear}`);
+  });
+
+  it("con year=all no manda year", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/?year=all" });
+    await waitFor(() => expect(urlOf("/stats/summary")).toBeDefined());
+    expect(urlOf("/stats/summary")).not.toContain("year=");
+  });
+
+  it("manda varios años como params repetidos", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/?year=2025&year=2026" });
+    await waitFor(() => expect(urlOf("/stats/monthly-usd")).toBeDefined());
+    expect(urlOf("/stats/monthly-usd")).toContain("year=2025&year=2026");
   });
 });

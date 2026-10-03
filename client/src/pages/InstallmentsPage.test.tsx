@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { InstallmentsPage } from "./InstallmentsPage.js";
 
@@ -22,12 +22,26 @@ beforeEach(() => {
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+const detailUrl = () => vi.mocked(fetch).mock.calls.map((call) => String(call[0])).find((url) => url.includes("/stats/future-installments/detail"));
 
 describe("InstallmentsPage", () => {
   it("muestra el KPI de cuotas pendientes y la torta por categoría", async () => {
     renderWithProviders(<InstallmentsPage />, { route: "/installments" });
     expect(await screen.findByText("Cuotas pendientes")).toBeInTheDocument();
     expect(screen.getByText("Cuotas pendientes por categoría")).toBeInTheDocument();
+  });
+
+  it("pide las cuotas que vencen en el año actual por defecto", async () => {
+    renderWithProviders(<InstallmentsPage />, { route: "/installments" });
+    await waitFor(() => expect(detailUrl()).toBeDefined());
+    expect(detailUrl()).toContain(`year=${new Date().getFullYear()}`);
+  });
+
+  it("pide las cuotas de todos los años elegidos", async () => {
+    renderWithProviders(<InstallmentsPage />, { route: "/installments?year=2026&year=2027" });
+    await waitFor(() => expect(detailUrl()).toBeDefined());
+    expect(detailUrl()).toContain("year=2026&year=2027");
   });
 });

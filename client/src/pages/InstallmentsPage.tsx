@@ -1,8 +1,8 @@
 import { Accordion, AccordionDetails, AccordionSummary, Box, Chip, CircularProgress, Stack, Typography } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { useSearchParams } from "react-router-dom";
 import { useFutureInstallmentsDetail, type StatFilters } from "../api/hooks.js";
 import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
+import { useGlobalFilters } from "../filters/useGlobalFilters.js";
 import { useInstallmentYearOptions } from "../filters/useYearOptions.js";
 import { formatMoney, formatMonthLabel } from "../format.js";
 import { MotionBox } from "../components/motion/motion.js";
@@ -19,12 +19,9 @@ import { Kpi } from "../components/Kpi.js";
 const INSTALLMENT_FIELDS: FilterField[] = ["year", "currency", "card"];
 
 export const InstallmentsPage = () => {
-  const [params] = useSearchParams();
-  const filters: StatFilters = {
-    currency: params.get("currency") === "USD" ? "USD" : "ARS",
-    cardLabel: params.get("cardLabel") ?? undefined,
-  };
-  const yearOptions = useInstallmentYearOptions(filters.currency, filters.cardLabel);
+  const { years, currency, cardLabel } = useGlobalFilters();
+  const yearOptions = useInstallmentYearOptions(currency, cardLabel);
+  const filters: StatFilters = { currency, cardLabel, year: years };
   const { data, isLoading } = useFutureInstallmentsDetail(filters);
   const months = data ?? [];
   const totalFuturo = months.reduce((acc, m) => acc + m.total, 0);

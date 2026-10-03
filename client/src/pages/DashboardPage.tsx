@@ -1,7 +1,7 @@
-import { Box, Typography } from "@mui/material";
-import { useSearchParams } from "react-router-dom";
+import { Typography } from "@mui/material";
 import { type StatFilters } from "../api/hooks.js";
 import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
+import { useGlobalFilters } from "../filters/useGlobalFilters.js";
 import { useTransactionYearOptions } from "../filters/useYearOptions.js";
 import { KpiCards } from "../components/KpiCards.js";
 import { CardCycleSummary } from "../components/CardCycleSummary.js";
@@ -18,20 +18,15 @@ import { MonthlyUsdChart } from "../components/charts/MonthlyUsdChart.js";
 const DASHBOARD_FIELDS: FilterField[] = ["year", "currency", "card", "month"];
 
 export const DashboardPage = () => {
-  const [params] = useSearchParams();
-  const filters: StatFilters = {
-    currency: (params.get("currency") as "ARS" | "USD") ?? "ARS",
-    from: params.get("from") ?? undefined,
-    to: params.get("to") ?? undefined,
-    cardLabel: params.get("cardLabel") ?? undefined,
-  };
-  const yearOptions = useTransactionYearOptions(filters.currency, filters.cardLabel);
+  const { years, currency, cardLabel, from, to } = useGlobalFilters();
+  const yearOptions = useTransactionYearOptions(currency, cardLabel);
+  const filters: StatFilters = { currency, cardLabel, from, to, year: years };
 
   return (
     <>
       <Typography variant="h4" sx={{ mb: 3 }}>Dashboard</Typography>
-      <CardCycleSummary />
       <FiltersBar fields={DASHBOARD_FIELDS} yearOptions={yearOptions} />
+      <CardCycleSummary />
       <KpiCards {...filters} />
       <MotionBox
         variants={staggerContainer}

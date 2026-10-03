@@ -53,4 +53,18 @@ describe("TransactionsPage", () => {
       expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ ids: ["1"] });
     });
   });
+
+  it("manda el año actual al API por defecto y ninguno con year=all", async () => {
+    const listUrl = () => vi.mocked(fetch).mock.calls
+      .map((c) => String(c[0]))
+      .find((u) => u.includes("/transactions") && !u.includes("/categories"));
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    await waitFor(() => expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument());
+    expect(listUrl()).toContain(`year=${new Date().getFullYear()}`);
+    cleanup();
+    vi.mocked(fetch).mockClear();
+    renderWithProviders(<TransactionsPage />, { route: "/transactions?year=all" });
+    await waitFor(() => expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument());
+    expect(listUrl()).not.toContain("year=");
+  });
 });
