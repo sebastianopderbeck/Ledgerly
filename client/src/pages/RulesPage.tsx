@@ -1,11 +1,22 @@
 import { Alert, Button, CircularProgress, Stack, Table, TableCell, TableHead, TableRow, Typography } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 import { useApplyRules, useCategoryRules, useCreateRule, useDeleteRule, useUpdateRule } from "../api/hooks.js";
 import { CategoryRuleForm } from "../components/CategoryRuleForm.js";
 import { CategoryRuleRow } from "../components/CategoryRuleRow.js";
+import { RulesMobile } from "../components/RulesMobile.js";
 import { MotionTableBody } from "../components/motion/motion.js";
 import { staggerContainer } from "../components/motion/variants.js";
+import { useIsMobile } from "../useIsMobile.js";
+
+const headerSx: SxProps<Theme> = {
+  justifyContent: "space-between",
+  alignItems: { xs: "stretch", md: "center" },
+  gap: { xs: 2, md: 0 },
+  mb: 3,
+};
 
 export const RulesPage = () => {
+  const isMobile = useIsMobile();
   const { data, isLoading, isError, error } = useCategoryRules();
   const create = useCreateRule();
   const update = useUpdateRule();
@@ -15,17 +26,16 @@ export const RulesPage = () => {
   if (isLoading) return <CircularProgress />;
   if (isError) return <Alert severity="error">{error.message}</Alert>;
 
-  return (
+  const rules = data ?? [];
+  const rulesView = isMobile ? (
+    <RulesMobile
+      rules={rules}
+      onCreate={(values) => create.mutate(values)}
+      onUpdate={(id, body) => update.mutate({ id, body })}
+      onDelete={(id) => del.mutate(id)}
+    />
+  ) : (
     <>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h4">Reglas de categoría</Typography>
-        <Button variant="outlined" onClick={() => apply.mutate()} disabled={apply.isPending}>
-          Reaplicar a todo
-        </Button>
-      </Stack>
-
-      {apply.isSuccess && <Alert severity="success" sx={{ mb: 2 }}>{apply.data.updated} movimientos recategorizados (las reglas pisan también las categorías manuales cuando matchean)</Alert>}
-
       <CategoryRuleForm onCreate={(values) => create.mutate(values)} />
 
       <Table size="small">
@@ -36,7 +46,7 @@ export const RulesPage = () => {
           </TableRow>
         </TableHead>
         <MotionTableBody variants={staggerContainer} initial="hidden" animate="visible">
-          {(data ?? []).map((r) => (
+          {rules.map((r) => (
             <CategoryRuleRow
               key={r.id}
               rule={r}
@@ -47,6 +57,21 @@ export const RulesPage = () => {
           ))}
         </MotionTableBody>
       </Table>
+    </>
+  );
+
+  return (
+    <>
+      <Stack direction={{ xs: "column", md: "row" }} sx={headerSx}>
+        <Typography variant="h4">Reglas de categoría</Typography>
+        <Button variant="outlined" onClick={() => apply.mutate()} disabled={apply.isPending}>
+          Reaplicar a todo
+        </Button>
+      </Stack>
+
+      {apply.isSuccess && <Alert severity="success" sx={{ mb: 2 }}>{apply.data.updated} movimientos recategorizados (las reglas pisan también las categorías manuales cuando matchean)</Alert>}
+
+      {rulesView}
     </>
   );
 };
