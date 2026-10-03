@@ -1,8 +1,11 @@
 import { Alert, CircularProgress, Typography } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
 import { useDeleteTransactions, usePatchTransaction, useTransactions, type TxFilters } from "../api/hooks.js";
-import { FiltersBar } from "../components/FiltersBar.js";
+import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
+import { useTransactionYearOptions } from "../filters/useYearOptions.js";
 import { TransactionsTable } from "../components/TransactionsTable.js";
+
+const TRANSACTION_FIELDS: FilterField[] = ["year", "currency", "card", "month", "transaction"];
 
 export const TransactionsPage = () => {
   const [params] = useSearchParams();
@@ -18,6 +21,7 @@ export const TransactionsPage = () => {
     installment: params.get("installment") ?? undefined,
   };
   const { data, isLoading, isError, error } = useTransactions(filters);
+  const yearOptions = useTransactionYearOptions(filters.currency ?? "ARS", filters.cardLabel);
 
   if (isLoading) return <CircularProgress />;
   if (isError) return <Alert severity="error">{error.message}</Alert>;
@@ -25,7 +29,7 @@ export const TransactionsPage = () => {
   return (
     <>
       <Typography variant="h4" sx={{ mb: 3 }}>Movimientos</Typography>
-      <FiltersBar showCategory />
+      <FiltersBar fields={TRANSACTION_FIELDS} yearOptions={yearOptions} />
       <TransactionsTable
         rows={data?.items ?? []}
         onCategoryChange={(id, category) => patch.mutate({ id, body: { category } })}
