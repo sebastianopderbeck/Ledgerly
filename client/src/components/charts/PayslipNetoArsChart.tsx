@@ -5,6 +5,7 @@ import type { PayslipDTO } from "@ledgerly/shared";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { useChartLayout } from "./useChartLayout.js";
 import { byPeriodoAsc, monthLabel } from "../../payslipConcepts.js";
 
 interface PayslipNetoArsChartProps {
@@ -14,6 +15,7 @@ interface PayslipNetoArsChartProps {
 
 export const PayslipNetoArsChart = ({ payslips, monthOnly = false }: PayslipNetoArsChartProps) => {
   const theme = useTheme();
+  const { seriesMargin, bottomTicks } = useChartLayout();
   if (payslips.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
   const points = [...payslips]
@@ -29,7 +31,7 @@ export const PayslipNetoArsChart = ({ payslips, monthOnly = false }: PayslipNeto
         data={series}
         theme={nivoTheme(theme)}
         colors={[color]}
-        margin={{ top: 16, right: 24, bottom: 64, left: 64 }}
+        margin={seriesMargin({ top: 16, right: 24, bottom: 64, left: 64 })}
         xScale={{ type: "point" }}
         yScale={{ type: "linear", min: "auto", max: "auto" }}
         curve="monotoneX"
@@ -51,6 +53,7 @@ export const PayslipNetoArsChart = ({ payslips, monthOnly = false }: PayslipNeto
           tickPadding: 10,
           tickRotation: monthOnly ? 0 : -45,
           format: monthOnly ? (value) => monthLabel(String(value)) : undefined,
+          tickValues: bottomTicks(points.map((point) => point.x)),
         }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
         yFormat={(value) => formatMoney(Number(value), "ARS")}

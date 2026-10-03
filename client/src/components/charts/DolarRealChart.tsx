@@ -4,6 +4,7 @@ import { Box, Typography, useTheme } from "@mui/material";
 import type { DolarReal } from "../../macroSignals.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { useChartLayout } from "./useChartLayout.js";
 
 interface DolarRealChartProps {
   dolarReal: DolarReal;
@@ -11,6 +12,7 @@ interface DolarRealChartProps {
 
 export const DolarRealChart = ({ dolarReal }: DolarRealChartProps) => {
   const theme = useTheme();
+  const { seriesMargin, bottomTicks } = useChartLayout();
 
   if (dolarReal.serie.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
@@ -23,7 +25,7 @@ export const DolarRealChart = ({ dolarReal }: DolarRealChartProps) => {
         data={[{ id: "Dólar real", data: points }]}
         theme={nivoTheme(theme)}
         colors={[color]}
-        margin={{ top: 16, right: 24, bottom: 64, left: 56 }}
+        margin={seriesMargin({ top: 16, right: 24, bottom: 64, left: 56 })}
         xScale={{ type: "point" }}
         yScale={{ type: "linear", min: "auto", max: "auto" }}
         curve="monotoneX"
@@ -48,7 +50,7 @@ export const DolarRealChart = ({ dolarReal }: DolarRealChartProps) => {
           lineStyle: { stroke: theme.palette.text.secondary, strokeWidth: 1, strokeDasharray: "4 4" },
           textStyle: { fill: theme.palette.text.secondary, fontSize: 10 },
         }]}
-        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45 }}
+        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45, tickValues: bottomTicks(points.map((point) => point.x)) }}
         axisLeft={{ tickSize: 0, tickPadding: 8 }}
         yFormat={(value) => Number(value).toFixed(0)}
         useMesh

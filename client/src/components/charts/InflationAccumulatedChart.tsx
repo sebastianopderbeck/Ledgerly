@@ -5,6 +5,7 @@ import type { InflationRateDTO } from "@ledgerly/shared";
 import { formatPercent } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { useChartLayout } from "./useChartLayout.js";
 import { monthLabel } from "../../payslipConcepts.js";
 import { accumulatedInflation } from "../../inflationStats.js";
 
@@ -16,6 +17,7 @@ interface InflationAccumulatedChartProps {
 
 export const InflationAccumulatedChart = ({ inflation, years, monthOnly = false }: InflationAccumulatedChartProps) => {
   const theme = useTheme();
+  const { seriesMargin, bottomTicks } = useChartLayout();
   const acc = accumulatedInflation(inflation, years);
 
   if (acc.length === 0) return <Typography color="text.secondary">Sin datos de inflación</Typography>;
@@ -30,7 +32,7 @@ export const InflationAccumulatedChart = ({ inflation, years, monthOnly = false 
         data={series}
         theme={nivoTheme(theme)}
         colors={[color]}
-        margin={{ top: 16, right: 24, bottom: 64, left: 64 }}
+        margin={seriesMargin({ top: 16, right: 24, bottom: 64, left: 64 })}
         xScale={{ type: "point" }}
         yScale={{ type: "linear", min: 0, max: "auto" }}
         curve="monotoneX"
@@ -52,6 +54,7 @@ export const InflationAccumulatedChart = ({ inflation, years, monthOnly = false 
           tickPadding: 10,
           tickRotation: monthOnly ? 0 : -45,
           format: monthOnly ? (value) => monthLabel(String(value)) : undefined,
+          tickValues: bottomTicks(points.map((point) => point.x)),
         }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatPercent(Number(value)) }}
         yFormat={(value) => formatPercent(Number(value))}

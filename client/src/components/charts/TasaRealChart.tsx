@@ -3,6 +3,7 @@ import { Box, Typography, useTheme } from "@mui/material";
 import type { TasaRealPoint } from "../../macroSignals.js";
 import { formatPercent } from "../../format.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { useChartLayout } from "./useChartLayout.js";
 
 interface TasaRealChartProps {
   points: TasaRealPoint[];
@@ -10,6 +11,7 @@ interface TasaRealChartProps {
 
 export const TasaRealChart = ({ points }: TasaRealChartProps) => {
   const theme = useTheme();
+  const { seriesMargin, bottomTicks } = useChartLayout();
 
   if (points.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
@@ -24,13 +26,13 @@ export const TasaRealChart = ({ points }: TasaRealChartProps) => {
         indexBy="month"
         colors={({ data }) => (data.tasaReal >= 0 ? theme.palette.success.main : theme.palette.error.main)}
         valueScale={{ type: "linear", min: "auto", max: "auto" }}
-        margin={{ top: 16, right: 24, bottom: 64, left: 56 }}
+        margin={seriesMargin({ top: 16, right: 24, bottom: 64, left: 56 })}
         padding={0.35}
         borderRadius={4}
         enableLabel={false}
         enableGridX={false}
         valueFormat={(value) => formatPercent(value)}
-        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45 }}
+        axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -45, tickValues: bottomTicks(rows.map((row) => row.month)) }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatPercent(Number(value)) }}
         markers={[{
           axis: "y",
