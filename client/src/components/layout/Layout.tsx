@@ -1,6 +1,6 @@
 import { useCallback, useState, type ReactNode } from "react";
-import { Box, Container, useMediaQuery } from "@mui/material";
-import type { Theme } from "@mui/material/styles";
+import { Box, Container } from "@mui/material";
+import { useIsMobile } from "../../useIsMobile.js";
 import { DesktopSidebar } from "./DesktopSidebar.js";
 import { MobileSidebar } from "./MobileSidebar.js";
 import { TopActionsPill } from "./TopActionsPill.js";
@@ -8,10 +8,8 @@ import { useSidebarCollapsed } from "./useSidebarCollapsed.js";
 
 interface LayoutProps { children: ReactNode; }
 
-const desktopQuery = (theme: Theme) => theme.breakpoints.up("md");
-
 export const Layout = ({ children }: LayoutProps) => {
-  const isDesktop = useMediaQuery(desktopQuery, { noSsr: true, defaultMatches: true });
+  const isDesktop = !useIsMobile();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
   const [mobileOpen, setMobileOpen] = useState(false);
   const openMobileNav = useCallback(() => setMobileOpen(true), []);

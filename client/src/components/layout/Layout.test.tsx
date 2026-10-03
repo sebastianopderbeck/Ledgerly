@@ -1,22 +1,11 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
+import { emulateDesktop, emulateMobile } from "../../testing/viewport.js";
 import { Layout } from "./Layout.js";
 import { NAV_ITEMS } from "./navItems.js";
 
 const SECTIONS = [/dashboard/i, /cuotas/i, /créditos/i, /auto/i, /sueldo/i, /contexto/i, /movimientos/i, /reglas/i, /importar/i];
-
-const emulateViewport = (matches: boolean) =>
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    matches,
-    media: query,
-    onchange: null,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
 
 const renderLayout = (route = "/") => renderWithProviders(<Layout><div>contenido</div></Layout>, { route });
 
@@ -87,13 +76,13 @@ describe("Layout", () => {
   });
 
   it("en desktop no ofrece la hamburguesa", () => {
-    emulateViewport(true);
+    emulateDesktop();
     renderLayout();
     expect(within(quickActions()).queryByLabelText("abrir menú")).not.toBeInTheDocument();
   });
 
   it("en pantallas chicas abre la navegación desde la hamburguesa y la cierra al navegar", async () => {
-    emulateViewport(false);
+    emulateMobile();
     renderLayout();
     expect(screen.queryByRole("navigation", { name: /principal/i })).not.toBeInTheDocument();
 
