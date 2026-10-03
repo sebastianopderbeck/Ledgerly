@@ -85,4 +85,27 @@ describe("RuleSheet para una regla nueva", () => {
     await userEvent.click(within(sheet).getByRole("button", { name: "Guardar" }));
     expect(onSave).toHaveBeenCalledWith({ priority: 100, matchType: "contains", pattern: "RAPPI", category: "Delivery" });
   });
+
+  it("un patrón o una categoría con solo espacios no deja guardar", async () => {
+    const { sheet } = setup(null);
+    const pattern = within(sheet).getByRole("textbox", { name: "Patrón" });
+    const category = within(sheet).getByRole("textbox", { name: "Categoría" });
+    const save = within(sheet).getByRole("button", { name: "Guardar" });
+    await userEvent.type(pattern, "   ");
+    await userEvent.type(category, "Delivery");
+    expect(save).toBeDisabled();
+    await userEvent.clear(pattern);
+    await userEvent.type(pattern, "RAPPI");
+    await userEvent.clear(category);
+    await userEvent.type(category, "  ");
+    expect(save).toBeDisabled();
+  });
+
+  it("guarda el patrón y la categoría sin los espacios que agrega el teclado del celular", async () => {
+    const { sheet, onSave } = setup(null);
+    await userEvent.type(within(sheet).getByRole("textbox", { name: "Patrón" }), "  UBER  ");
+    await userEvent.type(within(sheet).getByRole("textbox", { name: "Categoría" }), "Transporte ");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Guardar" }));
+    expect(onSave).toHaveBeenCalledWith({ priority: 100, matchType: "contains", pattern: "UBER", category: "Transporte" });
+  });
 });

@@ -47,7 +47,9 @@ const RuleForm = ({ rule, onClose, onSave, onDelete }: RuleFormProps) => {
   const [pattern, setPattern] = useState(rule?.pattern ?? "");
   const [category, setCategory] = useState(rule?.category ?? "");
   const parsedPriority = Number(priority);
-  const valid = pattern !== "" && category !== "" && priority.trim() !== "" && Number.isFinite(parsedPriority);
+  const trimmedPattern = pattern.trim();
+  const trimmedCategory = category.trim();
+  const valid = trimmedPattern !== "" && trimmedCategory !== "" && priority.trim() !== "" && Number.isFinite(parsedPriority);
 
   const changePriority = (event: ChangeEvent<HTMLInputElement>) => setPriority(event.target.value);
   const changeMatchType = (event: ChangeEvent<HTMLInputElement>) => {
@@ -58,7 +60,7 @@ const RuleForm = ({ rule, onClose, onSave, onDelete }: RuleFormProps) => {
 
   const save = () => {
     if (!valid) return;
-    onSave({ priority: parsedPriority, matchType, pattern, category });
+    onSave({ priority: parsedPriority, matchType, pattern: trimmedPattern, category: trimmedCategory });
     onClose();
   };
 
