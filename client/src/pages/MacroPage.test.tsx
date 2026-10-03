@@ -29,6 +29,7 @@ function stubFetch(macroBody: unknown) {
 beforeEach(() => stubFetch(series));
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -58,5 +59,19 @@ describe("MacroPage", () => {
     expect(within(listbox).getByRole("option", { name: "2025" })).toBeInTheDocument();
     expect(within(listbox).getByRole("option", { name: "2026" })).toBeInTheDocument();
     expect(screen.getByText("Veredicto del mes")).toBeInTheDocument();
+  });
+
+  it("por defecto filtra los gráficos por el año actual", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-02T12:00:00"));
+    renderWithProviders(<MacroPage />, { route: "/contexto" });
+    await waitFor(() => expect(screen.getByText("Veredicto del mes")).toBeInTheDocument());
+    expect(screen.getByRole("combobox", { name: /año/i })).toHaveTextContent("2026");
+  });
+
+  it("con un año sin series los gráficos quedan vacíos y el veredicto sigue", async () => {
+    renderWithProviders(<MacroPage />, { route: "/contexto?year=2019" });
+    await waitFor(() => expect(screen.getByText("Veredicto del mes")).toBeInTheDocument());
+    expect(screen.getAllByText("Sin datos")).toHaveLength(3);
   });
 });
