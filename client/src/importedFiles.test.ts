@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ImportedFileDTO } from "@ledgerly/shared";
 import {
-  EMPTY_IMPORTED_FILES_FILTERS, filterImportedFiles, importedFileYears, type ImportedFilesFilters,
+  EMPTY_IMPORTED_FILES_FILTERS, filterImportedFiles, importedFileDeleteMessage, importedFileYears, type ImportedFilesFilters,
 } from "./importedFiles.js";
 
 const file = (overrides: Partial<ImportedFileDTO>): ImportedFileDTO => ({
@@ -61,5 +61,21 @@ describe("importedFileYears", () => {
 
   it("sin archivos no hay años", () => {
     expect(importedFileYears([])).toEqual([]);
+  });
+});
+
+describe("importedFileDeleteMessage", () => {
+  it("avisa que borrar un resumen también borra sus movimientos", () => {
+    expect(importedFileDeleteMessage(files[0])).toBe(
+      "¿Borrar visa-julio.pdf? También se borran sus movimientos. Esta acción no se puede deshacer.",
+    );
+  });
+
+  it("para los demás tipos solo pide confirmar", () => {
+    expect(importedFileDeleteMessage(files[1])).toBe("¿Borrar cupon-1.pdf? Esta acción no se puede deshacer.");
+  });
+
+  it("sin archivo pendiente no hay mensaje", () => {
+    expect(importedFileDeleteMessage(null)).toBe("");
   });
 });
