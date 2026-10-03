@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, cleanup, within } from "@testing-library/react";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
+import { emulateDesktop, emulateMobile } from "../testing/viewport.js";
 import { TransactionsPage } from "./TransactionsPage.js";
 
 const tx = {
@@ -19,7 +20,11 @@ beforeEach(() => {
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("TransactionsPage", () => {
   it("renderiza los movimientos en la tabla", async () => {
@@ -78,5 +83,48 @@ describe("TransactionsPage", () => {
     await waitFor(() => expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes("year=2025&year=2026"))).toBe(true));
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument();
+  });
+});
+
+describe("TransactionsPage en mobile", () => {
+  beforeEach(() => emulateMobile());
+
+  const openSheet = async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    await userEvent.click(await screen.findByRole("button", { name: /MERCADOLIBRE/ }));
+    return screen.getByRole("dialog", { name: "MERCADOLIBRE" });
+  };
+
+  it("muestra los movimientos como lista y no como grilla", async () => {
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    expect(await screen.findByRole("region", { name: "movimientos" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /MERCADOLIBRE/ })).toBeInTheDocument();
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("cambiar la categoría desde la hoja manda el PATCH del movimiento", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    const sheet = await openSheet();
+    const category = within(sheet).getByRole("combobox", { name: "Categoría" });
+    await userEvent.clear(category);
+    await userEvent.type(category, "Viajes");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => {
+      const call = vi.mocked(fetch).mock.calls.find((c) => (c[1] as RequestInit | undefined)?.method === "PATCH");
+      expect(String(call?.[0])).toContain("/transactions/1");
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ category: "Viajes" });
+    });
+  });
+
+  it("si la pantalla pasa a tamaño compu con la hoja abierta, no queda nada tapando la tabla", async () => {
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    await openSheet();
+    emulateDesktop();
+    await waitFor(() => expect(screen.getByRole("grid")).toBeInTheDocument());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.querySelector(".MuiBackdrop-root")).not.toBeInTheDocument();
+    expect(document.body.style.overflow).not.toBe("hidden");
   });
 });
