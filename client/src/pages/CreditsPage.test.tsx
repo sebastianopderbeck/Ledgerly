@@ -56,6 +56,7 @@ describe("CreditsPage", () => {
     await waitFor(() => expect(screen.getByText("Total pagado")).toBeInTheDocument());
     expect(screen.getAllByText("Sin datos").length).toBeGreaterThan(0);
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText(/detalle mes a mes/i)).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /año/i })).toHaveTextContent("2019");
   });
 

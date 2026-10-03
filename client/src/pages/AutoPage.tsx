@@ -3,6 +3,7 @@ import { CircularProgress, Typography } from "@mui/material";
 import { useAutoCoupons } from "../api/hooks.js";
 import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { yearsOf } from "../filters/globalFilters.js";
+import { useAutoCouponsInYears } from "../filters/useInYears.js";
 import { AutoKpiCards } from "../components/AutoKpiCards.js";
 import { AutoCouponsTable } from "../components/AutoCouponsTable.js";
 import { MotionBox } from "../components/motion/motion.js";
@@ -19,6 +20,8 @@ const AUTO_FIELDS: FilterField[] = ["year"];
 export const AutoPage = () => {
   const { data, isLoading } = useAutoCoupons();
   const coupons = data ?? [];
+  const { data: couponsInYears } = useAutoCouponsInYears();
+  const hasDetail = (couponsInYears ?? []).length > 0;
   const yearOptions = useMemo(() => yearsOf((data ?? []).map((coupon) => coupon.fechaVencimiento)), [data]);
 
   return (
@@ -49,7 +52,7 @@ export const AutoPage = () => {
             <ChartCard title="Valor de la cuota en USD"><AutoCouponUsdChart /></ChartCard>
           </MotionBox>
 
-          <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>
+          {hasDetail && <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>}
           <AutoCouponsTable />
         </>
       )}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { PayslipsPage } from "./PayslipsPage.js";
 
@@ -50,5 +50,12 @@ describe("PayslipsPage", () => {
     expect(within(table).getByText("2026-03")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /año/i })).toHaveTextContent("Todos");
     expect(screen.queryByRole("group", { name: /filtrar gráficos por año/i })).not.toBeInTheDocument();
+  });
+
+  it("con un año sin recibos no muestra el detalle vacío", async () => {
+    renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=2019" });
+    await waitFor(() => expect(screen.getByText("Último neto")).toBeInTheDocument());
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText("Detalle mes a mes")).not.toBeInTheDocument();
   });
 });

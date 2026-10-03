@@ -53,4 +53,11 @@ describe("AutoPage", () => {
     expect(within(table).queryByText("2024-11-11")).not.toBeInTheDocument();
     expect(await screen.findByText("Valor del auto")).toBeInTheDocument();
   });
+
+  it("con un año sin datos no muestra el detalle vacío", async () => {
+    renderWithProviders(<AutoPage />, { route: "/auto?year=2019" });
+    await waitFor(() => expect(screen.getByText("Valor del auto")).toBeInTheDocument());
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText("Detalle mes a mes")).not.toBeInTheDocument();
+  });
 });

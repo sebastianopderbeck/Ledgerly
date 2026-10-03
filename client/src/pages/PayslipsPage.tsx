@@ -83,7 +83,7 @@ export const PayslipsPage = () => {
       <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>Descuentos acumulados</Typography>
       <PayslipDescuentoKpis payslips={payslips} />
 
-      <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>
+      {inYears.length > 0 && <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>}
       <PayslipsTable payslips={inYears} />
     </>
   );
