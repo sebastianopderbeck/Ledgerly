@@ -20,7 +20,7 @@ const statusBarScrimSx: SxProps<Theme> = {
   left: 0,
   right: 0,
   height: "env(safe-area-inset-top)",
-  bgcolor: "background.default",
+  bgcolor: "#0b0f19",
   zIndex: (theme) => theme.zIndex.appBar,
 };
 

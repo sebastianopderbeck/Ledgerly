@@ -176,4 +176,14 @@ describe("Layout en mobile", () => {
     expect(cssFor(screen.getByRole("main").firstElementChild!)).toContain("env(safe-area-inset-bottom)");
     expect(cssFor(quickActions())).toContain("env(safe-area-inset-top)");
   });
+
+  it("la franja de la barra de estado es oscura también en modo claro", () => {
+    localStorage.setItem("ledgerly.colorMode", JSON.stringify("light"));
+    renderLayout();
+    const scrim = Array.from(document.querySelectorAll("[aria-hidden]")).find(
+      (element) => cssFor(element).includes("height:env(safe-area-inset-top)"),
+    );
+    expect(scrim).toBeDefined();
+    expect(cssFor(scrim!)).toMatch(/background-color:\s*#0b0f19/i);
+  });
 });
