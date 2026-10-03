@@ -46,6 +46,7 @@ export const ChartTooltip = ({ title, rows }: ChartTooltipProps) => {
   const theme = useTheme();
   const containerStyle: CSSProperties = {
     ...nivoTheme(theme).tooltip?.container,
+    width: "max-content",
     maxWidth: TOOLTIP_MAX_WIDTH,
     whiteSpace: "normal",
     overflowWrap: "anywhere",

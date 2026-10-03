@@ -40,7 +40,7 @@ describe("compactBarTooltip", () => {
     expect(screen.getByText("MERCADOLIBRE SUPERMERCADO")).toBeInTheDocument();
     expect(screen.getByText("$ 1.500,00")).toBeInTheDocument();
     expect(screen.queryByText("total")).not.toBeInTheDocument();
-    expect(container.firstElementChild).toHaveStyle({ maxWidth: "220px", whiteSpace: "normal" });
+    expect(container.firstElementChild).toHaveStyle({ width: "max-content", maxWidth: "220px", whiteSpace: "normal" });
   });
 
   it("con showKey nombra la serie de la barra", () => {
