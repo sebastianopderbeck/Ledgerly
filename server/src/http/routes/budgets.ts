@@ -1,9 +1,13 @@
 import { Router } from "express";
-import { isValidObjectId } from "mongoose";
-import { budgetInputSchema, budgetPatchSchema } from "@ledgerly/shared";
+import { isValidObjectId, type FilterQuery } from "mongoose";
+import { budgetInputSchema, budgetPatchSchema, type BudgetSpendingDTO, type CategoryMonthStat } from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
-import { BudgetModel, InflationRateModel } from "../../db/models.js";
+import {
+  BudgetModel, InflationRateModel, StatementModel, TransactionModel, type TransactionDoc,
+} from "../../db/models.js";
 import { toBudgetDTO } from "../mappers.js";
+import { parseYears, yearDateRanges } from "../yearFilter.js";
+import { lastClosedMonth } from "../../stats/closedMonth.js";
 
 export const budgetsRouter = Router();
 
@@ -30,6 +34,35 @@ const validId = (id: string): string => {
 budgetsRouter.get("/", asyncHandler(async (_req, res) => {
   const budgets = await BudgetModel.find().sort({ category: 1 });
   res.json(budgets.map(toBudgetDTO));
+}));
+
+const spendingByMonthAndCategory = (match: FilterQuery<TransactionDoc>) =>
+  TransactionModel.aggregate<CategoryMonthStat>([
+    { $match: match },
+    {
+      $group: {
+        _id: { month: { $dateToString: { format: "%Y-%m", date: "$date" } }, category: "$category" },
+        total: { $sum: "$amount" },
+        count: { $sum: 1 },
+      },
+    },
+    { $project: { _id: 0, month: "$_id.month", category: "$_id.category", total: 1, count: 1 } },
+    { $sort: { month: 1, total: -1 } },
+  ]);
+
+budgetsRouter.get("/spending", asyncHandler(async (req, res) => {
+  const match: FilterQuery<TransactionDoc> = { type: "purchase", currency: "ARS" };
+  const years = parseYears(req.query.year);
+  if (years) match.$or = yearDateRanges(years);
+  const [gastos, statements] = await Promise.all([
+    spendingByMonthAndCategory(match),
+    StatementModel.find({}, { closingDate: 1 }).lean(),
+  ]);
+  const body: BudgetSpendingDTO = {
+    ultimoMesCerrado: lastClosedMonth(statements.map((statement) => statement.closingDate ?? null)),
+    gastos,
+  };
+  res.json(body);
 }));
 
 budgetsRouter.post("/", asyncHandler(async (req, res) => {

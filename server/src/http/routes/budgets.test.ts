@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import request from "supertest";
+import type { CategoryMonthStat } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
 import { createApp } from "../app.js";
-import { BudgetModel, InflationRateModel } from "../../db/models.js";
+import { BudgetModel, InflationRateModel, StatementModel, TransactionModel } from "../../db/models.js";
 
 withDb();
 const app = createApp();
@@ -135,5 +136,124 @@ describe("validación de /api/budgets", () => {
     await BudgetModel.init();
     await BudgetModel.create({ category: "Comida", topeArs: 1, periodoBase: "2026-08" });
     await expect(BudgetModel.create({ category: "Comida", topeArs: 2, periodoBase: "2026-08" })).rejects.toThrow(/duplicate key/);
+  });
+});
+
+interface TxSeed {
+  date: string;
+  category: string;
+  amount: number;
+  currency?: "ARS" | "USD";
+  type?: string;
+  cardLabel?: string;
+}
+
+interface CategoryTotal {
+  category: string;
+  total: number;
+}
+
+const money = { ars: 0, usd: 0 };
+let statementCount = 0;
+
+const seedStatement = (closingDate: string | null) => {
+  statementCount += 1;
+  return StatementModel.create({
+    issuer: "visa_signature", cardLabel: "Visa ****1234", last4: "1234",
+    closingDate: closingDate === null ? null : new Date(closingDate), dueDate: null,
+    totals: { totalConsumos: money, saldoActual: money, pagoMinimo: money, saldoAnterior: money },
+    sourceFileName: `resumen-${statementCount}.pdf`, sourceHash: `hash-${statementCount}`, pageCount: 1,
+    parserVersion: "1", needsReview: false, reconciliation: { ok: true, entries: [] },
+  });
+};
+
+const seedTransactions = async (rows: TxSeed[]) => {
+  const statement = await seedStatement(null);
+  await TransactionModel.insertMany(rows.map((row, index) => ({
+    statementId: statement._id, issuer: "visa_signature", cardLabel: row.cardLabel ?? "Visa ****1234",
+    date: new Date(row.date), descriptionRaw: `COMERCIO ${index}`, merchant: `COMERCIO ${index}`,
+    category: row.category, categorySource: "rule", amount: row.amount, currency: row.currency ?? "ARS",
+    direction: "debit", type: row.type ?? "purchase", isInstallment: false, fingerprint: `f${index}`,
+  })));
+};
+
+const byCategory = (a: CategoryTotal, b: CategoryTotal): number => a.category.localeCompare(b.category);
+
+describe("GET /api/budgets/spending", () => {
+  it("agrupa por mes y categoría solo los consumos en pesos de todas las tarjetas", async () => {
+    await seedTransactions([
+      { date: "2026-09-01", category: "Comida", amount: 100 },
+      { date: "2026-09-15", category: "Comida", amount: 50 },
+      { date: "2026-09-20", category: "Transporte", amount: 30 },
+      { date: "2026-09-05", category: "Ropa", amount: 10, cardLabel: "ICBC Mastercard" },
+      { date: "2026-09-10", category: "Comida", amount: 999, currency: "USD" },
+      { date: "2026-09-11", category: "Comida", amount: 500, type: "payment" },
+      { date: "2026-09-12", category: "Comida", amount: 70, type: "tax" },
+      { date: "2026-09-13", category: "Comida", amount: -40, type: "refund" },
+      { date: "2026-10-01", category: "Comida", amount: 20 },
+    ]);
+    const response = await request(app).get("/api/budgets/spending");
+    expect(response.status).toBe(200);
+    expect(response.body.gastos).toEqual([
+      { month: "2026-09", category: "Comida", total: 150, count: 2 },
+      { month: "2026-09", category: "Transporte", total: 30, count: 1 },
+      { month: "2026-09", category: "Ropa", total: 10, count: 1 },
+      { month: "2026-10", category: "Comida", total: 20, count: 1 },
+    ]);
+  });
+
+  it("con year solo trae los meses de esos años", async () => {
+    await seedTransactions([
+      { date: "2025-12-31", category: "Comida", amount: 10 },
+      { date: "2026-01-01", category: "Comida", amount: 20 },
+    ]);
+    const only2026 = await request(app).get("/api/budgets/spending?year=2026");
+    expect(only2026.body.gastos.map((gasto: CategoryMonthStat) => gasto.month)).toEqual(["2026-01"]);
+    const all = await request(app).get("/api/budgets/spending");
+    expect(all.body.gastos.map((gasto: CategoryMonthStat) => gasto.month)).toEqual(["2025-12", "2026-01"]);
+  });
+
+  it("ultimoMesCerrado sale del cierre más reciente, sin importar el año elegido", async () => {
+    await seedStatement("2026-09-25");
+    await seedStatement("2026-10-02");
+    await seedStatement(null);
+    const response = await request(app).get("/api/budgets/spending?year=2025");
+    expect(response.body.ultimoMesCerrado).toBe("2026-09");
+  });
+
+  it("sin resúmenes ni consumos devuelve null y una lista vacía", async () => {
+    const response = await request(app).get("/api/budgets/spending");
+    expect(response.body).toEqual({ ultimoMesCerrado: null, gastos: [] });
+  });
+
+  it("para un mes da lo mismo que «Gasto por categoría» del Dashboard en ARS", async () => {
+    await seedTransactions([
+      { date: "2026-08-31", category: "Comida", amount: 11 },
+      { date: "2026-09-01", category: "Comida", amount: 100 },
+      { date: "2026-09-14", category: "Transporte", amount: 45.5 },
+      { date: "2026-09-30", category: "Comida", amount: 25 },
+      { date: "2026-09-30", category: "Sin categoría", amount: 7 },
+      { date: "2026-09-18", category: "Ropa", amount: 60, cardLabel: "ICBC Mastercard" },
+      { date: "2026-09-18", category: "Ropa", amount: 3, currency: "USD" },
+      { date: "2026-10-01", category: "Comida", amount: 13 },
+    ]);
+    const spending = await request(app).get("/api/budgets/spending");
+    const dashboard = await request(app)
+      .get("/api/stats/by-category")
+      .query({ currency: "ARS", from: "2026-09-01", to: "2026-09-30" });
+    const fromBudgets = spending.body.gastos
+      .filter((gasto: CategoryMonthStat) => gasto.month === "2026-09")
+      .map(({ category, total }: CategoryMonthStat) => ({ category, total }))
+      .sort(byCategory);
+    const fromDashboard = dashboard.body
+      .map(({ category, total }: CategoryTotal) => ({ category, total }))
+      .sort(byCategory);
+    expect(fromBudgets).toEqual(fromDashboard);
+    expect(fromBudgets).toEqual([
+      { category: "Comida", total: 125 },
+      { category: "Ropa", total: 60 },
+      { category: "Sin categoría", total: 7 },
+      { category: "Transporte", total: 45.5 },
+    ]);
   });
 });
