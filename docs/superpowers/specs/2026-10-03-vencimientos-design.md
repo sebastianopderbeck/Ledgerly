@@ -56,7 +56,16 @@ Archivos de esta feature: `client/src/vencimientos.ts` (+ test), `client/src/use
 - **Confirmado vs estimado:** es *confirmado* si la fecha sale tal cual de un documento
   (`Statement.dueDate`, `MortgageCoupon.fechaDebito`, `AutoCoupon.fechaVencimiento`,
   `Payslip.fechaPago`). Es *estimado* si se proyecta con el desplazamiento típico de los últimos
-  documentos (ver Cálculo).
+  documentos (ver Cálculo) o, en un resumen sin `dueDate`, si sale de su cierre. El estado habla
+  **de la fecha**; si el monto es aproximado lo dice otro campo, `montoAproximado`.
+- **Resumen sin fecha de vencimiento:** si un resumen tiene `closingDate` pero no `dueDate`, su
+  vencimiento se estima en **cierre + 12 días** (`DIAS_CIERRE_A_VENCIMIENTO`), la misma regla que la
+  base fijó para flujo y ahorro-cuotas en `server/src/stats/statementDueDate.ts` (el cliente no
+  puede importar código del server, así que la constante se repite), corrido al lunes si cae en fin
+  de semana. Ese ítem es *estimado* pero lleva el saldo del resumen **sin «≈»**, porque el monto sí
+  sale del documento, y su detalle dice «vencimiento estimado». Esas fechas también arman el patrón
+  de la tarjeta. **Hallazgo con datos reales:** los 8 resúmenes Visa importados tienen
+  `dueDate: null` (el parser no lo está leyendo); sin esta regla, Visa no aparecía en la página.
 - **Montos:**
   - un ítem confirmado lleva el monto de su documento;
   - una **tarjeta estimada no lleva monto** («A confirmar»), porque el consumo varía demasiado;
@@ -65,7 +74,8 @@ Archivos de esta feature: `client/src/vencimientos.ts` (+ test), `client/src/use
   - una **cuota del auto estimada** = `totalAPagar` del último cupón;
   - un **sueldo estimado** = neto del último recibo mensual.
 
-  Los montos estimados llevan «≈».
+  Los montos proyectados llevan «≈» (`montoAproximado: true`). El saldo de un resumen nunca lo
+  lleva, aunque su fecha sea estimada.
 - **Fines de semana:** una fecha estimada que cae sábado o domingo se corre. Los **pagos** pasan al
   lunes siguiente, porque los vencimientos bancarios se mueven al día hábil siguiente. El
   **sueldo** pasa al viernes anterior. Los feriados no se contemplan. Las fechas confirmadas no se
@@ -135,7 +145,8 @@ Notas:
   dos hooks y `useMacroSeries` son **datos opcionales**: se espera a que terminen de cargar, pero su
   error nunca pone a la página en estado de error. Sin resumen no hay límite de cuotas, y sin serie
   macro no hay UVA de hoy.
-- Los statements con `dueDate: null` se ignoran.
+- Los statements con `dueDate: null` usan cierre + 12 días; si tampoco tienen `closingDate`, se
+  ignoran.
 - Se asume **un solo crédito y un solo plan**, como ya asumen `computeCreditProgress` y
   `computeAutoProgress`. Las tarjetas se agrupan por `issuer`, como `latestStatementPerIssuer` en
   `client/src/cardCycle.ts`.
@@ -177,6 +188,7 @@ export const formatMonthYear = (mes: string): string
 export const MESES_ADELANTE = 2;
 export const MUESTRA_PATRON = 6;
 export const MESES_SIN_DOCUMENTO_MAX = 3;
+export const DIAS_CIERRE_A_VENCIMIENTO = 12;
 
 export type VencimientoTipo = "tarjeta" | "credito" | "auto" | "sueldo";
 export type VencimientoSentido = "pago" | "cobro";
@@ -194,6 +206,7 @@ export interface Vencimiento {
   detalle: string;
   monto: number | null;
   montoUsd: number | null;
+  montoAproximado: boolean;
 }
 
 export interface RangoFechas { desde: string; hasta: string; }
@@ -248,7 +261,7 @@ pago y la fecha real.
 
 | Fuente | `mes` (ancla) | `fecha` |
 |---|---|---|
-| Tarjeta | `monthOf(dueDate)` | `dueDate` |
+| Tarjeta | `monthOf(vencimiento)` | `vencimiento` = `dueDate`, o cierre + 12 días corrido al lunes si no hay |
 | Crédito | `monthOf(fechaDebito)` | `fechaDebito` |
 | Auto | `monthOf(fechaVencimiento)` | `fechaVencimiento` |
 | Sueldo | `addMonths(periodo, 1)` | `fechaPago` |
@@ -307,8 +320,10 @@ export function vencimientosDeSueldo(payslips: PayslipDTO[], rango: RangoFechas)
 Cada función devuelve `[]` si no hay documentos. Las tarjetas devuelven una fuente por `issuer`
 (en orden alfabético de `issuer`) y el resto, una sola fuente. Dentro de cada fuente:
 
-- **Confirmados:** los documentos cuya fecha cae dentro del rango.
-- **Estimados:** `proyectarFechas(...)`, solo si la fuente no está desactualizada ni terminada.
+- **De documento** (`montoAproximado: false`): los documentos cuya fecha cae dentro del rango. Son
+  *confirmados*, salvo el resumen sin `dueDate`, que es *estimado*.
+- **Proyectados** (`estado: "estimado"`, `montoAproximado: true`): `proyectarFechas(...)`, solo si
+  la fuente no está desactualizada ni terminada.
 
 | Fuente | `etiqueta` | Confirmado: `titulo` / `detalle` / `monto` | Estimado: `titulo` / `detalle` / `monto` | Corrimiento |
 |---|---|---|---|---|
@@ -376,7 +391,7 @@ export function notaSinEstimar(sinEstimar: string[]): string | null
 - Totales:
   - `totalPagos` suma el `monto` no nulo de los pagos y `totalPagosUsd` suma su `montoUsd`;
   - `totalCobros` suma el `monto` de los cobros;
-  - `pagosAproximados` es `true` si algún pago estimado con monto entra en `totalPagos`;
+  - `pagosAproximados` es `true` si algún pago con `montoAproximado` y monto entra en `totalPagos`;
     `cobrosAproximados`, lo mismo con los cobros;
   - `aConfirmar` cuenta los ítems con `monto === null`.
 - `resumenDeGrupo` arma el texto del encabezado con las partes no vacías unidas por ` · `:
@@ -386,7 +401,7 @@ export function notaSinEstimar(sinEstimar: string[]): string | null
   - `1 a confirmar` (si `aConfirmar > 0`).
 - `montoTexto`:
   - `null` → `"A confirmar"`;
-  - si no, `formatMoney(monto, "ARS")`, con prefijo `+` en los cobros y `≈ ` en los estimados. Por
+  - si no, `formatMoney(monto, "ARS")`, con prefijo `+` en los cobros y `≈ ` si `montoAproximado`. Por
     ejemplo: `≈ $ 812.000,00`, `+$ 2.100.000,00` o `≈ +$ 2.100.000,00`.
 - `montoUsdTexto`: `+ US$ 35,00` si hay `montoUsd`; si no, `null`.
 - `etiquetaDia`: `"hoy"`, `"mañana"` o `formatWeekdayShort(fecha)`. `diaDelMes` es el número de día.
@@ -400,8 +415,8 @@ export function notaSinEstimar(sinEstimar: string[]): string | null
 | Fuente sin documentos | No aporta ítems ni aparece en «Sin estimar» |
 | Un solo documento en la fuente | El desplazamiento típico es el de ese documento; se proyecta igual |
 | Último resumen con `dueDate` futuro | Ese vencimiento es confirmado y las estimaciones arrancan el mes siguiente |
-| Último resumen con `dueDate: null` | Se ignora; el patrón usa los anteriores |
-| Todos los resúmenes de un emisor sin `dueDate` | Ese emisor no aporta nada |
+| Resumen con `dueDate: null` y cierre | Vence cierre + 12 días (al lunes si cae en fin de semana): estimado, con su saldo sin «≈» |
+| Resumen sin `dueDate` ni cierre | Se ignora; el patrón usa los demás |
 | Último documento con más de 3 meses | Sin estimados; la etiqueta va a «Sin estimar» |
 | Crédito o auto en su última cuota | Sin estimados y sin aviso |
 | Mes proyectado que cae antes de hoy | Se descarta (ya pasó y no hay documento) |
@@ -550,21 +565,22 @@ son sintéticos.
   - `estimarCuotaCredito`: con UVA de hoy, sin UVA, y con UVA de hoy menor que la del cupón (gana la
     del cupón);
   - tarjetas: resumen futuro confirmado con saldo ARS + USD y mínimo en el detalle; mes siguiente
-    estimado con `monto: null`; `dueDate: null` ignorado; dos emisores independientes; emisor
-    viejo → `desactualizada`; mismo vencimiento importado dos veces → un ítem;
+    estimado con `monto: null`; sin `dueDate`, cierre + 12 días con el saldo y corrido al lunes;
+    sin `dueDate` ni cierre, ignorado; dos emisores independientes; emisor viejo →
+    `desactualizada`; mismo vencimiento importado dos veces → un ítem;
   - crédito: número de cuota correlativo, corte en `cuotasTotales` y fuente terminada sin aviso;
   - auto: cupón futuro confirmado con `totalAPagar` y estimados con el mismo monto;
   - sueldo: ancla en `periodo + 1`, corrimiento hacia atrás, SAC ignorado y `titulo` con el período
     correcto;
   - `listVencimientos`: orden por fecha con cobro antes que pago el mismo día, `sinEstimar`;
   - `agruparVencimientos`: títulos «Esta semana», «La semana que viene», «Semana del 12 de octubre»,
-    «Este mes», «Noviembre 2026»; totales, aproximación por separado, `aConfirmar`; grupos vacíos
-    omitidos;
+    «Este mes», «Noviembre 2026»; totales, aproximación por separado y solo por `montoAproximado`,
+    `aConfirmar`; grupos vacíos omitidos;
   - `resumenDeGrupo`, `montoTexto`, `montoUsdTexto`, `etiquetaDia` y `notaSinEstimar`;
   - el ejemplo completo de este spec como caso de integración del motor.
 - `client/src/components/VencimientosList.test.tsx`: un encabezado `h2` por grupo con su resumen;
-  filas con `aria-label`; chip «Confirmado» o «Estimado»; «≈» en montos estimados; «A confirmar»;
-  `+ US$`; «hoy» y «mañana» en la ficha.
+  filas con `aria-label`; chip «Confirmado» o «Estimado»; «≈» en montos estimados; un resumen con
+  fecha estimada muestra su saldo sin «≈»; «A confirmar»; `+ US$`; «hoy» y «mañana» en la ficha.
 - `client/src/pages/VencimientosPage.test.tsx`, con `fetch` stubeado por URL y la fecha fijada en
   `2026-10-03T12:00:00`:
   - con datos se ven «La semana que viene», «Crédito UVA · cuota 25» como estimado y «Plan del auto

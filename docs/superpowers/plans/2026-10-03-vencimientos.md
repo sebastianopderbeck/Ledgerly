@@ -30,6 +30,7 @@
 - Los textos que la lista necesita (`etiquetaDia`, `diaDelMes`, `montoUsdTexto`, `notaSinEstimar`) salen de `vencimientos.ts`, así la lista no calcula nada y todo se testea sin render.
 - Dos documentos de una fuente con la misma fecha dan un solo ítem (mismo `id`); en las tarjetas gana el importado más recientemente (`uploadedAt`).
 - Los fixtures sintéticos viven en `client/src/testing/vencimientosFixtures.ts` y los usan los tres archivos de test.
+- **Agregado durante la ejecución (Task 6):** los resúmenes sin `dueDate` usan cierre + 12 días, y `Vencimiento` suma `montoAproximado` para que el «≈» dependa del monto y no de la fecha. Salió de correr el motor contra los datos reales: Visa no traía `dueDate` en ningún resumen.
 
 ## Global Constraints
 
@@ -50,6 +51,7 @@
 3. **Semana mixta**: un resumen confirmado y un sueldo estimado en la misma semana no pueden marcar «≈» en los pagos. → test «la aproximación de pagos y cobros va por separado» en Task 3.
 4. **Sin crédito, sin plan o sin serie macro**: los resúmenes responden 204 (React Query los deja en error) y la página no puede mostrar error ni dejar de proyectar. → test «los resúmenes con 204 y sin serie macro no son error» en Task 5.
 5. **Hay documentos pero nada en el rango** (crédito terminado, todo viejo): tiene que decir «No hay pagos ni cobros…», no invitar a importar. → test «con documentos pero nada en el rango muestra el mensaje vacío» en Task 5.
+6. **Resúmenes sin `dueDate`** (hoy, todos los de Visa): tienen que aparecer con la fecha estimada por el cierre y su saldo sin «≈». → tests de Task 6.
 
 ---
 
@@ -2039,7 +2041,238 @@ git commit -m "feat(client): página de vencimientos con agrupación por semana 
 
 ---
 
-### Task 6: Verificación final
+### Task 6: Resúmenes sin fecha de vencimiento (hallazgo con datos reales)
+
+Al correr el motor contra los datos reales (solo lectura, `GET` al servicio instalado, sin levantar la app ni guardar nada), Visa no aparecía: sus 8 resúmenes tienen `dueDate: null`. La base ya resolvió ese caso del lado del server con `statementDueDate` (cierre + 12 días). Este task lleva la misma regla al cliente y separa «fecha estimada» de «monto aproximado», para que el saldo de un resumen, que sí sale del documento, no lleve «≈».
+
+**Files:**
+- Modify: `client/src/vencimientos.ts`
+- Modify: `client/src/testing/vencimientosFixtures.ts`
+- Test: `client/src/vencimientos.test.ts`, `client/src/components/VencimientosList.test.tsx`
+
+**Interfaces:**
+- Consumes: Tasks 1 a 4.
+- Produces:
+  - `export const DIAS_CIERRE_A_VENCIMIENTO = 12;`
+  - `Vencimiento` suma `montoAproximado: boolean` (`true` en todo lo proyectado; `false` en todo lo que sale de un documento).
+  - `montoTexto` y `pagosAproximados`/`cobrosAproximados` miran `montoAproximado`, no `estado`.
+  - El fixture `vencimiento(overrides)` toma `montoAproximado: overrides.estado === "estimado"` por defecto.
+
+- [ ] **Step 1: Write the failing tests**
+
+En `client/src/testing/vencimientosFixtures.ts`, dentro de `vencimiento`, antes de `...overrides`:
+
+```ts
+  montoAproximado: overrides.estado === "estimado",
+```
+
+En `client/src/vencimientos.test.ts`:
+
+- en los `toEqual` de objetos completos, agregar `montoAproximado: false` al confirmado de Visa y `montoAproximado: true` a los dos estimados de Visa y a los dos del sueldo;
+- renombrar «ignora los resúmenes sin vencimiento» a «ignora los resúmenes sin vencimiento ni cierre» y pasar el segundo resumen a `closingDate: null`;
+- agregar en `describe("vencimientosDeTarjetas")`:
+
+```ts
+  it("sin vencimiento estima la fecha a 12 días del cierre y lleva el saldo del resumen", () => {
+    const visa = statement({
+      id: "visa-09", issuer: "visa_signature", closingDate: "2026-09-24", dueDate: null, saldoArs: 812_000, minimoArs: 42_000,
+    });
+    const [fuente] = vencimientosDeTarjetas([visa], RANGO);
+    expect(fuente.items[0]).toEqual({
+      id: "tarjeta-visa_signature-2026-10-06",
+      tipo: "tarjeta",
+      sentido: "pago",
+      estado: "estimado",
+      montoAproximado: false,
+      fecha: "2026-10-06",
+      titulo: "Visa Signature",
+      detalle: `Resumen con cierre 24/09 · vencimiento estimado · mín. ${formatMoney(42_000, "ARS")}`,
+      monto: 812_000,
+      montoUsd: null,
+    });
+  });
+
+  it("el vencimiento estimado por el cierre se corre al lunes y arma el patrón", () => {
+    const statements = [
+      statement({ id: "visa-08", issuer: "visa_signature", closingDate: "2026-08-27", dueDate: null }),
+      statement({ id: "visa-09", issuer: "visa_signature", closingDate: "2026-09-29", dueDate: null, saldoArs: 500_000 }),
+    ];
+    const [fuente] = vencimientosDeTarjetas(statements, RANGO);
+    expect(fuente.items.map(({ fecha, estado, monto }) => [fecha, estado, monto])).toEqual([
+      ["2026-10-12", "estimado", 500_000],
+      ["2026-11-10", "estimado", null],
+      ["2026-12-10", "estimado", null],
+    ]);
+  });
+```
+
+- agregar en `describe("agruparVencimientos")`:
+
+```ts
+  it("un resumen con fecha estimada pero saldo conocido no aproxima los pagos", () => {
+    const items = [
+      vencimiento({ fecha: "2026-10-06", titulo: "Visa Signature", estado: "estimado", montoAproximado: false, monto: 812_000 }),
+    ];
+    const [grupo] = agruparVencimientos(items, "semana", HOY);
+    expect(grupo.pagosAproximados).toBe(false);
+    expect(resumenDeGrupo(grupo)).toBe(`Pagos ${formatMoney(812_000, "ARS")}`);
+  });
+```
+
+- agregar en `describe("textos de cada fila")`:
+
+```ts
+  it("montoTexto no aproxima el saldo de un resumen aunque su fecha sea estimada", () => {
+    const visa = vencimiento({ fecha: "2026-10-06", titulo: "Visa", estado: "estimado", montoAproximado: false, monto: 812_000 });
+    expect(montoTexto(visa)).toBe(formatMoney(812_000, "ARS"));
+  });
+```
+
+En `client/src/components/VencimientosList.test.tsx`, antes de «la ficha de fecha dice hoy, mañana o el día corto»:
+
+```tsx
+  it("un resumen con fecha estimada muestra Estimado y su saldo sin ≈", () => {
+    const visa = vencimiento({ fecha: "2026-10-06", titulo: "Visa Signature", estado: "estimado", montoAproximado: false, monto: 812_000 });
+    renderWithProviders(<VencimientosList grupos={agruparVencimientos([visa], "semana", HOY)} hoy={HOY} />);
+    const fila = screen.getByRole("listitem", { name: "Visa Signature, 6 de octubre, estimado" });
+    expect(within(fila).getByText("Estimado")).toBeInTheDocument();
+    expect(within(fila).getByText(visible(formatMoney(812_000, "ARS")))).toBeInTheDocument();
+  });
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `bun run test client/src/vencimientos.test.ts client/src/components/VencimientosList.test.tsx`
+Expected: FAIL — 8 tests (falta `montoAproximado`, los resúmenes sin `dueDate` se ignoran y el «≈» sale del `estado`).
+
+- [ ] **Step 3: Implement**
+
+En `client/src/vencimientos.ts`:
+
+```ts
+export const DIAS_CIERRE_A_VENCIMIENTO = 12;
+```
+
+debajo de `MESES_SIN_DOCUMENTO_MAX`; `montoAproximado: boolean;` al final de `Vencimiento`; y reemplazar `type StatementConVencimiento` y `DefinicionFuente.documentos` por:
+
+```ts
+type DatosDocumento = DatosVencimiento & Pick<Vencimiento, "estado">;
+
+interface ResumenConVencimiento { statement: StatementDTO; fecha: string; confirmado: boolean; }
+```
+
+con `documentos: DatosDocumento[];` en `DefinicionFuente`. En `armarFuente`:
+
+```ts
+  const crear = (datos: DatosVencimiento, estado: VencimientoEstado, montoAproximado: boolean): Vencimiento => ({
+    id: clave ? `${tipo}-${clave}-${datos.fecha}` : `${tipo}-${datos.fecha}`,
+    tipo,
+    sentido,
+    estado,
+    montoAproximado,
+    ...datos,
+  });
+  const ultimoMes = ordenarOcurrencias(ocurrencias).at(-1)?.mes;
+  const terminada = pasosRestantes <= 0;
+  const desactualizada = !terminada && ultimoMes !== undefined && estaDesactualizada(ultimoMes, rango.desde);
+  const documentados = documentos
+    .filter(({ fecha }) => enRango(fecha, rango))
+    .map(({ estado, ...datos }) => crear(datos, estado, false));
+  const proyectadas = terminada || desactualizada ? [] : proyectarFechas(ocurrencias, rango, corrimiento);
+  const estimados = proyectadas
+    .filter(({ paso }) => paso <= pasosRestantes)
+    .map((proyectada) => crear({ fecha: proyectada.fecha, ...estimar(proyectada) }, "estimado", true));
+  return { etiqueta, items: unicosPorId([...documentados, ...estimados]), desactualizada };
+```
+
+Las tarjetas pasan a trabajar con el vencimiento efectivo de cada resumen:
+
+```ts
+const estadoDe = (confirmado: boolean): VencimientoEstado => (confirmado ? "confirmado" : "estimado");
+
+const vencimientoDeResumen = (statement: StatementDTO): ResumenConVencimiento | null => {
+  if (statement.dueDate) return { statement, fecha: statement.dueDate, confirmado: true };
+  if (!statement.closingDate) return null;
+  const fecha = ajustarFinDeSemana(addDays(statement.closingDate, DIAS_CIERRE_A_VENCIMIENTO), "adelante");
+  return { statement, fecha, confirmado: false };
+};
+
+const tieneVencimiento = (resumen: ResumenConVencimiento | null): resumen is ResumenConVencimiento => resumen !== null;
+
+const porVencimientoEImportacion = (a: ResumenConVencimiento, b: ResumenConVencimiento): number =>
+  a.fecha.localeCompare(b.fecha) || a.statement.uploadedAt.localeCompare(b.statement.uploadedAt);
+
+const detalleResumen = ({ statement, confirmado }: ResumenConVencimiento): string => {
+  const origen = statement.closingDate ? `Resumen con cierre ${formatDayMonth(statement.closingDate)}` : "Resumen importado";
+  const vencimiento = confirmado ? "" : " · vencimiento estimado";
+  return `${origen}${vencimiento} · mín. ${formatMoney(statement.totals.pagoMinimo.ars, "ARS")}`;
+};
+
+const fuenteDeTarjeta = (issuer: Issuer, resumenes: ResumenConVencimiento[], rango: RangoFechas): FuenteVencimientos => {
+  const ordenados = [...resumenes].sort(porVencimientoEImportacion);
+  const ultimo = ordenados[ordenados.length - 1].statement;
+  const ocurrencias = ordenados.map(({ fecha }) => ({ mes: monthOf(fecha), fecha }));
+  const detalle = detallePatron(Math.min(MUESTRA_PATRON, ordenarOcurrencias(ocurrencias).length));
+  return armarFuente({
+    tipo: "tarjeta",
+    sentido: "pago",
+    clave: issuer,
+    etiqueta: ultimo.cardLabel,
+    corrimiento: "adelante",
+    ocurrencias,
+    documentos: ordenados.map((resumen) => ({
+      fecha: resumen.fecha,
+      estado: estadoDe(resumen.confirmado),
+      titulo: resumen.statement.cardLabel,
+      detalle: detalleResumen(resumen),
+      monto: resumen.statement.totals.saldoActual.ars,
+      montoUsd: resumen.statement.totals.saldoActual.usd > 0 ? resumen.statement.totals.saldoActual.usd : null,
+    })),
+    pasosRestantes: SIN_LIMITE,
+    estimar: () => ({ titulo: ultimo.cardLabel, detalle, monto: null, montoUsd: null }),
+  }, rango);
+};
+
+export function vencimientosDeTarjetas(statements: StatementDTO[], rango: RangoFechas): FuenteVencimientos[] {
+  const resumenes = statements.map(vencimientoDeResumen).filter(tieneVencimiento);
+  const emisores = [...new Set(resumenes.map(({ statement }) => statement.issuer))].sort();
+  return emisores.map((issuer) =>
+    fuenteDeTarjeta(issuer, resumenes.filter(({ statement }) => statement.issuer === issuer), rango));
+}
+```
+
+En los `documentos` de crédito, auto y sueldo, agregar `estado: "confirmado",` después de `fecha`. Y para la aproximación:
+
+```ts
+const hayMontoAproximado = (items: Vencimiento[]): boolean =>
+  items.some(({ montoAproximado, monto }) => montoAproximado && monto !== null);
+```
+
+(en `armarGrupo`, `pagosAproximados: hayMontoAproximado(pagos)` y `cobrosAproximados: hayMontoAproximado(cobros)`), y
+
+```ts
+export function montoTexto({ monto, sentido, montoAproximado }: Vencimiento): string {
+  if (monto === null) return "A confirmar";
+  const signo = sentido === "cobro" ? "+" : "";
+  return `${prefijoAproximado(montoAproximado)}${signo}${formatMoney(monto, "ARS")}`;
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `bun run test client/src/vencimientos.test.ts client/src/components/VencimientosList.test.tsx client/src/pages/VencimientosPage.test.tsx && bun run typecheck`
+Expected: PASS (84 tests) y typecheck sin errores.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add client/src/vencimientos.ts client/src/vencimientos.test.ts client/src/testing/vencimientosFixtures.ts client/src/components/VencimientosList.test.tsx
+git commit -m "feat(client): vencimiento estimado por cierre en resúmenes sin fecha" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 7: Verificación final
 
 **Files:** ninguno (solo verificación).
 
