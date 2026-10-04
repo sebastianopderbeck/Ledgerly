@@ -1,6 +1,6 @@
 import type { BudgetDTO, BudgetSpendingDTO, CategoryMonthStat, CategoryRuleDTO, InflationRateDTO } from "@ledgerly/shared";
 import { categoryOptions } from "./categoryOptions.js";
-import { formatMoney, formatMonthLabel } from "./format.js";
+import { formatMonthLabel } from "./format.js";
 import { inflationFactor, latestInflationPeriod } from "./inflationIndex.js";
 
 export type BudgetStatus = "ok" | "cerca" | "pasado";
@@ -64,6 +64,10 @@ export interface BudgetsView {
   hasSpending: boolean;
 }
 
+const pesosFormat = new Intl.NumberFormat("es-AR", {
+  style: "currency", currency: "ARS", minimumFractionDigits: 0, maximumFractionDigits: 0,
+});
+
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
 const spendingIn = (gastos: CategoryMonthStat[], month: string): Map<string, number> =>
@@ -82,7 +86,7 @@ const categoriesIn = (lines: BudgetLine[], estado: BudgetStatus): string[] =>
   lines.filter((line) => line.estado === estado).map((line) => line.category);
 
 export function formatPesos(value: number): string {
-  return formatMoney(Math.round(value) || 0, "ARS");
+  return pesosFormat.format(Math.round(value) || 0);
 }
 
 export function monthInText(month: string): string {

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import type { BudgetDTO, BudgetSpendingDTO, CategoryMonthStat, InflationRateDTO } from "@ledgerly/shared";
-import { formatMoney } from "./format.js";
 import {
   budgetBalanceText, budgetCategoryOptions, budgetHistory, budgetInflationNote, budgetLines, budgetStatus, budgetTotals,
   budgetsView, closedMonths, currentLimit, defaultBudgetMonth, formatPesos, isPartialMonth, limitForMonth, monthInText,
@@ -150,9 +149,10 @@ describe("budgetCategoryOptions", () => {
 });
 
 describe("textos", () => {
-  it("formatPesos redondea a pesos enteros y no muestra -0", () => {
-    expect(formatPesos(1500.6)).toBe(formatMoney(1501, "ARS"));
-    expect(formatPesos(-0.2)).toBe(formatMoney(0, "ARS"));
+  it("formatPesos muestra pesos enteros, sin centavos ni -0", () => {
+    expect(formatPesos(1500.6)).toMatch(/^\$\s1\.501$/);
+    expect(formatPesos(300000)).toMatch(/^\$\s300\.000$/);
+    expect(formatPesos(-0.2)).toMatch(/^\$\s0$/);
   });
 
   it("monthInText deja el mes en minúscula para usarlo en una oración", () => {
@@ -160,9 +160,9 @@ describe("textos", () => {
   });
 
   it("budgetBalanceText dice cuánto queda o por cuánto te pasaste", () => {
-    expect(budgetBalanceText(65000)).toBe(`Te quedan ${formatMoney(65000, "ARS")}`);
-    expect(budgetBalanceText(0)).toBe(`Te quedan ${formatMoney(0, "ARS")}`);
-    expect(budgetBalanceText(-30000)).toBe(`Te pasaste por ${formatMoney(30000, "ARS")}`);
+    expect(budgetBalanceText(65000)).toMatch(/^Te quedan \$\s65\.000$/);
+    expect(budgetBalanceText(0)).toMatch(/^Te quedan \$\s0$/);
+    expect(budgetBalanceText(-30000.4)).toMatch(/^Te pasaste por \$\s30\.000$/);
   });
 
   it("budgetInflationNote aclara el ajuste y hasta qué IPC llega", () => {
