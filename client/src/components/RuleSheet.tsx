@@ -40,7 +40,7 @@ const matchTypeOptions = MATCH_TYPES.map((type) => (
   <MenuItem key={type} value={type}>{MATCH_TYPE_LABELS[type]}</MenuItem>
 ));
 
-const patternInputProps = { autoCapitalize: "none", autoCorrect: "off", spellCheck: false, style: { fontFamily: "monospace" } };
+export const patternInputProps = { autoCapitalize: "none", autoCorrect: "off", spellCheck: false, style: { fontFamily: "monospace" } };
 
 const RuleForm = ({ rule, onClose, onSave, onDelete }: RuleFormProps) => {
   const [priority, setPriority] = useState(String(rule?.priority ?? NEW_RULE_PRIORITY));
