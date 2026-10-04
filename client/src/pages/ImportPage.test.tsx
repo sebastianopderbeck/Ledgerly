@@ -123,6 +123,19 @@ describe("ImportPage", () => {
     await waitFor(() => expect(screen.getByText(/importado: 3 movimientos/i)).toBeInTheDocument());
   });
 
+  it("después de importar un resumen se ve «Revisión antes de pagar» con sus hallazgos", async () => {
+    mockFetch((url, init) => (url.includes("/import") && init?.method === "POST" ? statementResult("imported", 3) : []));
+    renderWithProviders(<ImportPage />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, new File(["x"], "r.pdf", { type: "application/pdf" }));
+    expect(await screen.findByRole("heading", { name: "Revisión antes de pagar" })).toBeInTheDocument();
+    expect(await screen.findByText("COMERCIO UNO")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "revisado: COMERCIO UNO" })).not.toBeChecked();
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
+    expect(headings.indexOf("Revisión antes de pagar")).toBeGreaterThan(headings.indexOf("Gmail"));
+    expect(headings.indexOf("Revisión antes de pagar")).toBeLessThan(headings.indexOf("Archivos importados"));
+  });
+
   it("permite reemplazar cuando el resumen ya existe", async () => {
     let replaceCalled = false;
     mockFetch((url, init) => {
