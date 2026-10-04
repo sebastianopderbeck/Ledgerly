@@ -819,7 +819,7 @@ const getReview = async (id: string): Promise<StatementReviewDTO> => {
 const findingFor = (review: StatementReviewDTO, merchant: string): ReviewFinding | undefined =>
   review.findings.find((finding) => finding.kind === "transaction" && finding.transaction.merchant === merchant);
 
-const patchReview = (id: string, body: unknown) => request(app).patch(`/api/statements/${id}/review`).send(body);
+const patchReview = (id: string, body: object) => request(app).patch(`/api/statements/${id}/review`).send(body);
 
 describe("GET /api/statements/:id/review", () => {
   it("compara contra los resúmenes anteriores de la misma tarjeta", async () => {
