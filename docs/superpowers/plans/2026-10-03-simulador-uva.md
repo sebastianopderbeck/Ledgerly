@@ -49,6 +49,7 @@ Decisiones de detalle tomadas al planificar; ya están volcadas en el spec:
 - **Mínimo del monto**: `montoPesos <= 0` es inválido en `simularPrecancelacion` (la base acepta `"0"`).
 - **Corte mobile: `< md` (900px)** vía `useIsMobile()`. En mobile, cada `ToggleButton` y «Ver Contexto» llevan `tapTargetSx` (44px).
 - Tests de cliente con más de un render llevan `afterEach(cleanup)` (el auto-cleanup de RTL está apagado). Los que stubean globals llaman `vi.unstubAllGlobals()` en `afterEach`.
+- `formatMoney` separa `$` con un espacio no separable. `getByText` normaliza los espacios del DOM pero no los del string esperado: un texto armado con `formatMoney` se compara pasándolo por `texto.replace(/\s+/g, " ")` (`comoSeLee` en el test de la tarjeta).
 - Fixtures **sintéticos**: nada de `examples/`.
 - Imports con extensión `.js` (ESM), como el resto del repo.
 - Copy en español rioplatense, exacto como en el spec.
@@ -979,6 +980,8 @@ const montoInput = () => screen.getByRole("textbox", { name: "Monto a adelantar"
 
 const tile = (name: string) => screen.getByRole("group", { name });
 
+const comoSeLee = (texto: string) => texto.replace(/\s+/g, " ");
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -1005,7 +1008,7 @@ describe("PrepaymentSimulatorCard", () => {
     expect(within(tile("Cuotas menos")).getByText("54")).toBeInTheDocument();
     expect(within(tile("Intereses que te ahorrás")).getByText("38.895,86 UVA")).toBeInTheDocument();
     expect(within(tile("Capital que cancelás")).getByText("10.000,00 UVA")).toBeInTheDocument();
-    expect(screen.getByText(`10.000,00 UVA a ${formatMoney(2000, "ARS")} por UVA`)).toBeInTheDocument();
+    expect(screen.getByText(comoSeLee(`10.000,00 UVA a ${formatMoney(2000, "ARS")} por UVA`))).toBeInTheDocument();
     expect(screen.queryByText("Ingresá un monto para ver cuánto te ahorrás.")).not.toBeInTheDocument();
   });
 
@@ -1084,7 +1087,7 @@ describe("PrepaymentSimulatorCard sin la UVA de hoy", () => {
     renderCard();
     await findCard();
     await userEvent.type(montoInput(), "19.000.000");
-    expect(screen.getByText(`10.000,00 UVA a ${formatMoney(1900, "ARS")} por UVA (cotización del último cupón)`)).toBeInTheDocument();
+    expect(screen.getByText(comoSeLee(`10.000,00 UVA a ${formatMoney(1900, "ARS")} por UVA (cotización del último cupón)`))).toBeInTheDocument();
   });
 
   it("si /macro/series falla la tarjeta igual se muestra con el último cupón", async () => {
