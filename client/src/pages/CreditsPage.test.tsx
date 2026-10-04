@@ -13,18 +13,28 @@ const coupon = (id: string, cuotaNro: number, fechaDebito: string) => ({
   tipoCambioUsd: 1350, tipoCambioSource: "api", totalUsd: 813.1,
 });
 
+const SUMMARY = {
+  prestamoNro: "0405727408", cuotasPagadas: 11, cuotasTotales: 240, totalPagado: 13594820.38,
+  capitalPagado: 2378973.78, interesPagado: 11097965.12, seguroPagado: 117881.48, capitalOriginalUva: 78316.73,
+  capitalAmortizadoUva: 1355.89, capitalPendienteUva: 76960.84, capitalPendientePesos: 153827014.64,
+  porcentajeAvanceCapital: 0.017313, cotizacionUvaActual: 1998.77, cuotaPuraUva: 699.6, tna: 8.9, tasaRealMensual: 0.0074,
+};
+
+const MACRO_SERIES = {
+  desde: "2025-01", meses: [], hoy: { fecha: "2026-10-02", usdOficial: null, uva: 2075.56, tasa30: null },
+};
+
+let summary: Record<string, unknown> = SUMMARY;
+
 function route(url: string) {
-  if (url.includes("/credits/summary")) {
-    return { prestamoNro: "0405727408", cuotasPagadas: 11, cuotasTotales: 240, totalPagado: 13594820.38,
-      capitalPagado: 2378973.78, interesPagado: 11097965.12, seguroPagado: 117881.48, capitalOriginalUva: 78316.73,
-      capitalAmortizadoUva: 1355.89, capitalPendienteUva: 76960.84, capitalPendientePesos: 153827014.64,
-      porcentajeAvanceCapital: 0.017313, cotizacionUvaActual: 1998.77, cuotaPuraUva: 699.6, tna: 8.9 };
-  }
+  if (url.includes("/credits/summary")) return summary;
   if (url.includes("/credits/coupons")) return [coupon("1", 1, "2025-08-18"), coupon("2", 6, "2026-01-19")];
+  if (url.includes("/macro/series")) return MACRO_SERIES;
   return {};
 }
 
 beforeEach(() => {
+  summary = SUMMARY;
   vi.stubGlobal("fetch", vi.fn(async (url: string) =>
     new Response(JSON.stringify(route(url)), { status: 200, headers: { "Content-Type": "application/json" } })));
 });
@@ -34,6 +44,9 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+
+const followsInDocument = (first: Element, second: Element) =>
+  Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
 
 describe("CreditsPage", () => {
   it("muestra KPIs, gráficos y detalle mes a mes", async () => {
@@ -70,6 +83,22 @@ describe("CreditsPage", () => {
     expect(within(listbox).getByRole("option", { name: "2025" })).toBeInTheDocument();
     expect(within(listbox).getByRole("option", { name: "2026" })).toBeInTheDocument();
   });
+
+  it("muestra el simulador de precancelación entre los KPIs y los gráficos", async () => {
+    renderWithProviders(<CreditsPage />, { route: "/credits?year=all" });
+    const simulador = await screen.findByRole("region", { name: "Simulador de precancelación" });
+    expect(within(simulador).getByRole("textbox", { name: "Monto a adelantar" })).toBeInTheDocument();
+    expect(followsInDocument(screen.getByText("Total pagado"), simulador)).toBe(true);
+    expect(followsInDocument(simulador, screen.getByText(/capital vs interés por mes/i))).toBe(true);
+  });
+
+  it("sin tasaRealMensual sigue mostrando los KPIs y no monta el simulador", async () => {
+    summary = { ...SUMMARY, tasaRealMensual: undefined };
+    renderWithProviders(<CreditsPage />, { route: "/credits?year=all" });
+    await waitFor(() => expect(screen.getByText("Total pagado")).toBeInTheDocument());
+    await flushAsync();
+    expect(screen.queryByRole("region", { name: "Simulador de precancelación" })).not.toBeInTheDocument();
+  });
 });
 
 const patches = () => vi.mocked(fetch).mock.calls
@@ -92,6 +121,12 @@ describe("CreditsPage en mobile", () => {
     expect(screen.getByRole("article", { name: "Cuota 6" })).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+  });
+
+  it("muestra el simulador de precancelación", async () => {
+    renderWithProviders(<CreditsPage />, { route: "/credits?year=all" });
+    const simulador = await screen.findByRole("region", { name: "Simulador de precancelación" });
+    expect(within(simulador).getByRole("button", { name: "Reducir plazo" })).toBeInTheDocument();
   });
 
   it("cambiar el TC desde la hoja manda el PATCH del cupón", async () => {
