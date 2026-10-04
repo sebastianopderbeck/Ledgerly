@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Currency, SubscriptionDTO, SubscriptionsReportDTO } from "@ledgerly/shared";
 import { formatMoney } from "../format.js";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
+import { emulateMobile } from "../testing/viewport.js";
 import { SubscriptionsPage } from "./SubscriptionsPage.js";
 
 const streamflix: SubscriptionDTO = {
@@ -138,5 +139,50 @@ describe("SubscriptionsPage", () => {
     vi.stubGlobal("fetch", vi.fn(async () => json({ error: "boom" }, 500)));
     renderWithProviders(<SubscriptionsPage />);
     expect(await screen.findByText("No pudimos calcular las suscripciones.")).toBeInTheDocument();
+  });
+});
+
+describe("SubscriptionsPage en mobile", () => {
+  beforeEach(() => emulateMobile());
+
+  it("muestra tarjetas en lugar de tablas", async () => {
+    serve(report);
+    renderWithProviders(<SubscriptionsPage />);
+    const card = await screen.findByRole("article", { name: "MUSICAPP" });
+    expect(within(card).getByText("+10,0%")).toBeInTheDocument();
+    expect(within(card).getByText("ICBC · Suscripciones")).toBeInTheDocument();
+    expect(within(card).getByText("Por mes")).toBeInTheDocument();
+    const stopped = screen.getByRole("article", { name: "GIMNASIO NORTE" });
+    expect(within(stopped).getByText("Último monto")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("ocultar desde la tarjeta manda el PUT", async () => {
+    serve(report);
+    renderWithProviders(<SubscriptionsPage />);
+    const card = await screen.findByRole("article", { name: "STREAMFLIX.COM" });
+    await userEvent.click(within(card).getByRole("button", { name: "Ocultar STREAMFLIX.COM" }));
+    await waitFor(() => expect(mutations()).toEqual(["PUT /api/subscriptions/hidden/STREAMFLIX%20COM"]));
+  });
+
+  it("el detalle trae el próximo cobro, el aumento y el link a movimientos", async () => {
+    serve(report);
+    renderWithProviders(<SubscriptionsPage />);
+    const card = await screen.findByRole("article", { name: "MUSICAPP" });
+    await userEvent.click(within(card).getByRole("button", { name: "Ver detalle" }));
+    expect(within(card).getByText("2026-09-12")).toBeInTheDocument();
+    expect(
+      within(card).getByText(`${money(4990, "ARS")} → ${money(5490, "ARS")} desde marzo de 2026`),
+    ).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Ver movimientos de MUSICAPP" }))
+      .toHaveAttribute("href", "/transactions?year=all&search=MUSICAPP");
+  });
+
+  it("la moneda anterior aparece en el detalle", async () => {
+    serve(report);
+    renderWithProviders(<SubscriptionsPage />);
+    const card = await screen.findByRole("article", { name: "STREAMFLIX.COM" });
+    await userEvent.click(within(card).getByRole("button", { name: "Ver detalle" }));
+    expect(within(card).getByText("Antes se cobraba en pesos")).toBeInTheDocument();
   });
 });
