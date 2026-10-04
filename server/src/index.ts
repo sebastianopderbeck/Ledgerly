@@ -4,6 +4,8 @@ import { createApp } from "./http/app.js";
 import { serveClient } from "./http/serveClient.js";
 import { resolveListenOptions } from "./http/listenOptions.js";
 import { connectMongo } from "./db/connection.js";
+import { describeGmailSetup, readGmailConfig } from "./gmail/gmailConfig.js";
+import { startGmailJob } from "./gmail/gmailJob.js";
 
 const { port, host } = resolveListenOptions(process.env);
 const MONGO_URL = process.env.MONGO_URL ?? "mongodb://localhost:27017/ledgerly";
@@ -22,3 +24,7 @@ if (host) {
 } else {
   app.listen(port, logListening);
 }
+
+console.log(describeGmailSetup(process.env));
+const gmailConfig = readGmailConfig(process.env);
+if (gmailConfig?.intervalMinutes) await startGmailJob(gmailConfig);
