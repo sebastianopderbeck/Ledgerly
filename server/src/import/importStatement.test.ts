@@ -66,9 +66,9 @@ const cuotaRow = (cur: number): ParsedStatement["rows"][number] => ({
   currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
   installmentCurrent: cur, installmentTotal: 12, comprobante: "001061",
 });
-const stmtWith = (rows: ParsedStatement["rows"]): ParsedStatement => ({
+const stmtWith = (rows: ParsedStatement["rows"], closingDate = "2026-07-02"): ParsedStatement => ({
   header: {
-    issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: "2026-07-02", dueDate: "2026-07-14",
+    issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate, dueDate: "2026-07-14",
     totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
       pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
   },
@@ -81,7 +81,7 @@ describe("importStatement dedup entre resúmenes", () => {
   it("no duplica una línea idéntica (misma cuota) presente en dos resúmenes distintos", async () => {
     mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5)]), ...okMeta });
     await importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" });
-    mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5), cuotaRow(6)]), ...okMeta });
+    mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5), cuotaRow(6)], "2026-08-02"), ...okMeta });
     const res = await importStatement({ data: new Uint8Array([2]), fileName: "b.pdf" });
     expect(res.transactionCount).toBe(1);
     expect(await TransactionModel.countDocuments()).toBe(2);
@@ -90,8 +90,50 @@ describe("importStatement dedup entre resúmenes", () => {
   it("conserva cuotas distintas de la misma compra (no son duplicados)", async () => {
     mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5)]), ...okMeta });
     await importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" });
-    mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(6)]), ...okMeta });
+    mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(6)], "2026-08-02"), ...okMeta });
     await importStatement({ data: new Uint8Array([2]), fileName: "b.pdf" });
     expect(await TransactionModel.countDocuments()).toBe(2);
+  });
+});
+
+describe("importStatement dedup por clave natural", () => {
+  it("la misma tarjeta y el mismo cierre con otros bytes es duplicate, sin segundo resumen", async () => {
+    await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "home-banking.pdf" });
+    const res = await importStatement({ data: new Uint8Array([4, 5, 6]), fileName: "mail.pdf" });
+    const only = await StatementModel.findOne();
+    expect(res.status).toBe("duplicate");
+    expect(res.statementId).toBe(only?._id.toString());
+    expect(res.transactionCount).toBe(2);
+    expect(only?.sourceFileName).toBe("home-banking.pdf");
+    expect(await StatementModel.countDocuments()).toBe(1);
+  });
+
+  it("con replace reemplaza el resumen de la misma tarjeta y cierre", async () => {
+    await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "home-banking.pdf" });
+    const res = await importStatement({ data: new Uint8Array([4, 5, 6]), fileName: "mail.pdf", replace: true });
+    expect(res.status).toBe("imported");
+    expect(res.transactionCount).toBe(2);
+    expect(await StatementModel.countDocuments()).toBe(1);
+    expect((await StatementModel.findOne())?.sourceFileName).toBe("mail.pdf");
+    expect(await TransactionModel.countDocuments()).toBe(2);
+  });
+
+  it("otra tarjeta con el mismo cierre no es duplicado", async () => {
+    await importStatement({ data: new Uint8Array([1]), fileName: "icbc.pdf" });
+    mocked.mockResolvedValueOnce({
+      statement: { ...parsed, header: { ...parsed.header, issuer: "visa_signature", cardLabel: "Visa Signature ****1234" } },
+      ...okMeta,
+    });
+    const res = await importStatement({ data: new Uint8Array([2]), fileName: "visa.pdf" });
+    expect(res.status).toBe("imported");
+    expect(await StatementModel.countDocuments()).toBe(2);
+  });
+
+  it("sin fecha de cierre no deduplica por clave natural", async () => {
+    mocked.mockResolvedValue({ statement: { ...parsed, header: { ...parsed.header, closingDate: null } }, ...okMeta });
+    await importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    const res = await importStatement({ data: new Uint8Array([2]), fileName: "b.pdf" });
+    expect(res.status).toBe("imported");
+    expect(await StatementModel.countDocuments()).toBe(2);
   });
 });

@@ -1,4 +1,5 @@
-import type { ExtractedPdf } from "@ledgerly/shared";
+import type { ExtractedPdf, ParsedStatement } from "@ledgerly/shared";
+import type { Types } from "mongoose";
 import { createHash } from "node:crypto";
 import { parseStatement } from "../ingestion/parseStatement.js";
 import { CategoryRuleModel, StatementModel, TransactionModel } from "../db/models.js";
@@ -15,28 +16,49 @@ export function fingerprintOf(
     .digest("hex");
 }
 
+interface ImportStatementResult {
+  status: "imported" | "duplicate";
+  statementId: string;
+  transactionCount: number;
+}
+
+const duplicateOf = async (statementId: Types.ObjectId): Promise<ImportStatementResult> => ({
+  status: "duplicate",
+  statementId: statementId.toString(),
+  transactionCount: await TransactionModel.countDocuments({ statementId }),
+});
+
+const removeStatement = async (statementId: Types.ObjectId): Promise<void> => {
+  await TransactionModel.deleteMany({ statementId });
+  await StatementModel.deleteOne({ _id: statementId });
+};
+
+const findSameStatement = async (header: ParsedStatement["header"]) => {
+  if (!header.closingDate) return null;
+  return StatementModel.findOne({
+    issuer: header.issuer,
+    cardLabel: header.cardLabel,
+    closingDate: new Date(header.closingDate),
+  });
+};
+
 export async function importStatement(input: {
   data: Uint8Array;
   fileName: string;
   replace?: boolean;
   extracted?: ExtractedPdf;
-}): Promise<{ status: "imported" | "duplicate"; statementId: string; transactionCount: number }> {
+}): Promise<ImportStatementResult> {
   const sourceHash = createHash("sha256").update(input.data).digest("hex");
 
-  const existing = await StatementModel.findOne({ sourceHash });
-  if (existing && !input.replace) {
-    return {
-      status: "duplicate",
-      statementId: existing._id.toString(),
-      transactionCount: await TransactionModel.countDocuments({ statementId: existing._id }),
-    };
-  }
-  if (existing && input.replace) {
-    await TransactionModel.deleteMany({ statementId: existing._id });
-    await StatementModel.deleteOne({ _id: existing._id });
-  }
+  const sameFile = await StatementModel.findOne({ sourceHash });
+  if (sameFile && !input.replace) return duplicateOf(sameFile._id);
+  if (sameFile) await removeStatement(sameFile._id);
 
   const { statement, reconciliation, meta } = await parseStatement(input.data, input.extracted);
+  const sameStatement = await findSameStatement(statement.header);
+  if (sameStatement && !input.replace) return duplicateOf(sameStatement._id);
+  if (sameStatement) await removeStatement(sameStatement._id);
+
   const rules = (await CategoryRuleModel.find({ enabled: true }).lean()) as unknown as RuleInput[];
 
   const created = await StatementModel.create({
