@@ -32,8 +32,14 @@ const captionSx = { display: "block" };
 
 const dash = <Typography component="span" color="text.disabled">—</Typography>;
 
-const SubscriptionRow = ({ item, variant, onHide }: SubscriptionRowProps) => {
-  const { key, nombre, busqueda, moneda, montoActual, montoMensualArs, primerCobro, ultimoCobro, proximoCobro, aumento, monedaAnterior } = item;
+const SubscriptionRow = ({
+  item: {
+    key, nombre, busqueda, categoria, cardLabel, moneda, montoActual, montoMensualArs,
+    primerCobro, ultimoCobro, proximoCobro, aumento, monedaAnterior,
+  },
+  variant,
+  onHide,
+}: SubscriptionRowProps) => {
   const isActive = variant === "activas";
   const previousCurrency = monedaAnterior && (
     <Typography variant="caption" color="text.secondary" sx={captionSx}>{previousCurrencyLabel(monedaAnterior)}</Typography>
@@ -44,12 +50,13 @@ const SubscriptionRow = ({ item, variant, onHide }: SubscriptionRowProps) => {
   const variation = aumento
     ? <Chip size="small" color="warning" label={increaseLabel(aumento)} title={increaseDetail(aumento, montoActual, moneda)} />
     : dash;
+  const variationCell = isActive && <TableCell>{variation}</TableCell>;
 
   return (
     <MotionTableRow variants={fadeUpItem}>
       <TableCell>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>{nombre}</Typography>
-        <Typography variant="caption" color="text.secondary" sx={captionSx}>{subscriptionMeta(item)}</Typography>
+        <Typography variant="caption" color="text.secondary" sx={captionSx}>{subscriptionMeta({ cardLabel, categoria })}</Typography>
         {previousCurrency}
       </TableCell>
       <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>{formatMoney(montoActual, moneda)}</TableCell>
@@ -59,7 +66,7 @@ const SubscriptionRow = ({ item, variant, onHide }: SubscriptionRowProps) => {
         {ultimoCobro}
         {nextCharge}
       </TableCell>
-      {isActive && <TableCell>{variation}</TableCell>}
+      {variationCell}
       <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
         <Tooltip title="Ocultar: no es una suscripción" describeChild>
           <IconButton aria-label={`Ocultar ${nombre}`} onClick={() => onHide(key)}>
@@ -75,7 +82,7 @@ const SubscriptionRow = ({ item, variant, onHide }: SubscriptionRowProps) => {
 };
 
 export const SubscriptionsTable = ({ items, variant, onHide }: SubscriptionListProps) => {
-  const isActive = variant === "activas";
+  const variationHeader = variant === "activas" && <TableCell>Variación</TableCell>;
   const rows = items.map((item) => <SubscriptionRow key={item.key} item={item} variant={variant} onHide={onHide} />);
 
   return (
@@ -88,7 +95,7 @@ export const SubscriptionsTable = ({ items, variant, onHide }: SubscriptionListP
             <TableCell align="right">En pesos</TableCell>
             <TableCell>Desde</TableCell>
             <TableCell>Último cobro</TableCell>
-            {isActive && <TableCell>Variación</TableCell>}
+            {variationHeader}
             <TableCell align="right" aria-label="Acciones" />
           </TableRow>
         </TableHead>

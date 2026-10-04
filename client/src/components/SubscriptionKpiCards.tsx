@@ -19,9 +19,10 @@ const money = (value: number): string => formatMoney(value, "ARS");
 
 const count = (value: number): string => String(Math.round(value));
 
-export const SubscriptionKpiCards = ({ report, sections }: SubscriptionKpiCardsProps) => {
-  const { cotizacionOficial, totalMensualArs, totalMensualUsd, totalAnualArs } = report;
-  const { activas, cortadas, subieron, ahorroMensualArs } = sections;
+export const SubscriptionKpiCards = ({
+  report: { cotizacionOficial, totalMensualArs, totalMensualUsd, totalAnualArs },
+  sections: { activas, cortadas, subieron, ahorroMensualArs },
+}: SubscriptionKpiCardsProps) => {
   const monthlySub = monthlyKpiSub(activas.length, totalMensualUsd, cotizacionOficial);
   const stoppedSub = ahorroMensualArs > 0 ? `${money(ahorroMensualArs)} menos por mes` : WINDOW_LABEL;
 

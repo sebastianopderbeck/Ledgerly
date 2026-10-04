@@ -59,17 +59,16 @@ const detailsOf = (item: SubscriptionDTO, variant: SubscriptionVariant): RecordF
 };
 
 const SubscriptionCard = ({ item, variant, onHide }: SubscriptionCardProps) => {
-  const { key, nombre, aumento } = item;
-  const badge = aumento ? <Chip size="small" color="warning" label={increaseShortLabel(aumento)} /> : undefined;
+  const badge = item.aumento ? <Chip size="small" color="warning" label={increaseShortLabel(item.aumento)} /> : undefined;
   const action = (
-    <IconButton aria-label={`Ocultar ${nombre}`} onClick={() => onHide(key)} sx={iconTapTargetSx}>
+    <IconButton aria-label={`Ocultar ${item.nombre}`} onClick={() => onHide(item.key)} sx={iconTapTargetSx}>
       <VisibilityOffOutlinedIcon />
     </IconButton>
   );
 
   return (
     <RecordCard
-      title={nombre}
+      title={item.nombre}
       meta={subscriptionMeta(item)}
       badge={badge}
       action={action}
