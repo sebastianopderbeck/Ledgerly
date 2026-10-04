@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { CategoryRuleDTO, InboxRuleResultDTO, UncategorizedGroupDTO, UncategorizedInboxDTO } from "@ledgerly/shared";
+import { cssFor } from "../testing/cssFor.js";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
+import { emulateMobile } from "../testing/viewport.js";
 import { UncategorizedInbox } from "./UncategorizedInbox.js";
 
 const group = (overrides: Partial<UncategorizedGroupDTO>): UncategorizedGroupDTO => ({
@@ -201,5 +203,71 @@ describe("UncategorizedInbox en compu", () => {
     renderInbox();
     expect(await screen.findByText("Sin cotización del dólar cargada: los montos en USD no cuentan para ordenar por monto."))
       .toBeInTheDocument();
+  });
+});
+
+describe("UncategorizedInbox en mobile", () => {
+  beforeEach(() => emulateMobile());
+
+  it("muestra los comercios como lista, sin tabla", async () => {
+    renderInbox();
+    expect(await screen.findByRole("button", { name: /PANADERIA LA ESPIGA/ })).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("tocar un comercio abre su hoja; elegir categoría y crear manda el POST y la cierra", async () => {
+    renderInbox();
+    await userEvent.click(await screen.findByRole("button", { name: /PANADERIA LA ESPIGA/ }));
+    const sheet = screen.getByRole("dialog", { name: "PANADERIA LA ESPIGA" });
+    await userEvent.click(await within(sheet).findByRole("button", { name: "Comida" }));
+    await userEvent.click(within(sheet).getByRole("button", { name: "Crear regla" }));
+    await waitFor(() => expect(posts()).toEqual([
+      { url: "/api/category-rules/inbox/rules", body: { pattern: "PANADERIA LA ESPIGA", category: "Comida" } },
+    ]));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "PANADERIA LA ESPIGA" })).not.toBeInTheDocument());
+    expect(await screen.findByText("Regla «PANADERIA LA ESPIGA» → Comida: 6 movimientos categorizados.")).toBeInTheDocument();
+  });
+
+  it("si el server rechaza la regla la hoja queda abierta y muestra el error", async () => {
+    respondCreate = async () => jsonResponse({ error: "Elegí una categoría" }, 400);
+    renderInbox();
+    await userEvent.click(await screen.findByRole("button", { name: /PANADERIA LA ESPIGA/ }));
+    const sheet = screen.getByRole("dialog", { name: "PANADERIA LA ESPIGA" });
+    await userEvent.click(await within(sheet).findByRole("button", { name: "Comida" }));
+    await userEvent.click(within(sheet).getByRole("button", { name: "Crear regla" }));
+    expect(await screen.findByText("Elegí una categoría")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "PANADERIA LA ESPIGA" })).toBeInTheDocument();
+  });
+
+  it("los toggles de orden, «Mostrar todos» y los botones de la hoja miden 44px", async () => {
+    currentInbox = inboxOf(manyGroups);
+    renderInbox();
+    expect(cssFor(await screen.findByRole("button", { name: "Mostrar todos (10)" }))).toContain("min-height:44px");
+    expect(cssFor(screen.getByRole("button", { name: "Monto" }))).toContain("min-height:44px");
+    expect(cssFor(screen.getByRole("button", { name: "Frecuencia" }))).toContain("min-height:44px");
+    await userEvent.click(screen.getByRole("button", { name: /COMERCIO ALFA/ }));
+    const sheet = screen.getByRole("dialog", { name: "COMERCIO ALFA" });
+    expect(cssFor(await within(sheet).findByRole("button", { name: "Comida" }))).toContain("min-height:44px");
+    expect(cssFor(within(sheet).getByRole("button", { name: "Crear regla" }))).toContain("min-height:44px");
+    expect(cssFor(within(sheet).getByRole("link", { name: "Ver movimientos" }))).toContain("min-height:44px");
+  });
+
+  it("un comercio largo va en una sola línea", async () => {
+    const longName = "COMERCIO CON UN NOMBRE MUY MUY LARGO QUE NO ENTRA EN EL CELULAR";
+    currentInbox = inboxOf([group({ pattern: "COMERCIO CON UN", merchants: [longName] })]);
+    renderInbox();
+    expect(await screen.findByText(longName)).toHaveClass("MuiTypography-noWrap");
+  });
+
+  it("el aviso queda arriba de la barra inferior", async () => {
+    renderInbox();
+    await userEvent.click(await screen.findByRole("button", { name: /KIOSCO EL SOL/ }));
+    const sheet = screen.getByRole("dialog", { name: "KIOSCO EL SOL" });
+    await userEvent.click(await within(sheet).findByRole("button", { name: "Comida" }));
+    await userEvent.click(within(sheet).getByRole("button", { name: "Crear regla" }));
+    await waitFor(() => expect(document.querySelector(".MuiSnackbar-root")).toBeInTheDocument());
+    const css = cssFor(document.querySelector(".MuiSnackbar-root")!);
+    expect(css).toContain("env(safe-area-inset-bottom)");
+    expect(css).toContain("64px");
   });
 });

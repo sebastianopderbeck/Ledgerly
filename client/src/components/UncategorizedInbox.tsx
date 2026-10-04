@@ -5,9 +5,12 @@ import {
 import type { SxProps, Theme } from "@mui/material/styles";
 import type { CategoryRuleDTO } from "@ledgerly/shared";
 import { INBOX_PREVIEW_SIZE, inboxSummary, missingUsdRate, pendingLabel, type InboxOrder } from "../uncategorizedInbox.js";
+import { useIsMobile } from "../useIsMobile.js";
 import { compactCardContentSx } from "./compactCardContentSx.js";
+import { InboxList } from "./InboxList.js";
 import { InboxTable } from "./InboxTable.js";
 import { snackbarAboveNavSx } from "./snackbarSx.js";
+import { MIN_TAP_SIZE, tapTargetSx } from "./tapTarget.js";
 import { useInboxSection } from "./useInboxSection.js";
 
 interface UncategorizedInboxProps {
@@ -27,8 +30,12 @@ const ORDER_OPTIONS: OrderOption[] = [
 const SNACKBAR_ANCHOR = { vertical: "bottom", horizontal: "center" } as const;
 
 const headerSx: SxProps<Theme> = { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1, mb: 2 };
+const orderDesktopSx: SxProps<Theme> = { ml: "auto" };
+const showAllSx: SxProps<Theme> = { mt: 1 };
+const showAllMobileSx: SxProps<Theme> = { mt: 1, minHeight: MIN_TAP_SIZE };
 
 export const UncategorizedInbox = ({ rules }: UncategorizedInboxProps) => {
+  const isMobile = useIsMobile();
   const titleId = useId();
   const {
     inbox, isLoading, error, order, changeOrder, showAll, toggleShowAll, visibleGroups, allGroups, categories,
@@ -43,16 +50,30 @@ export const UncategorizedInbox = ({ rules }: UncategorizedInboxProps) => {
   const isEmpty = allGroups.length === 0;
   const hasMore = allGroups.length > INBOX_PREVIEW_SIZE;
   const showAllLabel = showAll ? "Mostrar menos" : `Mostrar todos (${allGroups.length})`;
+  const InboxView = isMobile ? InboxList : InboxTable;
   const orderButtons = ORDER_OPTIONS.map((option) => (
-    <ToggleButton key={option.value} value={option.value}>{option.label}</ToggleButton>
+    <ToggleButton key={option.value} value={option.value} sx={isMobile ? tapTargetSx : undefined}>{option.label}</ToggleButton>
   ));
   const summary = !isEmpty && (
     <Typography variant="body2" color="text.secondary">{inboxSummary(pendingCount, allGroups.length)}</Typography>
   );
   const orderPicker = !isEmpty && (
-    <ToggleButtonGroup exclusive size="small" value={order} onChange={changeOrder} aria-label="Ordenar por" sx={{ ml: "auto" }}>
+    <ToggleButtonGroup
+      exclusive
+      size="small"
+      fullWidth={isMobile}
+      value={order}
+      onChange={changeOrder}
+      aria-label="Ordenar por"
+      sx={isMobile ? undefined : orderDesktopSx}
+    >
       {orderButtons}
     </ToggleButtonGroup>
+  );
+  const showAllButton = hasMore && (
+    <Button size="small" fullWidth={isMobile} onClick={toggleShowAll} sx={isMobile ? showAllMobileSx : showAllSx}>
+      {showAllLabel}
+    </Button>
   );
   const usdWarning = missingUsdRate(inbox) && (
     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
@@ -63,8 +84,8 @@ export const UncategorizedInbox = ({ rules }: UncategorizedInboxProps) => {
     <Typography color="text.secondary">No quedan movimientos sin categoría.</Typography>
   ) : (
     <>
-      <InboxTable groups={visibleGroups} allGroups={allGroups} categories={categories} creating={creating} onCreate={createRule} />
-      {hasMore && <Button size="small" onClick={toggleShowAll} sx={{ mt: 1 }}>{showAllLabel}</Button>}
+      <InboxView groups={visibleGroups} allGroups={allGroups} categories={categories} creating={creating} onCreate={createRule} />
+      {showAllButton}
       {usdWarning}
     </>
   );
