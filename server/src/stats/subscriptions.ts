@@ -3,10 +3,13 @@ import {
   type Currency,
   type Direction,
   type Issuer,
+  type SubscriptionDTO,
   type SubscriptionIncrease,
+  type SubscriptionsReportDTO,
   type TxType,
 } from "@ledgerly/shared";
-import { addMonths, addMonthsClamped, daysBetween, monthOf } from "./months.js";
+import { canonicalMerchantKeys, merchantDisplayName, merchantKey, merchantSearchTerm } from "./merchantKey.js";
+import { addDays, addMonths, addMonthsClamped, daysBetween, monthOf } from "./months.js";
 
 export { addMonthsClamped };
 
@@ -44,7 +47,18 @@ export interface Charge extends SubscriptionTx {
   key: string;
 }
 
+type SubscriptionTotals = Pick<SubscriptionsReportDTO, "totalMensualArs" | "totalMensualUsd" | "totalAnualArs">;
+
+interface KeyedTx {
+  tx: SubscriptionTx;
+  rawKey: string;
+}
+
 const LOG_PARECIDO = Math.log(1 + VARIACION_PARECIDA);
+
+const roundCents = (value: number): number => Math.round(value * 100) / 100;
+
+const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
 const byDate = (a: Charge, b: Charge): number => a.date.localeCompare(b.date);
 
@@ -166,4 +180,102 @@ export function priceIncrease(run: Charge[]): SubscriptionIncrease | null {
   const variacion = last.amount / reference.amount - 1;
   if (variacion < UMBRAL_AUMENTO) return null;
   return { variacion, desde: monthOf(reference.date), montoAnterior: reference.amount };
+}
+
+const isValidRun = (run: Charge[]): boolean => run.length >= MIN_COBROS && similarAmounts(run);
+
+const isEligibleDebit = ({ type, direction, isInstallment, amount }: SubscriptionTx): boolean =>
+  type === "purchase" && direction === "debit" && !isInstallment && amount > 0;
+
+const isRefundCredit = ({ type, direction }: SubscriptionTx): boolean =>
+  direction === "credit" && (type === "purchase" || type === "refund");
+
+const keyed = (txs: SubscriptionTx[]): KeyedTx[] =>
+  txs.map((tx) => ({ tx, rawKey: merchantKey(tx.merchant) })).filter(({ rawKey }) => rawKey !== "");
+
+const hasLaterSimilar = (charges: Charge[], last: Charge): boolean =>
+  charges.some((charge) => monthOf(charge.date) > monthOf(last.date) && isSimilar(last, charge));
+
+const statusOf = (last: Charge, proximoCobro: string, { ultimoCierre }: SubscriptionContext): SubscriptionDTO["estado"] => {
+  const cierre = ultimoCierre[last.issuer];
+  return cierre !== undefined && addDays(proximoCobro, GRACIA_DIAS) < cierre ? "cortada" : "activa";
+};
+
+const monthlyArs = ({ amount, currency }: Charge, cotizacion: number | null): number | null => {
+  if (currency === "ARS") return amount;
+  return cotizacion === null ? null : roundCents(amount * cotizacion);
+};
+
+const previousCurrency = (run: Charge[], last: Charge): Currency | null =>
+  run.find(({ currency }) => currency !== last.currency)?.currency ?? null;
+
+const isHidden = (key: string, rawKeys: ReadonlySet<string>, ocultas: ReadonlySet<string>): boolean =>
+  ocultas.has(key) || [...rawKeys].some((rawKey) => ocultas.has(rawKey));
+
+const subscriptionOf = (charges: Charge[], rawKeys: ReadonlySet<string>, ctx: SubscriptionContext): SubscriptionDTO | null => {
+  const run = monthlyRuns(charges).filter(isValidRun).at(-1);
+  if (run === undefined) return null;
+  const first = run[0];
+  const last = run[run.length - 1];
+  if (hasLaterSimilar(charges, last)) return null;
+  const proximoCobro = addMonthsClamped(last.date, 1);
+  const estado = statusOf(last, proximoCobro, ctx);
+  if (estado === "cortada" && last.date < addMonthsClamped(ctx.hoy, -VENTANA_CORTADAS_MESES)) return null;
+  return {
+    key: last.key,
+    nombre: merchantDisplayName(last.merchant),
+    busqueda: merchantSearchTerm(run.map(({ merchant }) => merchant).reverse()),
+    categoria: last.category,
+    cardLabel: last.cardLabel,
+    moneda: last.currency,
+    montoActual: last.amount,
+    montoMensualArs: monthlyArs(last, ctx.cotizacion),
+    primerCobro: first.date,
+    ultimoCobro: last.date,
+    proximoCobro,
+    cobros: run.length,
+    estado,
+    oculta: isHidden(last.key, rawKeys, ctx.ocultas),
+    aumento: priceIncrease(run),
+    monedaAnterior: previousCurrency(run, last),
+  };
+};
+
+const compareMonthlyArs = (a: number | null, b: number | null): number => {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return b - a;
+};
+
+const compareSubscriptions = (a: SubscriptionDTO, b: SubscriptionDTO): number => {
+  if (a.estado !== b.estado) return a.estado === "activa" ? -1 : 1;
+  if (a.estado === "cortada") return b.ultimoCobro.localeCompare(a.ultimoCobro);
+  return compareMonthlyArs(a.montoMensualArs, b.montoMensualArs) || a.nombre.localeCompare(b.nombre);
+};
+
+export function detectSubscriptions(txs: SubscriptionTx[], ctx: SubscriptionContext): SubscriptionDTO[] {
+  const debitRows = keyed(txs.filter(isEligibleDebit));
+  const creditRows = keyed(txs.filter(isRefundCredit));
+  const canonical = canonicalMerchantKeys([...debitRows, ...creditRows].map(({ rawKey }) => rawKey));
+  const canonicalOf = (rawKey: string): string => canonical.get(rawKey) ?? rawKey;
+  const toCharge = ({ tx, rawKey }: KeyedTx): Charge => ({ ...tx, key: canonicalOf(rawKey) });
+  const rowsByGroup = groupBy(debitRows, ({ rawKey }) => canonicalOf(rawKey));
+  const debits = removeRefunded(debitRows.map(toCharge), creditRows.map(toCharge));
+  return [...groupBy(debits, ({ key }) => key)]
+    .flatMap(([key, charges]) => {
+      const rawKeys = new Set((rowsByGroup.get(key) ?? []).map(({ rawKey }) => rawKey));
+      const subscription = subscriptionOf(charges, rawKeys, ctx);
+      return subscription ? [subscription] : [];
+    })
+    .sort(compareSubscriptions);
+}
+
+export function summarizeSubscriptions(items: SubscriptionDTO[]): SubscriptionTotals {
+  const counted = items.filter(({ estado, oculta }) => estado === "activa" && !oculta);
+  const totalMensualArs = roundCents(sum(counted.map(({ montoMensualArs }) => montoMensualArs ?? 0)));
+  const totalMensualUsd = roundCents(
+    sum(counted.filter(({ moneda }) => moneda === "USD").map(({ montoActual }) => montoActual)),
+  );
+  return { totalMensualArs, totalMensualUsd, totalAnualArs: roundCents(totalMensualArs * 12) };
 }
