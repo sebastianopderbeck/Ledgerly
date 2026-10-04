@@ -1,3 +1,7 @@
+import { UNCATEGORIZED_CATEGORY } from "@ledgerly/shared";
+
+export const UNCATEGORIZED = UNCATEGORIZED_CATEGORY;
+
 export interface RuleInput {
   priority: number;
   matchType: "contains" | "regex";
@@ -31,7 +35,19 @@ export function categorize(
   merchant: string,
   rules: RuleInput[],
 ): { category: string; source: "rule" } {
-  return { category: matchRule(descriptionRaw, merchant, rules) ?? "Sin categoría", source: "rule" };
+  return { category: matchRule(descriptionRaw, merchant, rules) ?? UNCATEGORIZED, source: "rule" };
+}
+
+export interface RuleCandidate {
+  id: string;
+  descriptionRaw: string;
+  merchant: string;
+}
+
+export function idsMatchingRule(candidates: RuleCandidate[], rule: RuleInput): string[] {
+  return candidates
+    .filter((candidate) => matchRule(candidate.descriptionRaw, candidate.merchant, [rule]) !== null)
+    .map((candidate) => candidate.id);
 }
 
 export const SEED_RULES: Omit<RuleInput, "enabled">[] = [

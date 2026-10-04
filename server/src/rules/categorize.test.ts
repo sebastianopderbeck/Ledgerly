@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { categorize, matchRule, SEED_RULES } from "./categorize.js";
-import type { RuleInput } from "./categorize.js";
+import { categorize, idsMatchingRule, matchRule, SEED_RULES, UNCATEGORIZED } from "./categorize.js";
+import type { RuleCandidate, RuleInput } from "./categorize.js";
 
 const rules: RuleInput[] = [
   { priority: 1, matchType: "contains", pattern: "NETFLIX", category: "Suscripciones", enabled: true },
@@ -44,5 +44,42 @@ describe("SEED_RULES", () => {
   it("trae reglas de sistema con categoría", () => {
     expect(SEED_RULES.length).toBeGreaterThan(3);
     expect(SEED_RULES.every((r) => r.category && r.pattern)).toBe(true);
+  });
+});
+
+describe("UNCATEGORIZED", () => {
+  it("es la categoría de los movimientos sin regla", () => {
+    expect(UNCATEGORIZED).toBe("Sin categoría");
+    expect(categorize("ALGO RARO", "ALGO RARO", []).category).toBe(UNCATEGORIZED);
+  });
+});
+
+describe("idsMatchingRule", () => {
+  const candidates: RuleCandidate[] = [
+    { id: "a", descriptionRaw: "PANADERIA LA ESPIGA 123", merchant: "PANADERIA LA ESPIGA" },
+    { id: "b", descriptionRaw: "MERPAGO*KIOSCO EL SOL", merchant: "KIOSCO EL SOL" },
+    { id: "c", descriptionRaw: "UBER *TRIP HELP.UBER.COM", merchant: "UBER *TRIP HELP.UBER.COM" },
+  ];
+  const contains = (pattern: string): RuleInput => ({ priority: 100, matchType: "contains", pattern, category: "Comida", enabled: true });
+
+  it("matchea por el comercio sin importar mayúsculas", () => {
+    expect(idsMatchingRule(candidates, contains("panaderia la"))).toEqual(["a"]);
+  });
+
+  it("matchea también por la descripción cruda", () => {
+    expect(idsMatchingRule(candidates, contains("MERPAGO*"))).toEqual(["b"]);
+  });
+
+  it("en contains los caracteres de regex valen literal", () => {
+    expect(idsMatchingRule(candidates, contains("UBER *TRIP"))).toEqual(["c"]);
+    expect(idsMatchingRule(candidates, contains("UBER.*SOL"))).toEqual([]);
+  });
+
+  it("sin coincidencias devuelve una lista vacía", () => {
+    expect(idsMatchingRule(candidates, contains("FARMACIA"))).toEqual([]);
+  });
+
+  it("un regex inválido no matchea nada", () => {
+    expect(idsMatchingRule(candidates, { ...contains("("), matchType: "regex" })).toEqual([]);
   });
 });

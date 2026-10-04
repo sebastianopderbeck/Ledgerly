@@ -2,7 +2,7 @@ import { Router } from "express";
 import { HttpError, asyncHandler } from "../errors.js";
 import { CategoryRuleModel, TransactionModel } from "../../db/models.js";
 import { toCategoryRuleDTO } from "../mappers.js";
-import { matchRule, type RuleInput } from "../../rules/categorize.js";
+import { matchRule, UNCATEGORIZED, type RuleInput } from "../../rules/categorize.js";
 
 export const categoryRulesRouter = Router();
 
@@ -55,7 +55,7 @@ categoryRulesRouter.post(
     for (const tx of txs) {
       const matched = matchRule(tx.descriptionRaw, tx.merchant, rules);
       if (matched === null && tx.categorySource === "manual") continue;
-      const category = matched ?? "Sin categoría";
+      const category = matched ?? UNCATEGORIZED;
       if (category !== tx.category || tx.categorySource !== "rule") {
         tx.category = category;
         tx.categorySource = "rule";
