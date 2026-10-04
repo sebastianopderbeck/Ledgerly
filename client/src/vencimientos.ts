@@ -1,7 +1,10 @@
-import type { AutoCouponDTO, Issuer, MortgageCouponDTO, PayslipDTO, StatementDTO } from "@ledgerly/shared";
+import type {
+  AutoCouponDTO, AutoSummaryDTO, CreditSummaryDTO, Issuer, MortgageCouponDTO, PayslipDTO, StatementDTO,
+} from "@ledgerly/shared";
 import { formatMoney, formatUva } from "./format.js";
 import {
-  addDays, addMonths, daysBetween, formatDayMonth, formatMonthYear, lastDayOfMonth, monthOf, weekdayOf,
+  addDays, addMonths, daysBetween, formatDayMonth, formatDayOfMonthLong, formatMonthYear, formatWeekdayShort,
+  lastDayOfMonth, monthOf, startOfWeek, weekdayOf,
 } from "./isoDate.js";
 
 export const MESES_ADELANTE = 2;
@@ -31,6 +34,35 @@ export interface Ocurrencia { mes: string; fecha: string; }
 export interface FechaProyectada { mes: string; fecha: string; paso: number; }
 
 export interface FuenteVencimientos { etiqueta: string; items: Vencimiento[]; desactualizada: boolean; }
+
+export interface VencimientosInput {
+  statements: StatementDTO[];
+  creditCoupons: MortgageCouponDTO[];
+  creditSummary: CreditSummaryDTO | undefined;
+  autoCoupons: AutoCouponDTO[];
+  autoSummary: AutoSummaryDTO | undefined;
+  payslips: PayslipDTO[];
+  uvaHoy: number | null;
+}
+
+export interface VencimientosView { rango: RangoFechas; items: Vencimiento[]; sinEstimar: string[]; }
+
+export interface GrupoVencimientos {
+  clave: string;
+  titulo: string;
+  items: Vencimiento[];
+  totalPagos: number;
+  totalPagosUsd: number;
+  totalCobros: number;
+  pagosAproximados: boolean;
+  cobrosAproximados: boolean;
+  aConfirmar: number;
+}
+
+interface Agrupador {
+  clave: (fecha: string) => string;
+  titulo: (clave: string, hoy: string) => string;
+}
 
 type DatosVencimiento = Pick<Vencimiento, "fecha" | "titulo" | "detalle" | "monto" | "montoUsd">;
 
@@ -279,4 +311,120 @@ export function vencimientosDeSueldo(payslips: PayslipDTO[], rango: RangoFechas)
       montoUsd: null,
     }),
   }, rango)];
+}
+
+const ORDEN_SENTIDO: Record<VencimientoSentido, number> = { cobro: 0, pago: 1 };
+
+const compararVencimientos = (a: Vencimiento, b: Vencimiento): number =>
+  a.fecha.localeCompare(b.fecha) || ORDEN_SENTIDO[a.sentido] - ORDEN_SENTIDO[b.sentido] || a.titulo.localeCompare(b.titulo);
+
+export function listVencimientos(input: VencimientosInput, rango: RangoFechas): VencimientosView {
+  const fuentes = [
+    ...vencimientosDeTarjetas(input.statements, rango),
+    ...vencimientosDeCredito(input.creditCoupons, input.creditSummary?.cuotasTotales ?? null, input.uvaHoy, rango),
+    ...vencimientosDeAuto(input.autoCoupons, input.autoSummary?.cuotasTotales ?? null, rango),
+    ...vencimientosDeSueldo(input.payslips, rango),
+  ];
+  return {
+    rango,
+    items: fuentes.flatMap(({ items }) => items).sort(compararVencimientos),
+    sinEstimar: fuentes.filter(({ desactualizada }) => desactualizada).map(({ etiqueta }) => etiqueta),
+  };
+}
+
+export function hayDocumentos({ statements, creditCoupons, autoCoupons, payslips }: VencimientosInput): boolean {
+  return statements.length + creditCoupons.length + autoCoupons.length + payslips.length > 0;
+}
+
+export const isAgrupacion = (value: unknown): value is Agrupacion => value === "semana" || value === "mes";
+
+const capitalizar = (texto: string): string => texto.charAt(0).toUpperCase() + texto.slice(1);
+
+const tituloSemana = (clave: string, hoy: string): string => {
+  const estaSemana = startOfWeek(hoy);
+  if (clave === estaSemana) return "Esta semana";
+  if (clave === addDays(estaSemana, 7)) return "La semana que viene";
+  return `Semana del ${formatDayOfMonthLong(clave)}`;
+};
+
+const tituloMes = (clave: string, hoy: string): string =>
+  clave === monthOf(hoy) ? "Este mes" : capitalizar(formatMonthYear(clave));
+
+const AGRUPADORES: Record<Agrupacion, Agrupador> = {
+  semana: { clave: startOfWeek, titulo: tituloSemana },
+  mes: { clave: monthOf, titulo: tituloMes },
+};
+
+const sumar = (items: Vencimiento[], valor: (item: Vencimiento) => number | null): number =>
+  items.reduce((total, item) => total + (valor(item) ?? 0), 0);
+
+const hayEstimadoConMonto = (items: Vencimiento[]): boolean =>
+  items.some(({ estado, monto }) => estado === "estimado" && monto !== null);
+
+const armarGrupo = (clave: string, titulo: string, items: Vencimiento[]): GrupoVencimientos => {
+  const pagos = items.filter(({ sentido }) => sentido === "pago");
+  const cobros = items.filter(({ sentido }) => sentido === "cobro");
+  return {
+    clave,
+    titulo,
+    items,
+    totalPagos: sumar(pagos, ({ monto }) => monto),
+    totalPagosUsd: sumar(pagos, ({ montoUsd }) => montoUsd),
+    totalCobros: sumar(cobros, ({ monto }) => monto),
+    pagosAproximados: hayEstimadoConMonto(pagos),
+    cobrosAproximados: hayEstimadoConMonto(cobros),
+    aConfirmar: items.filter(({ monto }) => monto === null).length,
+  };
+};
+
+export function agruparVencimientos(items: Vencimiento[], agrupacion: Agrupacion, hoy: string): GrupoVencimientos[] {
+  const { clave: claveDe, titulo } = AGRUPADORES[agrupacion];
+  const porClave = new Map<string, Vencimiento[]>();
+  for (const item of items) {
+    const clave = claveDe(item.fecha);
+    porClave.set(clave, [...(porClave.get(clave) ?? []), item]);
+  }
+  return [...porClave.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([clave, delGrupo]) => armarGrupo(clave, titulo(clave, hoy), delGrupo));
+}
+
+const prefijoAproximado = (aproximado: boolean): string => (aproximado ? "≈ " : "");
+
+const tieneMonto = (items: Vencimiento[], sentido: VencimientoSentido): boolean =>
+  items.some((item) => item.sentido === sentido && item.monto !== null);
+
+export function resumenDeGrupo({
+  items, totalPagos, totalPagosUsd, totalCobros, pagosAproximados, cobrosAproximados, aConfirmar,
+}: GrupoVencimientos): string {
+  const partes = [
+    tieneMonto(items, "pago") ? `Pagos ${prefijoAproximado(pagosAproximados)}${formatMoney(totalPagos, "ARS")}` : null,
+    totalPagosUsd > 0 ? `+ ${formatMoney(totalPagosUsd, "USD")}` : null,
+    tieneMonto(items, "cobro") ? `Cobros ${prefijoAproximado(cobrosAproximados)}${formatMoney(totalCobros, "ARS")}` : null,
+    aConfirmar > 0 ? `${aConfirmar} a confirmar` : null,
+  ];
+  return partes.filter((parte): parte is string => parte !== null).join(" · ");
+}
+
+export function montoTexto({ monto, sentido, estado }: Vencimiento): string {
+  if (monto === null) return "A confirmar";
+  const signo = sentido === "cobro" ? "+" : "";
+  return `${prefijoAproximado(estado === "estimado")}${signo}${formatMoney(monto, "ARS")}`;
+}
+
+export function montoUsdTexto({ montoUsd }: Vencimiento): string | null {
+  return montoUsd === null ? null : `+ ${formatMoney(montoUsd, "USD")}`;
+}
+
+export function etiquetaDia(fecha: string, hoy: string): string {
+  if (fecha === hoy) return "hoy";
+  if (fecha === addDays(hoy, 1)) return "mañana";
+  return formatWeekdayShort(fecha);
+}
+
+export const diaDelMes = (fecha: string): number => Number(fecha.slice(8, 10));
+
+export function notaSinEstimar(sinEstimar: string[]): string | null {
+  if (sinEstimar.length === 0) return null;
+  return `Sin estimar porque no hay documentos de los últimos ${MESES_SIN_DOCUMENTO_MAX} meses: ${sinEstimar.join(", ")}.`;
 }

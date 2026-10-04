@@ -1,6 +1,7 @@
 import type {
   AutoCouponDTO, AutoSummaryDTO, CreditSummaryDTO, Issuer, MacroSeriesDTO, MortgageCouponDTO, PayslipDTO, StatementDTO,
 } from "@ledgerly/shared";
+import type { Vencimiento, VencimientosInput } from "../vencimientos.js";
 
 interface StatementFixture {
   id: string;
@@ -138,4 +139,44 @@ export const macroSeries = (uva: number | null): MacroSeriesDTO => ({
   desde: "2025-01",
   meses: [],
   hoy: { fecha: "2026-10-02", usdOficial: 1_400, uva, tasa30: 30 },
+});
+
+type VencimientoFixture = Partial<Vencimiento> & Pick<Vencimiento, "fecha" | "titulo">;
+
+export const vencimiento = (overrides: VencimientoFixture): Vencimiento => ({
+  id: `${overrides.titulo}-${overrides.fecha}`,
+  tipo: "tarjeta",
+  sentido: "pago",
+  estado: "confirmado",
+  detalle: "Detalle sintético",
+  monto: 100_000,
+  montoUsd: null,
+  ...overrides,
+});
+
+export const entradaVacia = (): VencimientosInput => ({
+  statements: [],
+  creditCoupons: [],
+  creditSummary: undefined,
+  autoCoupons: [],
+  autoSummary: undefined,
+  payslips: [],
+  uvaHoy: null,
+});
+
+export const ejemploVencimientos = (): VencimientosInput => ({
+  statements: [
+    statement({ id: "visa-08", issuer: "visa_signature", closingDate: "2026-07-31", dueDate: "2026-08-13", saldoArs: 700_000, minimoArs: 35_000 }),
+    statement({ id: "visa-09", issuer: "visa_signature", closingDate: "2026-09-01", dueDate: "2026-09-14", saldoArs: 750_000, minimoArs: 37_000 }),
+    statement({
+      id: "visa-10", issuer: "visa_signature", closingDate: "2026-10-02", dueDate: "2026-10-13", saldoArs: 812_000, saldoUsd: 35, minimoArs: 42_000,
+    }),
+    statement({ id: "icbc-09", issuer: "icbc", closingDate: "2026-09-02", dueDate: "2026-09-14", saldoArs: 400_000, minimoArs: 20_000 }),
+  ],
+  creditCoupons: [creditCoupon(22, "2026-07-06"), creditCoupon(23, "2026-08-05"), creditCoupon(24, "2026-09-04")],
+  creditSummary: creditSummary(240),
+  autoCoupons: [autoCoupon(23, "2026-08-10"), autoCoupon(24, "2026-09-09"), autoCoupon(25, "2026-10-09", 260_000)],
+  autoSummary: autoSummary(120),
+  payslips: [payslip("2026-06", "2026-07-01"), payslip("2026-07", "2026-07-31"), payslip("2026-08", "2026-09-01")],
+  uvaHoy: 2_000,
 });
