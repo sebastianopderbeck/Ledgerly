@@ -172,6 +172,15 @@ describe("UncategorizedInbox en compu", () => {
     expect(within(row).getByRole("button", { name: "Crear regla" })).toBeDisabled();
   });
 
+  it("las variantes del comercio se describen al pasar el mouse", async () => {
+    renderInbox();
+    await screen.findByRole("table");
+    const name = within(rowOf("STEAMGAMES.COM 4259522985")).getByText("STEAMGAMES.COM 4259522985");
+    await userEvent.hover(name);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("STEAMGAMES.COM 4259522985 · STEAMGAMES.COM 4259518112");
+    expect(name).toHaveAccessibleDescription("STEAMGAMES.COM 4259522985 · STEAMGAMES.COM 4259518112");
+  });
+
   it("«Ver movimientos» lleva a Movimientos filtrado por «Sin categoría» y el comercio", async () => {
     renderInbox();
     const link = await screen.findByRole("link", { name: "ver movimientos de PANADERIA LA ESPIGA" });

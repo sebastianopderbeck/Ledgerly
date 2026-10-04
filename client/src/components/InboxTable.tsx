@@ -32,7 +32,7 @@ const InboxGroupRow = ({ group, allGroups, categories, creating, onCreate }: Inb
   };
   const merchantName = <Typography variant="body2" sx={{ fontWeight: 600 }}>{merchant}</Typography>;
   const merchantLabel = group.merchants.length > 1
-    ? <Tooltip title={group.merchants.join(" · ")}>{merchantName}</Tooltip>
+    ? <Tooltip describeChild title={group.merchants.join(" · ")}>{merchantName}</Tooltip>
     : merchantName;
 
   return (
