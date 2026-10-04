@@ -294,3 +294,90 @@ describe("stats", () => {
     expect(fetchOficialRate).not.toHaveBeenCalled();
   });
 });
+
+describe("installment-purchases", () => {
+  const createStatement = (overrides: Record<string, unknown>) => StatementModel.create({
+    issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: null, dueDate: null,
+    totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+      pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
+    sourceFileName: "x.pdf", sourceHash: `h-${Math.random()}`, pageCount: 1, parserVersion: "1.0.0",
+    needsReview: false, reconciliation: { ok: true, entries: [] },
+    ...overrides,
+  });
+
+  const installmentRow = (statementId: unknown, overrides: Record<string, unknown>) => ({
+    statementId, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-07-20"), descriptionRaw: "R",
+    merchant: "FRAVEGA", category: "Hogar", categorySource: "rule", amount: 700, currency: "ARS",
+    direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 1, installmentTotal: 2,
+    comprobante: "30", fingerprint: `f-${Math.random()}`,
+    ...overrides,
+  });
+
+  const mercadolibre = {
+    id: "ICBC|2026-05-04|MERCADOLIBRE|4|1",
+    cardLabel: "ICBC",
+    merchant: "MERCADOLIBRE",
+    category: "Compras",
+    purchaseDate: "2026-05-04",
+    installmentTotal: 4,
+    installments: [
+      { number: 1, amount: 1500, paymentDate: "2026-06-14" },
+      { number: 2, amount: 1500, paymentDate: "2026-07-14" },
+      { number: 3, amount: 1500, paymentDate: "2026-08-14" },
+      { number: 4, amount: 1500, paymentDate: "2026-09-14" },
+    ],
+  };
+
+  it("arma el cronograma con el vencimiento estimado a 12 días del cierre y deja afuera lo que no es cuota", async () => {
+    const res = await request(app).get("/api/stats/installment-purchases");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([mercadolibre]);
+  });
+
+  it("usa el vencimiento del resumen cuando lo trae", async () => {
+    const statement = await createStatement({ closingDate: new Date("2026-07-28"), dueDate: new Date("2026-08-10") });
+    await TransactionModel.create(installmentRow(statement._id, {}));
+    const res = await request(app).get("/api/stats/installment-purchases");
+    const fravega = res.body.find((purchase: { merchant: string }) => purchase.merchant === "FRAVEGA");
+    expect(fravega.installments).toEqual([
+      { number: 1, amount: 700, paymentDate: "2026-08-10" },
+      { number: 2, amount: 700, paymentDate: "2026-09-10" },
+    ]);
+  });
+
+  it("deja afuera las cuotas en dólares y los créditos", async () => {
+    const statement = await StatementModel.findOne({});
+    await TransactionModel.insertMany([
+      installmentRow(statement!._id, { merchant: "AMAZON", currency: "USD" }),
+      installmentRow(statement!._id, { merchant: "DEVOLUCION", direction: "credit" }),
+    ]);
+    const res = await request(app).get("/api/stats/installment-purchases");
+    expect(res.body).toEqual([mercadolibre]);
+  });
+
+  it("descarta las cuotas de resúmenes sin cierre ni vencimiento", async () => {
+    const statement = await createStatement({});
+    await TransactionModel.create(installmentRow(statement._id, {}));
+    const res = await request(app).get("/api/stats/installment-purchases");
+    expect(res.body).toEqual([mercadolibre]);
+  });
+
+  it("filtra por año de compra", async () => {
+    const other = await request(app).get("/api/stats/installment-purchases?year=2025");
+    expect(other.body).toEqual([]);
+    const same = await request(app).get("/api/stats/installment-purchases?year=2025&year=2026");
+    expect(same.body).toEqual([mercadolibre]);
+  });
+
+  it("respeta la tarjeta", async () => {
+    const otherCard = await request(app).get("/api/stats/installment-purchases?cardLabel=VISA1");
+    expect(otherCard.body).toEqual([]);
+    const icbc = await request(app).get("/api/stats/installment-purchases?cardLabel=ICBC");
+    expect(icbc.body).toEqual([mercadolibre]);
+  });
+
+  it("ignora la moneda del pedido: siempre son cuotas en pesos", async () => {
+    const res = await request(app).get("/api/stats/installment-purchases?currency=USD");
+    expect(res.body).toEqual([mercadolibre]);
+  });
+});

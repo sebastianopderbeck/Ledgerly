@@ -6,6 +6,8 @@ import { computeFutureInstallments, computeFutureInstallmentsDetail, remainingIn
 import { representativeRateDate, consumptionMonth } from "../../stats/monthlyUsd.js";
 import { latestStatementIdsPerIssuer } from "../../stats/lastStatement.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
+import { buildInstallmentPurchases, type InstallmentOccurrence } from "../../stats/installmentPurchases.js";
+import { statementDueDate } from "../../stats/statementDueDate.js";
 import type { Currency, MonthlyUsdStat } from "@ledgerly/shared";
 import { monthInYears, parseYears, yearDateRanges } from "../yearFilter.js";
 
@@ -35,6 +37,37 @@ async function latestStatementInstallmentTxs(q: Record<string, unknown>) {
     })),
   );
   return TransactionModel.find({ type: "purchase", isInstallment: true, statementId: { $in: ids } }).lean();
+}
+
+const isoDay = (date: Date | null | undefined): string | null => (date ? date.toISOString().slice(0, 10) : null);
+
+async function installmentOccurrences(cardLabel: unknown): Promise<InstallmentOccurrence[]> {
+  const statements = await StatementModel.find(typeof cardLabel === "string" ? { cardLabel } : {}).lean();
+  const paymentDates = new Map(statements.map((s) => [
+    String(s._id),
+    statementDueDate({ dueDate: isoDay(s.dueDate), closingDate: isoDay(s.closingDate) }),
+  ]));
+  const txs = await TransactionModel.find({
+    type: "purchase", direction: "debit", currency: "ARS", isInstallment: true,
+    statementId: { $in: statements.map((s) => s._id) },
+  }).lean();
+  return txs.flatMap((t) => {
+    const paymentDate = paymentDates.get(String(t.statementId)) ?? null;
+    const installmentCurrent = t.installmentCurrent ?? null;
+    const installmentTotal = t.installmentTotal ?? null;
+    if (paymentDate === null || installmentCurrent === null || installmentTotal === null) return [];
+    return [{
+      cardLabel: t.cardLabel,
+      merchant: t.merchant,
+      category: t.category,
+      date: t.date.toISOString().slice(0, 10),
+      amount: t.amount,
+      installmentCurrent,
+      installmentTotal,
+      comprobante: t.comprobante ?? null,
+      paymentDate,
+    }];
+  });
 }
 
 export const statsRouter = Router();
@@ -177,4 +210,10 @@ statsRouter.get("/summary", asyncHandler(async (req, res) => {
     statementCount: await StatementModel.countDocuments(typeof cardLabel === "string" ? { cardLabel } : {}),
     futureInstallmentTotal,
   });
+}));
+
+statsRouter.get("/installment-purchases", asyncHandler(async (req, res) => {
+  const years = parseYears(req.query.year);
+  const purchases = buildInstallmentPurchases(await installmentOccurrences(req.query.cardLabel));
+  res.json(purchases.filter((purchase) => monthInYears(purchase.purchaseDate.slice(0, 7), years)));
 }));
