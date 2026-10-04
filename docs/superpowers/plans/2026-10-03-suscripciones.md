@@ -44,7 +44,7 @@
 - Consumes: `addDays`, `addMonths`, `addMonthsClamped`, `daysBetween`, `monthOf` de `./months.js`; `issuerSchema` y los tipos `Currency`, `Direction`, `Issuer`, `SubscriptionIncrease`, `TxType` de `@ledgerly/shared`.
 - Produces: las constantes de «Global Constraints»; `interface SubscriptionTx { date: string; merchant: string; amount: number; currency: Currency; direction: Direction; type: TxType; isInstallment: boolean; category: string; issuer: Issuer; cardLabel: string }`; `interface SubscriptionContext { hoy: string; ultimoCierre: Partial<Record<Issuer, string>>; ocultas: ReadonlySet<string>; cotizacion: number | null }`; `interface Charge extends SubscriptionTx { key: string }`; `latestClosingByIssuer(statements: { issuer: string; closingDate: Date | null }[]): Partial<Record<Issuer, string>>`; `removeRefunded(debits: Charge[], credits: Charge[]): Charge[]`; `monthlyRuns(charges: Charge[]): Charge[][]`; `similarAmounts(run: Charge[]): boolean`; `priceIncrease(run: Charge[]): SubscriptionIncrease | null`; re-export de `addMonthsClamped`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `server/src/stats/subscriptions.test.ts`:
 
@@ -249,12 +249,12 @@ describe("priceIncrease", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bunx vitest run server/src/stats/subscriptions.test.ts`
 Expected: FAIL — `Failed to resolve import "./subscriptions.js"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `server/src/stats/subscriptions.ts`:
 
@@ -430,12 +430,12 @@ export function priceIncrease(run: Charge[]): SubscriptionIncrease | null {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bunx vitest run server/src/stats/subscriptions.test.ts`
 Expected: PASS (todos los `describe`).
 
-- [ ] **Step 5: Typecheck y commit**
+- [x] **Step 5: Typecheck y commit**
 
 Run: `bun run typecheck` → sin errores.
 
@@ -456,7 +456,7 @@ git commit -m "feat(server): rachas mensuales, anulaciones y aumentos para suscr
 - Consumes: todo lo de Task 1; `canonicalMerchantKeys`, `merchantDisplayName`, `merchantKey`, `merchantSearchTerm` de `./merchantKey.js`; `addDays` de `./months.js`; tipos `SubscriptionDTO`, `SubscriptionsReportDTO`.
 - Produces: `detectSubscriptions(txs: SubscriptionTx[], ctx: SubscriptionContext): SubscriptionDTO[]` (ya ordenadas) y `summarizeSubscriptions(items: SubscriptionDTO[]): Pick<SubscriptionsReportDTO, "totalMensualArs" | "totalMensualUsd" | "totalAnualArs">`. Las consume la ruta (Task 3).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `server/src/stats/subscriptions.test.ts`, sumar a los imports `import type { SubscriptionDTO } from "@ledgerly/shared";` y, del módulo, `detectSubscriptions`, `summarizeSubscriptions` y `type SubscriptionContext`. Agregar después de los helpers existentes:
 
@@ -728,12 +728,12 @@ describe("summarizeSubscriptions", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bunx vitest run server/src/stats/subscriptions.test.ts`
 Expected: FAIL — `detectSubscriptions is not a function` (y `summarizeSubscriptions`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 En `server/src/stats/subscriptions.ts`, ampliar los imports:
 
@@ -873,12 +873,12 @@ export function summarizeSubscriptions(items: SubscriptionDTO[]): SubscriptionTo
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bunx vitest run server/src/stats/subscriptions.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Typecheck y commit**
+- [x] **Step 5: Typecheck y commit**
 
 Run: `bun run typecheck` → sin errores.
 
@@ -899,7 +899,7 @@ git commit -m "feat(server): detección de suscripciones y totales mensuales" -m
 - Consumes: `detectSubscriptions`, `latestClosingByIssuer`, `summarizeSubscriptions`, `SubscriptionTx` (Tasks 1-2); `TransactionModel`, `StatementModel`, `HiddenSubscriptionModel` (base); `fetchOficialRate(dateIso): Promise<number | null>`; `HttpError`, `asyncHandler`.
 - Produces: `GET /api/subscriptions` → `200 SubscriptionsReportDTO`; `PUT /api/subscriptions/hidden/:key` → `204` (o `400 { error: "Clave inválida" }`); `DELETE /api/subscriptions/hidden/:key` → `204`. Los consume `useSubscriptions`/`useSetSubscriptionHidden` (base).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `server/src/http/routes/subscriptions.test.ts`:
 
@@ -1031,12 +1031,12 @@ describe("ocultar suscripciones", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bunx vitest run server/src/http/routes/subscriptions.test.ts`
 Expected: FAIL — el stub no tiene handlers: `GET` responde 404 (`expected 404 to be 200`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Reemplazar `server/src/http/routes/subscriptions.ts`:
 
@@ -1106,12 +1106,12 @@ subscriptionsRouter.delete("/hidden/:key", asyncHandler(async (req, res) => {
 }));
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bunx vitest run server/src/http/routes/subscriptions.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Typecheck y commit**
+- [x] **Step 5: Typecheck y commit**
 
 Run: `bun run typecheck` → sin errores.
 
@@ -1132,7 +1132,7 @@ git commit -m "feat(server): API de suscripciones con ocultas en Mongo" -m "Co-A
 - Consumes: `formatMoney`, `formatMonthLabel`, `formatPercent`, `formatSignedPercent` de `./format.js`; `ALL_YEARS` de `./filters/globalFilters.js`; `transactionsLink` de `./filters/transactionsLink.js`; tipos `Currency`, `SubscriptionDTO`, `SubscriptionIncrease` (solo tipos: el cliente no importa valores de `@ledgerly/shared`).
 - Produces: `type SubscriptionVariant = "activas" | "cortadas"`; `interface SubscriptionListProps { items: SubscriptionDTO[]; variant: SubscriptionVariant; onHide: (key: string) => void }`; `interface SubscriptionSections { activas; cortadas; ocultas: SubscriptionDTO[]; subieron: number; ahorroMensualArs: number; conUsd: boolean }`; `AMOUNT_LABEL: Record<SubscriptionVariant, string>`; `subscriptionSections`, `subscriptionMeta`, `increaseLabel`, `increaseShortLabel`, `increaseDetail`, `increaseSinceDetail`, `previousCurrencyLabel`, `activeCountLabel`, `monthlyKpiSub`, `subscriptionTransactionsLink`. Los consumen los componentes y la página (Tasks 5-6).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `client/src/subscriptions.test.ts`:
 
@@ -1259,12 +1259,12 @@ describe("subscriptionTransactionsLink", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bunx vitest run client/src/subscriptions.test.ts`
 Expected: FAIL — `Failed to resolve import "./subscriptions.js"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `client/src/subscriptions.ts`:
 
@@ -1351,12 +1351,12 @@ export function subscriptionTransactionsLink(busqueda: string): string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bunx vitest run client/src/subscriptions.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Typecheck y commit**
+- [x] **Step 5: Typecheck y commit**
 
 Run: `bun run typecheck` → sin errores.
 
@@ -1380,7 +1380,7 @@ git commit -m "feat(client): secciones y textos de la página de suscripciones" 
 - Consumes: `useSubscriptions()` y `useSetSubscriptionHidden()` (base); todo `client/src/subscriptions.ts` (Task 4); `Kpi`, `KpiGrid`, `MotionBox`, `MotionTableBody`, `MotionTableRow`, `fadeUpItem`, `staggerContainer`, `tapTargetSx`; `formatMoney`, `formatMoneyOrDash`.
 - Produces: `SubscriptionKpiCards({ report, sections })`, `SubscriptionsTable(props: SubscriptionListProps)`, `HiddenSubscriptions({ items, onShow })` y la página `SubscriptionsPage`. La tabla lleva `aria-label` «Suscripciones activas» / «Suscripciones que dejaron de cobrarse».
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Crear `client/src/pages/SubscriptionsPage.test.tsx`:
 
@@ -1388,7 +1388,7 @@ Crear `client/src/pages/SubscriptionsPage.test.tsx`:
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { SubscriptionDTO, SubscriptionsReportDTO } from "@ledgerly/shared";
+import type { Currency, SubscriptionDTO, SubscriptionsReportDTO } from "@ledgerly/shared";
 import { formatMoney } from "../format.js";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { SubscriptionsPage } from "./SubscriptionsPage.js";
@@ -1423,6 +1423,8 @@ const report: SubscriptionsReportDTO = {
   items: [streamflix, musicapp, gimnasio, plan],
 };
 
+const money = (amount: number, currency: Currency): string => formatMoney(amount, currency).replace(/\s/g, " ");
+
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -1455,8 +1457,8 @@ describe("SubscriptionsPage", () => {
     expect(screen.getAllByText("Por mes")).toHaveLength(2);
     expect(screen.getByText("Por año")).toBeInTheDocument();
     expect(screen.getByText("Subieron")).toBeInTheDocument();
-    expect(screen.getByText(`2 activas · incluye ${formatMoney(12.99, "USD")} al oficial`)).toBeInTheDocument();
-    expect(screen.getByText(`${formatMoney(30000, "ARS")} menos por mes`)).toBeInTheDocument();
+    expect(screen.getByText(`2 activas · incluye ${money(12.99, "USD")} al oficial`)).toBeInTheDocument();
+    expect(screen.getByText(`${money(30000, "ARS")} menos por mes`)).toBeInTheDocument();
     expect(within(activas).getByText("STREAMFLIX.COM")).toBeInTheDocument();
     expect(within(activas).getByText("Antes se cobraba en pesos")).toBeInTheDocument();
     expect(within(activas).getByText("Subió 10,0% desde marzo de 2026")).toBeInTheDocument();
@@ -1467,7 +1469,7 @@ describe("SubscriptionsPage", () => {
     expect(within(cortadas).getByText("GIMNASIO NORTE")).toBeInTheDocument();
     expect(within(cortadas).getByText("Último monto")).toBeInTheDocument();
     expect(
-      screen.getByText(`Dólares al oficial de hoy (${formatMoney(1465, "ARS")}), sin impuestos ni percepciones.`),
+      screen.getByText(`Dólares al oficial de hoy (${money(1465, "ARS")}), sin impuestos ni percepciones.`),
     ).toBeInTheDocument();
   });
 
@@ -1499,7 +1501,7 @@ describe("SubscriptionsPage", () => {
       items: [musicapp, { ...streamflix, montoMensualArs: null }],
     });
     renderWithProviders(<SubscriptionsPage />);
-    expect(await screen.findByText(`2 activas · sin cotización para ${formatMoney(12.99, "USD")}`)).toBeInTheDocument();
+    expect(await screen.findByText(`2 activas · sin cotización para ${money(12.99, "USD")}`)).toBeInTheDocument();
     expect(screen.queryByText(/Dólares al oficial de hoy/)).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Dejaron de cobrarse" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Ocultas/ })).not.toBeInTheDocument();
@@ -1527,12 +1529,14 @@ describe("SubscriptionsPage", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+> `formatMoney` usa espacio no separable y Testing Library normaliza solo el texto del DOM, no el del matcher: por eso el test compara contra `money()`, que reemplaza `\s` por un espacio común (mismo patrón que `legendCharts.test.tsx`).
+
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bunx vitest run client/src/pages/SubscriptionsPage.test.tsx`
 Expected: FAIL — el stub no pide datos: `Unable to find role="table"` y no hay `progressbar`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `client/src/components/SubscriptionKpiCards.tsx`:
 
@@ -1558,9 +1562,10 @@ const money = (value: number): string => formatMoney(value, "ARS");
 
 const count = (value: number): string => String(Math.round(value));
 
-export const SubscriptionKpiCards = ({ report, sections }: SubscriptionKpiCardsProps) => {
-  const { cotizacionOficial, totalMensualArs, totalMensualUsd, totalAnualArs } = report;
-  const { activas, cortadas, subieron, ahorroMensualArs } = sections;
+export const SubscriptionKpiCards = ({
+  report: { cotizacionOficial, totalMensualArs, totalMensualUsd, totalAnualArs },
+  sections: { activas, cortadas, subieron, ahorroMensualArs },
+}: SubscriptionKpiCardsProps) => {
   const monthlySub = monthlyKpiSub(activas.length, totalMensualUsd, cotizacionOficial);
   const stoppedSub = ahorroMensualArs > 0 ? `${money(ahorroMensualArs)} menos por mes` : WINDOW_LABEL;
 
@@ -1612,8 +1617,14 @@ const captionSx = { display: "block" };
 
 const dash = <Typography component="span" color="text.disabled">—</Typography>;
 
-const SubscriptionRow = ({ item, variant, onHide }: SubscriptionRowProps) => {
-  const { key, nombre, busqueda, moneda, montoActual, montoMensualArs, primerCobro, ultimoCobro, proximoCobro, aumento, monedaAnterior } = item;
+const SubscriptionRow = ({
+  item: {
+    key, nombre, busqueda, categoria, cardLabel, moneda, montoActual, montoMensualArs,
+    primerCobro, ultimoCobro, proximoCobro, aumento, monedaAnterior,
+  },
+  variant,
+  onHide,
+}: SubscriptionRowProps) => {
   const isActive = variant === "activas";
   const previousCurrency = monedaAnterior && (
     <Typography variant="caption" color="text.secondary" sx={captionSx}>{previousCurrencyLabel(monedaAnterior)}</Typography>
@@ -1624,12 +1635,13 @@ const SubscriptionRow = ({ item, variant, onHide }: SubscriptionRowProps) => {
   const variation = aumento
     ? <Chip size="small" color="warning" label={increaseLabel(aumento)} title={increaseDetail(aumento, montoActual, moneda)} />
     : dash;
+  const variationCell = isActive && <TableCell>{variation}</TableCell>;
 
   return (
     <MotionTableRow variants={fadeUpItem}>
       <TableCell>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>{nombre}</Typography>
-        <Typography variant="caption" color="text.secondary" sx={captionSx}>{subscriptionMeta(item)}</Typography>
+        <Typography variant="caption" color="text.secondary" sx={captionSx}>{subscriptionMeta({ cardLabel, categoria })}</Typography>
         {previousCurrency}
       </TableCell>
       <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>{formatMoney(montoActual, moneda)}</TableCell>
@@ -1639,7 +1651,7 @@ const SubscriptionRow = ({ item, variant, onHide }: SubscriptionRowProps) => {
         {ultimoCobro}
         {nextCharge}
       </TableCell>
-      {isActive && <TableCell>{variation}</TableCell>}
+      {variationCell}
       <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
         <Tooltip title="Ocultar: no es una suscripción" describeChild>
           <IconButton aria-label={`Ocultar ${nombre}`} onClick={() => onHide(key)}>
@@ -1655,7 +1667,7 @@ const SubscriptionRow = ({ item, variant, onHide }: SubscriptionRowProps) => {
 };
 
 export const SubscriptionsTable = ({ items, variant, onHide }: SubscriptionListProps) => {
-  const isActive = variant === "activas";
+  const variationHeader = variant === "activas" && <TableCell>Variación</TableCell>;
   const rows = items.map((item) => <SubscriptionRow key={item.key} item={item} variant={variant} onHide={onHide} />);
 
   return (
@@ -1668,7 +1680,7 @@ export const SubscriptionsTable = ({ items, variant, onHide }: SubscriptionListP
             <TableCell align="right">En pesos</TableCell>
             <TableCell>Desde</TableCell>
             <TableCell>Último cobro</TableCell>
-            {isActive && <TableCell>Variación</TableCell>}
+            {variationHeader}
             <TableCell align="right" aria-label="Acciones" />
           </TableRow>
         </TableHead>
@@ -1824,12 +1836,12 @@ export const SubscriptionsPage = () => {
 };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bunx vitest run client/src/pages/SubscriptionsPage.test.tsx client/src/App.test.tsx`
 Expected: PASS (la página y la ruta, que exige el `h4` mientras carga).
 
-- [ ] **Step 5: Typecheck y commit**
+- [x] **Step 5: Typecheck y commit**
 
 Run: `bun run typecheck` → sin errores.
 
@@ -1851,7 +1863,7 @@ git commit -m "feat(client): página de suscripciones con KPIs, tabla y ocultas"
 - Consumes: `RecordCard`, `recordListSx`, `RecordField`; `MIN_TAP_SIZE`, `iconTapTargetSx`; `useIsMobile`; `client/src/subscriptions.ts`.
 - Produces: `SubscriptionCards(props: SubscriptionListProps)`: un `article` por suscripción, con `aria-label` igual a `nombre`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 En `client/src/pages/SubscriptionsPage.test.tsx`, sumar `beforeEach` al import de `vitest`, `import { emulateMobile } from "../testing/viewport.js";`, y al final del archivo:
 
@@ -1886,7 +1898,7 @@ describe("SubscriptionsPage en mobile", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Ver detalle" }));
     expect(within(card).getByText("2026-09-12")).toBeInTheDocument();
     expect(
-      within(card).getByText(`${formatMoney(4990, "ARS")} → ${formatMoney(5490, "ARS")} desde marzo de 2026`),
+      within(card).getByText(`${money(4990, "ARS")} → ${money(5490, "ARS")} desde marzo de 2026`),
     ).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "Ver movimientos de MUSICAPP" }))
       .toHaveAttribute("href", "/transactions?year=all&search=MUSICAPP");
@@ -1902,12 +1914,12 @@ describe("SubscriptionsPage en mobile", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bunx vitest run client/src/pages/SubscriptionsPage.test.tsx`
 Expected: FAIL — en mobile la página sigue mostrando tablas: `Unable to find role="article"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Crear `client/src/components/SubscriptionCards.tsx`:
 
@@ -1973,17 +1985,16 @@ const detailsOf = (item: SubscriptionDTO, variant: SubscriptionVariant): RecordF
 };
 
 const SubscriptionCard = ({ item, variant, onHide }: SubscriptionCardProps) => {
-  const { key, nombre, aumento } = item;
-  const badge = aumento ? <Chip size="small" color="warning" label={increaseShortLabel(aumento)} /> : undefined;
+  const badge = item.aumento ? <Chip size="small" color="warning" label={increaseShortLabel(item.aumento)} /> : undefined;
   const action = (
-    <IconButton aria-label={`Ocultar ${nombre}`} onClick={() => onHide(key)} sx={iconTapTargetSx}>
+    <IconButton aria-label={`Ocultar ${item.nombre}`} onClick={() => onHide(item.key)} sx={iconTapTargetSx}>
       <VisibilityOffOutlinedIcon />
     </IconButton>
   );
 
   return (
     <RecordCard
-      title={nombre}
+      title={item.nombre}
       meta={subscriptionMeta(item)}
       badge={badge}
       action={action}
@@ -2006,12 +2017,12 @@ En `client/src/pages/SubscriptionsPage.tsx`:
 - antes de `const activeList`: `const SubscriptionList = isMobile ? SubscriptionCards : SubscriptionsTable;`;
 - reemplazar los dos `<SubscriptionsTable ... />` por `<SubscriptionList ... />` (mismas props).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bunx vitest run client/src/pages/SubscriptionsPage.test.tsx client/src/App.test.tsx`
 Expected: PASS (compu y mobile).
 
-- [ ] **Step 5: Typecheck y commit**
+- [x] **Step 5: Typecheck y commit**
 
 Run: `bun run typecheck` → sin errores.
 
@@ -2026,15 +2037,17 @@ git commit -m "feat(client): suscripciones en mobile con tarjetas" -m "Co-Author
 
 **Files:** ninguno nuevo en el repo (el script de lectura va al scratchpad y no se commitea).
 
-- [ ] **Step 1: Suite, typecheck y build**
+- [x] **Step 1: Suite, typecheck y build**
 
 Run: `bun run test` → todo en verde (anotar cualquier falla ajena a la feature que ya fallara en la base).
 Run: `bun run typecheck` → sin errores.
 Run: `bun run build` → build de Vite sin errores.
 
-- [ ] **Step 2: Motor contra la base local, solo lectura**
+- [x] **Step 2: Motor contra la base local, solo lectura**
 
 Si hay `MONGODB_URI` en el `.env` del repo principal y Mongo responde, correr desde el worktree un script en el scratchpad que conecte con Mongoose, lea `TransactionModel`, `StatementModel` y `HiddenSubscriptionModel` con las mismas queries que la ruta, llame a `detectSubscriptions` con `cotizacion: null` (sin red) e imprima solo la cantidad de suscripciones, sus monedas, estado y si tienen `monedaAnterior`/`aumento`. No escribe nada. Esperado: 5 cobros recurrentes (tres en USD, dos de ellos con `monedaAnterior: "ARS"`; uno en pesos con aumento ≈ 7 %; el débito del plan de ahorro). Si la base no está disponible, queda como pendiente para el usuario.
+
+Resultado (2026-10-03, 16 resúmenes y 628 movimientos de consumo o devolución, sin ocultas): 5 cobros recurrentes, todos activos. Tres en USD (dos con `monedaAnterior: "ARS"`), uno en pesos con +6,7 % y el débito del plan de ahorro (+20,8 %, el valor móvil del plan). Una de las que pasaron a USD informa +48,9 % (de 4,66 a 6,94 USD entre junio y julio): con la regla del spec un aumento se informa con un solo cobro al precio nuevo; si julio fue el mes con impuestos incluidos, el aumento desaparece solo cuando entre el cobro de agosto.
 
 - [ ] **Step 3: Revisión visual**
 

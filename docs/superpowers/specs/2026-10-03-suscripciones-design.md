@@ -75,6 +75,8 @@ El algoritmo de abajo se probó en modo solo lectura contra la base local: 16 re
 
 **Lo que descarta.** Comercios de uso frecuente (transporte, delivery, cafés, supermercado) y una heladería con dos visitas de monto igual.
 
+**Verificación de la implementación (2026-10-03).** El motor implementado, corrido en modo solo lectura contra la misma base (16 resúmenes, 628 movimientos de consumo o devolución), da los mismos 5 cobros, todos activos. Además del 7 % en pesos, informa dos aumentos: el plan de ahorro (+20,8 %, el valor móvil) y una de las que pasaron a USD (+48,9 %, de 4,66 a 6,94 USD entre junio y julio). Ese último sale de medir solo en la moneda nueva con dos cobros; si julio fue el mes con impuestos incluidos, desaparece solo con el cobro de agosto.
+
 **Casos reales que fijaron decisiones:**
 
 - **Anulación:** un cobro y su devolución al día siguiente. Sin el paso de anulaciones, ese mes tenía dos cobros y partía la racha.
