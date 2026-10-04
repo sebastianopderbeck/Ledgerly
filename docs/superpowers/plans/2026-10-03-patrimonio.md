@@ -1820,6 +1820,8 @@ const months = (count: number): NetWorthMonthDTO[] => Array.from({ length: count
 
 const chart = () => probeOf(screen.getByTestId("nivo-chart"));
 
+const shown = (text: string): string => text.replace(/\s/g, " ");
+
 describe("NetWorthEvolutionCard", () => {
   it("arranca en dólares y cambia a pesos", async () => {
     renderWithProviders(<NetWorthEvolutionCard months={months(3)} />);
@@ -1829,10 +1831,10 @@ describe("NetWorthEvolutionCard", () => {
     const pesos = screen.getByRole("button", { name: "Pesos" });
     expect(usd).toHaveAttribute("aria-pressed", "true");
     const legend = screen.getByRole("list", { name: "referencias" });
-    expect(within(legend).getByText(formatMoney(7_434, "USD"))).toBeInTheDocument();
+    expect(within(legend).getByText(shown(formatMoney(7_434, "USD")))).toBeInTheDocument();
     await userEvent.click(pesos);
     expect(pesos).toHaveAttribute("aria-pressed", "true");
-    expect(within(legend).getByText(formatMoney(7_432_002, "ARS"))).toBeInTheDocument();
+    expect(within(legend).getByText(shown(formatMoney(7_432_002, "ARS")))).toBeInTheDocument();
   });
 
   it("pinta activos, pasivos y neto con su color de la paleta y tooltip por mes", () => {
