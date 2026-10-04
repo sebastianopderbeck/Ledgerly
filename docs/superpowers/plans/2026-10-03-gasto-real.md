@@ -636,7 +636,7 @@ export function summarizeRealSpending(series: RealSpendingPoint[], month: string
   };
 }
 
-const inScope = ({ years, from, to }: RealSpendingScope) => (month: string): boolean => {
+const inScope = ({ years, from, to }: RealSpendingScope) => ({ month }: RealSpendingPoint): boolean => {
   if (years !== undefined && !years.includes(month.slice(0, 4))) return false;
   if (from === undefined) return true;
   return month >= monthOf(from) && month <= monthOf(to ?? from);
