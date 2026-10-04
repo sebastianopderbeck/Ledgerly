@@ -16,6 +16,11 @@ export const parseYears = (values: string[]): YearSelection => {
   return { kind: "years", years: years.length > 0 ? years : [currentYear()] };
 };
 
+export const yearKeyOf = (params: URLSearchParams): string =>
+  params.getAll("year").join(",") || (params.get("from")?.slice(0, 4) ?? "");
+
+export const parseYearKey = (yearKey: string): YearSelection => parseYears(yearKey ? yearKey.split(",") : []);
+
 export const matchesYears = (value: string, selection: YearSelection): boolean =>
   selection.kind === "all" || selection.years.includes(value.slice(0, 4));
 
