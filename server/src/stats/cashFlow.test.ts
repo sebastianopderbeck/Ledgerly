@@ -350,3 +350,96 @@ describe("buildCashFlow: meses cerrados", () => {
     expect(mesDe(flow, "2026-09")).toMatchObject({ estado: "completo", hipoteca: 0, faltantes: [] });
   });
 });
+
+describe("buildCashFlow: proyección", () => {
+  const resumen = ({ mes, estado, ingreso, tarjetas, hipoteca, auto, margen }: CashFlowMonthDTO) =>
+    ({ mes, estado, ingreso, tarjetas, hipoteca, auto, margen });
+
+  it("reproduce la proyección del ejemplo", () => {
+    const flow = buildCashFlow(ejemplo());
+    expect(flow.meses.filter((mes) => mes.mes >= "2026-10").map(resumen)).toEqual([
+      { mes: "2026-10", estado: "en_curso", ingreso: 1_100_000, tarjetas: 510_000, hipoteca: 300_000, auto: 150_000, margen: 140_000 },
+      { mes: "2026-11", estado: "proyectado", ingreso: 1_100_000, tarjetas: 60_000, hipoteca: 300_000, auto: 150_000, margen: 590_000 },
+      { mes: "2026-12", estado: "proyectado", ingreso: 1_650_000, tarjetas: 30_000, hipoteca: 300_000, auto: 150_000, margen: 1_170_000 },
+      { mes: "2027-01", estado: "proyectado", ingreso: 1_100_000, tarjetas: 30_000, hipoteca: 300_000, auto: 150_000, margen: 620_000 },
+      { mes: "2027-02", estado: "proyectado", ingreso: 1_100_000, tarjetas: 0, hipoteca: 300_000, auto: 150_000, margen: 650_000 },
+      { mes: "2027-03", estado: "proyectado", ingreso: 1_100_000, tarjetas: 0, hipoteca: 300_000, auto: 150_000, margen: 650_000 },
+    ]);
+  });
+
+  it("anota qué parte de cada mes es estimada", () => {
+    const flow = buildCashFlow(ejemplo());
+    expect(mesDe(flow, "2026-10")).toMatchObject({
+      faltantes: [],
+      estimados: [ESTIMADO_SUELDO, estimadoTarjeta("ICBC"), ESTIMADO_HIPOTECA, ESTIMADO_AUTO],
+      tasaAhorro: 140_000 / 1_100_000,
+    });
+    expect(mesDe(flow, "2026-12")).toMatchObject({
+      conSac: true,
+      estimados: [ESTIMADO_SUELDO, ESTIMADO_SAC, estimadoTarjeta("Visa Signature"), estimadoTarjeta("ICBC"), ESTIMADO_HIPOTECA, ESTIMADO_AUTO],
+    });
+    expect(mesDe(flow, "2026-11")?.conSac).toBe(false);
+  });
+
+  it("una tarjeta sin cuotas pendientes se estima en 0 pero queda anotada", () => {
+    const flow = buildCashFlow(ejemplo());
+    expect(mesDe(flow, "2027-02")?.estimados).toContain(estimadoTarjeta("Visa Signature"));
+  });
+
+  it("usa lo real que ya está importado y lo toma como último neto", () => {
+    const base = ejemplo();
+    const flow = buildCashFlow({
+      ...base,
+      payslips: [...base.payslips, payslip("2026-10-31", 1_200_000)],
+      mortgage: { ...base.mortgage, coupons: [...base.mortgage.coupons, { fecha: "2026-10-16", cuotaNro: 13, monto: 310_000 }] },
+    });
+    expect(mesDe(flow, "2026-10")).toMatchObject({ ingreso: 1_200_000, hipoteca: 310_000 });
+    expect(mesDe(flow, "2026-10")?.estimados).toEqual([estimadoTarjeta("ICBC"), ESTIMADO_AUTO]);
+    expect(mesDe(flow, "2026-11")).toMatchObject({ ingreso: 1_200_000, hipoteca: 310_000 });
+  });
+
+  it("un plan terminado no se proyecta", () => {
+    const flow = buildCashFlow({
+      ...ejemplo(),
+      mortgage: { coupons: [{ fecha: "2026-09-17", cuotaNro: 24, monto: 300_000 }], cuotasTotales: 24 },
+    });
+    expect(mesDe(flow, "2026-10")?.hipoteca).toBe(0);
+    expect(mesDe(flow, "2026-10")?.estimados).not.toContain(ESTIMADO_HIPOTECA);
+  });
+
+  it("sin cotización para un saldo en USD lista la cotización pero calcula el margen", () => {
+    const base = ejemplo();
+    const flow = buildCashFlow({
+      ...base,
+      statements: [...base.statements.slice(0, 2), statement({ closingDate: "2026-10-02", dueDate: "2026-10-13", saldoArs: 500_000, saldoUsd: 10 }), base.statements[3]],
+      usdRates: [],
+    });
+    expect(mesDe(flow, "2026-10")).toMatchObject({ tarjetas: 510_000, margen: 140_000, faltantes: [FALTA_COTIZACION] });
+  });
+
+  it("con el vencimiento en el futuro usa la cotización de hoy", () => {
+    const base = ejemplo();
+    const flow = buildCashFlow({
+      ...base,
+      statements: [...base.statements.slice(0, 2), statement({ closingDate: "2026-10-02", dueDate: "2026-10-13", saldoArs: 500_000, saldoUsd: 10 }), base.statements[3]],
+      usdRates: [...base.usdRates, { fecha: "2026-10-13", valor: 1_500 }],
+    });
+    expect(mesDe(flow, "2026-10")?.tarjetas).toBe(500_000 + 10 * 1_450 + 10_000);
+  });
+
+  it("una tarjeta que todavía no empezó no se proyecta", () => {
+    const base = ejemplo();
+    const flow = buildCashFlow({
+      ...base,
+      statements: [...base.statements, statement({ issuer: "nueva", cardLabel: "Nueva", closingDate: "2026-10-30", dueDate: "2026-11-10", saldoArs: 80_000 })],
+    });
+    expect(mesDe(flow, "2026-10")?.estimados).not.toContain(estimadoTarjeta("Nueva"));
+    expect(mesDe(flow, "2026-11")?.tarjetas).toBe(60_000 + 80_000);
+    expect(mesDe(flow, "2026-12")?.estimados).toContain(estimadoTarjeta("Nueva"));
+  });
+
+  it("respeta el horizonte pedido", () => {
+    const flow = buildCashFlow({ ...ejemplo(), horizon: 3 });
+    expect(flow.meses.filter((mes) => mes.mes >= "2026-10").map((mes) => mes.mes)).toEqual(["2026-10", "2026-11", "2026-12"]);
+  });
+});

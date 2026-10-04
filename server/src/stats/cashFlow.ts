@@ -277,8 +277,56 @@ function closedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
   };
 }
 
+interface ProjectedPlanMonth {
+  monto: number;
+  estimado: boolean;
+}
+
+function projectedPlanMonth(plan: CashFlowPlan, mes: string): ProjectedPlanMonth {
+  const delMes = couponsIn(plan, mes);
+  if (delMes.length > 0) return { monto: sum(delMes.map((coupon) => coupon.monto)), estimado: false };
+  const monto = projectPlanPayment(plan, mes);
+  return { monto, estimado: monto > 0 };
+}
+
 function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
-  return { ...closedMonth(ctx, mes), estado: mes === ctx.mesActual ? "en_curso" : "proyectado" };
+  const recibos = ctx.recibosPorMes.get(mes) ?? [];
+  const mensuales = recibos.filter(isMensual);
+  const sacs = recibos.filter(isSac);
+  const sueldoEstimado = mensuales.length === 0;
+  const sacEstimado = isSacMonth(mes) && sacs.length === 0;
+  const sueldo = sueldoEstimado ? ctx.ultimoNeto : netos(mensuales);
+  const sac = sacEstimado ? ctx.ultimoNeto / 2 : netos(sacs);
+  const tracks = trackMonths(ctx, mes);
+  const reales = tracks.flatMap((trackMonth) => trackMonth.totals);
+  const estimadas = tracks.filter((trackMonth) => trackMonth.totals.length === 0);
+  const pisos = estimadas.map(({ track }) => (track.card ? installmentFloor(track.card, mes) : 0));
+  const tarjetas = sum(reales.map((total) => total.monto)) + sum(pisos);
+  const hipoteca = projectedPlanMonth(ctx.mortgage, mes);
+  const auto = projectedPlanMonth(ctx.auto, mes);
+  const ingreso = sueldo + sac;
+  const egresos = tarjetas + hipoteca.monto + auto.monto;
+  const margen = ingreso - egresos;
+  return {
+    mes,
+    estado: mes === ctx.mesActual ? "en_curso" : "proyectado",
+    ingreso,
+    conSac: isSacMonth(mes) || sacs.length > 0,
+    tarjetas,
+    hipoteca: hipoteca.monto,
+    auto: auto.monto,
+    egresos,
+    margen,
+    tasaAhorro: savingsRate(margen, ingreso),
+    faltantes: onlyIf(reales.some((total) => total.sinCotizacion), FALTA_COTIZACION),
+    estimados: [
+      ...onlyIf(sueldoEstimado, ESTIMADO_SUELDO),
+      ...onlyIf(sacEstimado, ESTIMADO_SAC),
+      ...estimadas.map(({ track }) => estimadoTarjeta(track.cardLabel)),
+      ...onlyIf(hipoteca.estimado, ESTIMADO_HIPOTECA),
+      ...onlyIf(auto.estimado, ESTIMADO_AUTO),
+    ],
+  };
 }
 
 const latestMonthlyNet = (payslips: CashFlowPayslip[]): number =>
