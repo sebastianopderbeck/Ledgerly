@@ -21,6 +21,7 @@ const statementSchema = new Schema(
     parserVersion: { type: String, required: true },
     needsReview: { type: Boolean, default: false },
     reconciliation: { type: Schema.Types.Mixed, required: true },
+    reviewedKeys: { type: [String], default: [] },
   },
   { timestamps: { createdAt: "uploadedAt", updatedAt: false } },
 );
@@ -148,6 +149,60 @@ const macroSeriesSchema = new Schema({
 });
 macroSeriesSchema.index({ serie: 1, fecha: 1 }, { unique: true });
 
+const hiddenSubscriptionSchema = new Schema(
+  { key: { type: String, required: true, unique: true } },
+  { timestamps: { createdAt: "hiddenAt", updatedAt: false } },
+);
+
+const assetValuationSchema = new Schema(
+  {
+    fecha: { type: String, required: true },
+    monto: { type: Number, required: true, min: 0 },
+  },
+  { _id: false },
+);
+
+const manualAssetSchema = new Schema(
+  {
+    nombre: { type: String, required: true },
+    tipo: { type: String, required: true, enum: ["cuenta", "ahorro", "plazo_fijo", "inversion", "inmueble", "otro"] },
+    moneda: { type: String, required: true, enum: ["ARS", "USD"] },
+    valuaciones: { type: [assetValuationSchema], default: [] },
+  },
+  { timestamps: true },
+);
+
+const budgetSchema = new Schema({
+  category: { type: String, required: true, unique: true },
+  topeArs: { type: Number, required: true },
+  ajustaInflacion: { type: Boolean, default: false },
+  periodoBase: { type: String, required: true },
+});
+
+const gmailSyncRunSchema = new Schema({
+  trigger: { type: String, required: true, enum: ["manual", "job"] },
+  startedAt: { type: Date, required: true, index: true },
+  finishedAt: { type: Date, required: true },
+  status: { type: String, required: true, enum: ["ok", "error"] },
+  error: { type: String, default: null },
+  messagesChecked: { type: Number, required: true },
+  hasMore: { type: Boolean, required: true },
+});
+
+const gmailAttachmentSchema = new Schema({
+  messageId: { type: String, required: true },
+  partId: { type: String, required: true },
+  runId: { type: Schema.Types.ObjectId, ref: "GmailSyncRun", required: true, index: true },
+  fileName: { type: String, required: true },
+  receivedAt: { type: Date, required: true },
+  outcome: { type: String, required: true, enum: ["imported", "duplicate", "skipped", "failed"] },
+  kind: { type: String, enum: ["statement", "coupon", "auto", "payslip", null], default: null },
+  documentId: { type: String, default: null },
+  detail: { type: String, required: true },
+  processedAt: { type: Date, required: true },
+});
+gmailAttachmentSchema.index({ messageId: 1, partId: 1 }, { unique: true });
+
 export type StatementDoc = InferSchemaType<typeof statementSchema>;
 export type TransactionDoc = InferSchemaType<typeof transactionSchema>;
 export type CategoryRuleDoc = InferSchemaType<typeof categoryRuleSchema>;
@@ -156,6 +211,11 @@ export type AutoCouponDoc = InferSchemaType<typeof autoCouponSchema>;
 export type PayslipDoc = InferSchemaType<typeof payslipSchema>;
 export type InflationRateDoc = InferSchemaType<typeof inflationRateSchema>;
 export type MacroSeriesDoc = InferSchemaType<typeof macroSeriesSchema>;
+export type HiddenSubscriptionDoc = InferSchemaType<typeof hiddenSubscriptionSchema>;
+export type ManualAssetDoc = InferSchemaType<typeof manualAssetSchema>;
+export type BudgetDoc = InferSchemaType<typeof budgetSchema>;
+export type GmailSyncRunDoc = InferSchemaType<typeof gmailSyncRunSchema>;
+export type GmailAttachmentDoc = InferSchemaType<typeof gmailAttachmentSchema>;
 
 export const StatementModel: Model<StatementDoc> =
   mongoose.models.Statement ?? mongoose.model("Statement", statementSchema);
@@ -173,3 +233,13 @@ export const InflationRateModel: Model<InflationRateDoc> =
   mongoose.models.InflationRate ?? mongoose.model("InflationRate", inflationRateSchema);
 export const MacroSeriesModel: Model<MacroSeriesDoc> =
   mongoose.models.MacroSeries ?? mongoose.model("MacroSeries", macroSeriesSchema);
+export const HiddenSubscriptionModel: Model<HiddenSubscriptionDoc> =
+  mongoose.models.HiddenSubscription ?? mongoose.model("HiddenSubscription", hiddenSubscriptionSchema);
+export const ManualAssetModel: Model<ManualAssetDoc> =
+  mongoose.models.ManualAsset ?? mongoose.model("ManualAsset", manualAssetSchema);
+export const BudgetModel: Model<BudgetDoc> =
+  mongoose.models.Budget ?? mongoose.model("Budget", budgetSchema);
+export const GmailSyncRunModel: Model<GmailSyncRunDoc> =
+  mongoose.models.GmailSyncRun ?? mongoose.model("GmailSyncRun", gmailSyncRunSchema);
+export const GmailAttachmentModel: Model<GmailAttachmentDoc> =
+  mongoose.models.GmailAttachment ?? mongoose.model("GmailAttachment", gmailAttachmentSchema);

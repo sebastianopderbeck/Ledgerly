@@ -1,6 +1,17 @@
 import { describe, it, expect } from "vitest";
+import { Types } from "mongoose";
 import { withDb } from "../testing/withDb.js";
-import { StatementModel, TransactionModel, MortgageCouponModel, AutoCouponModel } from "./models.js";
+import {
+  AutoCouponModel,
+  BudgetModel,
+  GmailAttachmentModel,
+  GmailSyncRunModel,
+  HiddenSubscriptionModel,
+  ManualAssetModel,
+  MortgageCouponModel,
+  StatementModel,
+  TransactionModel,
+} from "./models.js";
 
 withDb();
 
@@ -101,5 +112,64 @@ describe("AutoCoupon", () => {
     await AutoCouponModel.init();
     await AutoCouponModel.create(base);
     await expect(AutoCouponModel.create({ ...base, sourceHash: "h2" })).rejects.toThrow();
+  });
+});
+
+const emptyTotals = {
+  totalConsumos: { ars: 0, usd: 0 },
+  saldoActual: { ars: 0, usd: 0 },
+  pagoMinimo: { ars: 0, usd: 0 },
+  saldoAnterior: { ars: 0, usd: 0 },
+};
+
+const gmailAttachment = (runId: Types.ObjectId, partId: string) => ({
+  messageId: "msg-1", partId, runId, fileName: "resumen-sintetico.pdf", receivedAt: new Date("2026-09-28T10:00:00Z"),
+  outcome: "skipped", detail: "Formato de resumen no reconocido", processedAt: new Date("2026-10-03T12:00:00Z"),
+});
+
+describe("modelos nuevos", () => {
+  it("un resumen nace sin claves revisadas", async () => {
+    const statement = await StatementModel.create({
+      issuer: "icbc", cardLabel: "ICBC", totals: emptyTotals, sourceFileName: "r.pdf", sourceHash: "h1",
+      pageCount: 1, parserVersion: "1.0.0", reconciliation: { ok: true, entries: [] },
+    });
+    expect([...statement.reviewedKeys]).toEqual([]);
+  });
+
+  it("una suscripción oculta guarda la clave una sola vez y registra cuándo se ocultó", async () => {
+    await HiddenSubscriptionModel.init();
+    const hidden = await HiddenSubscriptionModel.create({ key: "STREAMFLIX COM" });
+    expect((hidden as unknown as { hiddenAt: Date }).hiddenAt).toBeInstanceOf(Date);
+    await expect(HiddenSubscriptionModel.create({ key: "STREAMFLIX COM" })).rejects.toThrow();
+  });
+
+  it("un activo manual rechaza tipos desconocidos y montos negativos", async () => {
+    await expect(ManualAssetModel.create({ nombre: "X", tipo: "cripto", moneda: "ARS" })).rejects.toThrow();
+    await expect(ManualAssetModel.create({
+      nombre: "X", tipo: "cuenta", moneda: "ARS", valuaciones: [{ fecha: "2026-10-01", monto: -1 }],
+    })).rejects.toThrow();
+    const asset = await ManualAssetModel.create({ nombre: "Cuenta", tipo: "cuenta", moneda: "ARS" });
+    expect([...asset.valuaciones]).toEqual([]);
+  });
+
+  it("hay un solo tope por categoría", async () => {
+    await BudgetModel.init();
+    const budget = await BudgetModel.create({ category: "Comida", topeArs: 1000, periodoBase: "2026-08" });
+    expect(budget.ajustaInflacion).toBe(false);
+    await expect(BudgetModel.create({ category: "Comida", topeArs: 2000, periodoBase: "2026-08" })).rejects.toThrow();
+  });
+
+  it("cada adjunto de Gmail se registra una sola vez por mensaje y parte", async () => {
+    await GmailAttachmentModel.init();
+    const run = await GmailSyncRunModel.create({
+      trigger: "manual", startedAt: new Date("2026-10-03T12:00:00Z"), finishedAt: new Date("2026-10-03T12:00:05Z"),
+      status: "ok", messagesChecked: 1, hasMore: false,
+    });
+    expect(run.error).toBeNull();
+    const attachment = await GmailAttachmentModel.create(gmailAttachment(run._id, "1"));
+    expect(attachment.kind).toBeNull();
+    expect(attachment.documentId).toBeNull();
+    await expect(GmailAttachmentModel.create(gmailAttachment(run._id, "1"))).rejects.toThrow();
+    await expect(GmailAttachmentModel.create(gmailAttachment(run._id, "2"))).resolves.toBeDefined();
   });
 });

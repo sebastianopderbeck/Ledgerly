@@ -1,5 +1,9 @@
-import type { AutoCouponDTO, CategoryRuleDTO, ImportedFileDTO, InflationRateDTO, MortgageCouponDTO, PayslipDTO, StatementDTO, TransactionDTO } from "@ledgerly/shared";
-import type { AutoCouponDoc, CategoryRuleDoc, InflationRateDoc, MortgageCouponDoc, PayslipDoc, StatementDoc, TransactionDoc } from "../db/models.js";
+import type {
+  AutoCouponDTO, BudgetDTO, CategoryRuleDTO, ImportedFileDTO, InflationRateDTO, ManualAssetDTO, MortgageCouponDTO, PayslipDTO, StatementDTO, TransactionDTO,
+} from "@ledgerly/shared";
+import type {
+  AutoCouponDoc, BudgetDoc, CategoryRuleDoc, InflationRateDoc, ManualAssetDoc, MortgageCouponDoc, PayslipDoc, StatementDoc, TransactionDoc,
+} from "../db/models.js";
 import type { HydratedDocument } from "mongoose";
 
 const isoDate = (d: Date | null): string | null => (d ? d.toISOString().slice(0, 10) : null);
@@ -171,5 +175,25 @@ export function payslipToImportedFileDTO(doc: HydratedDocument<PayslipDoc>): Imp
     documentDate: isoDate(doc.fechaPago),
     description: doc.tipo === "sac" ? `Período ${doc.periodo} · SAC` : `Período ${doc.periodo}`,
     needsReview: false,
+  };
+}
+
+export function toManualAssetDTO(doc: HydratedDocument<ManualAssetDoc>): ManualAssetDTO {
+  return {
+    id: doc._id.toString(),
+    nombre: doc.nombre,
+    tipo: doc.tipo as ManualAssetDTO["tipo"],
+    moneda: doc.moneda as ManualAssetDTO["moneda"],
+    valuaciones: doc.valuaciones.map((valuacion) => ({ fecha: valuacion.fecha, monto: valuacion.monto })),
+  };
+}
+
+export function toBudgetDTO(doc: HydratedDocument<BudgetDoc>): BudgetDTO {
+  return {
+    id: doc._id.toString(),
+    category: doc.category,
+    topeArs: doc.topeArs,
+    ajustaInflacion: doc.ajustaInflacion,
+    periodoBase: doc.periodoBase,
   };
 }
