@@ -4,6 +4,10 @@ import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
 import { buildCardCycleBarData, type CardCycleEntry } from "../../cardCycle.js";
+import { LegendSwatch } from "./ChartLegend.js";
+import { useChartLayout } from "./useChartLayout.js";
+
+const MOBILE_VALUE_TICKS = 4;
 
 interface CardCycleChartProps {
   cards: CardCycleEntry[];
@@ -11,6 +15,7 @@ interface CardCycleChartProps {
 
 export const CardCycleChart = ({ cards }: CardCycleChartProps) => {
   const theme = useTheme();
+  const { isMobile } = useChartLayout();
   if (cards.length === 0) return null;
 
   const { keys, row } = buildCardCycleBarData(cards);
@@ -31,10 +36,15 @@ export const CardCycleChart = ({ cards }: CardCycleChartProps) => {
         enableLabel={false}
         enableGridY={false}
         axisLeft={null}
-        axisBottom={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
+        axisBottom={{
+          tickSize: 0,
+          tickPadding: 8,
+          format: (value) => formatMoneyCompact(Number(value), "ARS"),
+          tickValues: isMobile ? MOBILE_VALUE_TICKS : undefined,
+        }}
         tooltip={({ id, color, value }) => (
           <div style={{ ...chartTheme.tooltip?.container, display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: color, display: "inline-block" }} />
+            <LegendSwatch color={color} />
             <span>
               {id}: <strong>{formatMoney(Number(value), "ARS")}</strong>
             </span>

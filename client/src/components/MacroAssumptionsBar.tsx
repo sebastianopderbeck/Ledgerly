@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type MouseEvent } from "react";
 import { Box, Button, Collapse, TextField, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
 import type { MacroAssumptions } from "../macroSignals.js";
+import { useIsMobile } from "../useIsMobile.js";
 
 const REVERSION_OPTIONS = [
   { value: "12", label: "Revierte en 12 meses" },
@@ -15,6 +16,7 @@ interface MacroAssumptionsBarProps {
 
 export const MacroAssumptionsBar = ({ assumptions, onChange }: MacroAssumptionsBarProps) => {
   const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const handleNumber = (field: "inflacionEsperada" | "tasaAnualPesos") => (event: ChangeEvent<HTMLInputElement>) => {
     const parsed = Number(event.target.value);
@@ -28,6 +30,8 @@ export const MacroAssumptionsBar = ({ assumptions, onChange }: MacroAssumptionsB
 
   const reversionValue = assumptions.reversionMeses === null ? "none" : String(assumptions.reversionMeses);
 
+  const toggleOrientation = isMobile ? "vertical" : "horizontal";
+
   return (
     <Box sx={{ mb: 3 }}>
       <Button size="small" onClick={() => setOpen(!open)}>
@@ -37,6 +41,7 @@ export const MacroAssumptionsBar = ({ assumptions, onChange }: MacroAssumptionsB
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", mt: 1 }}>
           <TextField
             size="small"
+            fullWidth={isMobile}
             type="number"
             label="Inflación esperada (% anual)"
             value={assumptions.inflacionEsperada}
@@ -44,6 +49,7 @@ export const MacroAssumptionsBar = ({ assumptions, onChange }: MacroAssumptionsB
           />
           <TextField
             size="small"
+            fullWidth={isMobile}
             type="number"
             label="Tasa en pesos (TNA %)"
             value={assumptions.tasaAnualPesos}
@@ -51,6 +57,8 @@ export const MacroAssumptionsBar = ({ assumptions, onChange }: MacroAssumptionsB
           />
           <ToggleButtonGroup
             size="small"
+            orientation={toggleOrientation}
+            fullWidth={isMobile}
             exclusive
             value={reversionValue}
             onChange={handleReversion}

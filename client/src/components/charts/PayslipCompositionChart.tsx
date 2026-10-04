@@ -4,7 +4,9 @@ import type { PayslipDTO } from "@ledgerly/shared";
 import { formatMoney, formatMoneyCompact } from "../../format.js";
 import { seriesColor } from "./palette.js";
 import { nivoTheme } from "./nivoTheme.js";
+import { useChartLayout } from "./useChartLayout.js";
 import { buildCompositionData, monthLabel, rawKey } from "../../payslipConcepts.js";
+import { LegendSwatch } from "./ChartLegend.js";
 
 interface PayslipCompositionChartProps {
   payslips: PayslipDTO[];
@@ -13,6 +15,7 @@ interface PayslipCompositionChartProps {
 
 export const PayslipCompositionChart = ({ payslips, monthOnly = false }: PayslipCompositionChartProps) => {
   const theme = useTheme();
+  const { seriesMargin, bottomTicks } = useChartLayout();
   if (payslips.length === 0) return <Typography color="text.secondary">Sin datos</Typography>;
 
   const { labels, rows } = buildCompositionData(payslips);
@@ -27,7 +30,7 @@ export const PayslipCompositionChart = ({ payslips, monthOnly = false }: Payslip
         keys={labels}
         indexBy="month"
         colors={colors}
-        margin={{ top: 16, right: 24, bottom: 64, left: 64 }}
+        margin={seriesMargin({ top: 16, right: 24, bottom: 64, left: 64 })}
         padding={0.35}
         enableLabel={false}
         enableGridX={false}
@@ -36,11 +39,12 @@ export const PayslipCompositionChart = ({ payslips, monthOnly = false }: Payslip
           tickPadding: 10,
           tickRotation: monthOnly ? 0 : -45,
           format: monthOnly ? (value) => monthLabel(String(value)) : undefined,
+          tickValues: bottomTicks(rows.map((row) => row.month)),
         }}
         axisLeft={{ tickSize: 0, tickPadding: 8, format: (value) => formatMoneyCompact(Number(value), "ARS") }}
         tooltip={({ id, color, data: row }) => (
           <div style={{ ...chartTheme.tooltip?.container, display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: color, display: "inline-block" }} />
+            <LegendSwatch color={color} />
             <span>
               {id}: <strong>{formatMoney(Number(row[rawKey(String(id))] ?? 0), "ARS")}</strong>
             </span>
