@@ -217,8 +217,9 @@ budgetInflationNote(budget: BudgetDTO, month: string, latestIpc: string | null):
   **Incluye** «Sin categoría» (`UNCATEGORIZED` de la base).
 - `budgetCategoryOptions` es `categoryOptions(categories, rules)` sin las categorías que ya tienen tope.
 - `monthInText` es `formatMonthLabel` en minúscula, para usar el mes dentro de una oración.
-- `formatPesos` es `formatMoney` en ARS redondeado a pesos enteros (sin `-0`): los topes ajustados tienen centavos que no
-  aportan nada en pantalla.
+- `formatPesos` formatea en ARS a pesos enteros, sin centavos ni `-0` (`Intl.NumberFormat` propio con 0 decimales, porque
+  `formatMoney` siempre muestra `,00`): los topes ajustados tienen centavos que no aportan nada en pantalla. El helper del
+  editor («= {monto} por mes») sí usa `formatMoney`, porque repite lo que se tipeó, centavos incluidos.
 - `budgetBalanceText` arma «Te quedan {restante}» o «Te pasaste por {−restante}», y `budgetInflationNote` el agregado
   « · Ajustado por IPC», « (IPC hasta {mes})» o « (sin IPC cargado)» de cada fila.
 

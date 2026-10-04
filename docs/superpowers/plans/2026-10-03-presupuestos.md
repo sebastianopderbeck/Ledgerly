@@ -605,7 +605,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `client/src/budgets.test.ts`
 
 **Interfaces:**
-- Consumes: `inflationFactor`, `latestInflationPeriod` (`client/src/inflationIndex.ts`); `categoryOptions` (`client/src/categoryOptions.ts`); `formatMoney`, `formatMonthLabel` (`client/src/format.ts`).
+- Consumes: `inflationFactor`, `latestInflationPeriod` (`client/src/inflationIndex.ts`); `categoryOptions` (`client/src/categoryOptions.ts`); `formatMonthLabel` (`client/src/format.ts`).
 - Produces (los usan las tasks 5 a 8):
   - `type BudgetStatus = "ok" | "cerca" | "pasado"`, `type BudgetStatusColor = "success" | "warning" | "error"`
   - `CERCA_DESDE`, `BUDGET_STATUSES`, `BUDGET_STATUS_LABEL`, `BUDGET_STATUS_COLOR`
@@ -622,7 +622,6 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```ts
 import { describe, it, expect } from "vitest";
 import type { BudgetDTO, CategoryMonthStat, InflationRateDTO } from "@ledgerly/shared";
-import { formatMoney } from "./format.js";
 import {
   budgetBalanceText, budgetCategoryOptions, budgetInflationNote, budgetLines, budgetStatus, budgetTotals, currentLimit,
   formatPesos, limitForMonth, monthInText, unbudgetedCategories,
@@ -771,9 +770,10 @@ describe("budgetCategoryOptions", () => {
 });
 
 describe("textos", () => {
-  it("formatPesos redondea a pesos enteros y no muestra -0", () => {
-    expect(formatPesos(1500.6)).toBe(formatMoney(1501, "ARS"));
-    expect(formatPesos(-0.2)).toBe(formatMoney(0, "ARS"));
+  it("formatPesos muestra pesos enteros, sin centavos ni -0", () => {
+    expect(formatPesos(1500.6)).toMatch(/^\$\s1\.501$/);
+    expect(formatPesos(300000)).toMatch(/^\$\s300\.000$/);
+    expect(formatPesos(-0.2)).toMatch(/^\$\s0$/);
   });
 
   it("monthInText deja el mes en minúscula para usarlo en una oración", () => {
@@ -781,9 +781,9 @@ describe("textos", () => {
   });
 
   it("budgetBalanceText dice cuánto queda o por cuánto te pasaste", () => {
-    expect(budgetBalanceText(65000)).toBe(`Te quedan ${formatMoney(65000, "ARS")}`);
-    expect(budgetBalanceText(0)).toBe(`Te quedan ${formatMoney(0, "ARS")}`);
-    expect(budgetBalanceText(-30000)).toBe(`Te pasaste por ${formatMoney(30000, "ARS")}`);
+    expect(budgetBalanceText(65000)).toMatch(/^Te quedan \$\s65\.000$/);
+    expect(budgetBalanceText(0)).toMatch(/^Te quedan \$\s0$/);
+    expect(budgetBalanceText(-30000.4)).toMatch(/^Te pasaste por \$\s30\.000$/);
   });
 
   it("budgetInflationNote aclara el ajuste y hasta qué IPC llega", () => {
@@ -808,7 +808,7 @@ Expected: FAIL — `Failed to load url ./budgets.js`.
 ```ts
 import type { BudgetDTO, CategoryMonthStat, CategoryRuleDTO, InflationRateDTO } from "@ledgerly/shared";
 import { categoryOptions } from "./categoryOptions.js";
-import { formatMoney, formatMonthLabel } from "./format.js";
+import { formatMonthLabel } from "./format.js";
 import { inflationFactor, latestInflationPeriod } from "./inflationIndex.js";
 
 export type BudgetStatus = "ok" | "cerca" | "pasado";
@@ -845,6 +845,10 @@ export interface UnbudgetedCategory {
   total: number;
 }
 
+const pesosFormat = new Intl.NumberFormat("es-AR", {
+  style: "currency", currency: "ARS", minimumFractionDigits: 0, maximumFractionDigits: 0,
+});
+
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
 const spendingIn = (gastos: CategoryMonthStat[], month: string): Map<string, number> =>
@@ -854,7 +858,7 @@ const byRatioThenCategory = (a: BudgetLine, b: BudgetLine): number =>
   b.ratio - a.ratio || a.category.localeCompare(b.category, "es");
 
 export function formatPesos(value: number): string {
-  return formatMoney(Math.round(value) || 0, "ARS");
+  return pesosFormat.format(Math.round(value) || 0);
 }
 
 export function monthInText(month: string): string {
@@ -984,7 +988,6 @@ En `client/src/budgets.test.ts`, reemplazar los imports por:
 ```ts
 import { describe, it, expect } from "vitest";
 import type { BudgetDTO, BudgetSpendingDTO, CategoryMonthStat, InflationRateDTO } from "@ledgerly/shared";
-import { formatMoney } from "./format.js";
 import {
   budgetBalanceText, budgetCategoryOptions, budgetHistory, budgetInflationNote, budgetLines, budgetStatus, budgetTotals,
   budgetsView, closedMonths, currentLimit, defaultBudgetMonth, formatPesos, isPartialMonth, limitForMonth, monthInText,
