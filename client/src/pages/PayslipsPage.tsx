@@ -3,6 +3,7 @@ import { CircularProgress, Typography } from "@mui/material";
 import { usePayslips, useInflation } from "../api/hooks.js";
 import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { PayslipKpiCards } from "../components/PayslipKpiCards.js";
+import { PayslipCards } from "../components/PayslipCards.js";
 import { PayslipsTable } from "../components/PayslipsTable.js";
 import { PayslipDescuentoKpis } from "../components/PayslipDescuentoKpis.js";
 import { MotionBox } from "../components/motion/motion.js";
@@ -17,6 +18,7 @@ import { PayslipGrossNetChart } from "../components/charts/PayslipGrossNetChart.
 import { payslipYears } from "../payslipConcepts.js";
 import { matchesYears } from "../filters/globalFilters.js";
 import { useGlobalFilters } from "../filters/useGlobalFilters.js";
+import { useIsMobile } from "../useIsMobile.js";
 
 const CHART_EXCLUDED_PERIODS = ["2023-12"];
 const PAYSLIP_FIELDS: FilterField[] = ["year"];
@@ -25,6 +27,7 @@ export const PayslipsPage = () => {
   const { data, isLoading } = usePayslips();
   const { data: inflationData } = useInflation();
   const { yearSelection } = useGlobalFilters();
+  const isMobile = useIsMobile();
   const inflation = inflationData ?? [];
   const payslips = useMemo(() => data ?? [], [data]);
   const years = useMemo(() => payslipYears(payslips), [payslips]);
@@ -59,6 +62,8 @@ export const PayslipsPage = () => {
     );
   }
 
+  const payslipDetail = isMobile ? <PayslipCards payslips={inYears} /> : <PayslipsTable payslips={inYears} />;
+
   return (
     <>
       <Typography variant="h4" sx={{ mb: 3 }}>Sueldo</Typography>
@@ -84,7 +89,7 @@ export const PayslipsPage = () => {
       <PayslipDescuentoKpis payslips={payslips} />
 
       {inYears.length > 0 && <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>}
-      <PayslipsTable payslips={inYears} />
+      {payslipDetail}
     </>
   );
 };

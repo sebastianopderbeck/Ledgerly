@@ -5,6 +5,7 @@ import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { yearsOf } from "../filters/globalFilters.js";
 import { useAutoCouponsInYears } from "../filters/useInYears.js";
 import { AutoKpiCards } from "../components/AutoKpiCards.js";
+import { AutoCouponCards } from "../components/AutoCouponCards.js";
 import { AutoCouponsTable } from "../components/AutoCouponsTable.js";
 import { MotionBox } from "../components/motion/motion.js";
 import { staggerContainer } from "../components/motion/variants.js";
@@ -14,6 +15,7 @@ import { AutoTotalPaidByMonthChart } from "../components/charts/AutoTotalPaidByM
 import { CarValueChart } from "../components/charts/CarValueChart.js";
 import { AutoProgressDonutChart } from "../components/charts/AutoProgressDonutChart.js";
 import { AutoCouponUsdChart } from "../components/charts/AutoCouponUsdChart.js";
+import { useIsMobile } from "../useIsMobile.js";
 
 const AUTO_FIELDS: FilterField[] = ["year"];
 
@@ -23,6 +25,8 @@ export const AutoPage = () => {
   const { data: couponsInYears } = useAutoCouponsInYears();
   const hasDetail = (couponsInYears ?? []).length > 0;
   const yearOptions = useMemo(() => yearsOf((data ?? []).map((coupon) => coupon.fechaVencimiento)), [data]);
+  const isMobile = useIsMobile();
+  const couponDetail = isMobile ? <AutoCouponCards /> : <AutoCouponsTable />;
 
   return (
     <>
@@ -53,7 +57,7 @@ export const AutoPage = () => {
           </MotionBox>
 
           {hasDetail && <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>}
-          <AutoCouponsTable />
+          {couponDetail}
         </>
       )}
     </>

@@ -52,7 +52,7 @@ export const BottomSheet = ({ open, onClose, title, children, actions }: BottomS
     slotProps={{ paper: { role: "dialog", "aria-modal": true, "aria-label": title, sx: paperSx } }}
   >
     <Box aria-hidden sx={handleSx} />
-    <Typography variant="h6" sx={{ mb: 2 }}>{title}</Typography>
+    <Typography variant="h6" sx={{ mb: 2, overflowWrap: "anywhere" }}>{title}</Typography>
     <Box sx={{ overflowY: "auto" }}>{children}</Box>
     {actions && <Box sx={{ display: "flex", gap: 1, mt: 2 }}>{actions}</Box>}
   </SwipeableDrawer>

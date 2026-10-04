@@ -5,6 +5,7 @@ import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { yearsOf } from "../filters/globalFilters.js";
 import { useCreditCouponsInYears } from "../filters/useInYears.js";
 import { CreditKpiCards } from "../components/CreditKpiCards.js";
+import { MortgageCouponCards } from "../components/MortgageCouponCards.js";
 import { MortgageCouponsTable } from "../components/MortgageCouponsTable.js";
 import { MotionBox } from "../components/motion/motion.js";
 import { staggerContainer } from "../components/motion/variants.js";
@@ -14,6 +15,7 @@ import { TotalPaidByMonthChart } from "../components/charts/TotalPaidByMonthChar
 import { UvaEvolutionChart } from "../components/charts/UvaEvolutionChart.js";
 import { AmortizationDonutChart } from "../components/charts/AmortizationDonutChart.js";
 import { CouponUsdChart } from "../components/charts/CouponUsdChart.js";
+import { useIsMobile } from "../useIsMobile.js";
 
 const CREDIT_FIELDS: FilterField[] = ["year"];
 
@@ -23,6 +25,8 @@ export const CreditsPage = () => {
   const { data: couponsInYears } = useCreditCouponsInYears();
   const hasDetail = (couponsInYears ?? []).length > 0;
   const yearOptions = useMemo(() => yearsOf((data ?? []).map((coupon) => coupon.fechaDebito)), [data]);
+  const isMobile = useIsMobile();
+  const couponDetail = isMobile ? <MortgageCouponCards /> : <MortgageCouponsTable />;
 
   return (
     <>
@@ -53,7 +57,7 @@ export const CreditsPage = () => {
           </MotionBox>
 
           {hasDetail && <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>}
-          <MortgageCouponsTable />
+          {couponDetail}
         </>
       )}
     </>

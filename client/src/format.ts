@@ -31,3 +31,7 @@ export function formatLocalDate(iso: string): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
+
+export function formatMoneyOrDash(amount: number | null, currency: "ARS" | "USD"): string {
+  return amount === null ? "—" : formatMoney(amount, currency);
+}

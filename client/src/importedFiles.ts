@@ -48,3 +48,9 @@ export const filterImportedFiles = (
 
 export const importedFileYears = (files: ImportedFileDTO[]): string[] =>
   [...new Set(files.map(yearOf))].sort().reverse();
+
+export const importedFileDeleteMessage = (file: ImportedFileDTO | null): string => {
+  if (!file) return "";
+  const cascade = file.kind === "statement" ? " También se borran sus movimientos." : "";
+  return `¿Borrar ${file.fileName}?${cascade} Esta acción no se puede deshacer.`;
+};
