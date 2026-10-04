@@ -471,7 +471,8 @@ Lo usan la fila de compu y la hoja de mobile.
 fila `InboxGroupRow` por grupo, `key={group.pattern}`:
 
 - **Comercio**: `merchants[0]` en `fontWeight: 600` y debajo `Typography variant="caption"` con
-  `groupCaption(group)`; si hay variantes, `Tooltip` con `merchants.join(" · ")`.
+  `groupCaption(group)`; si hay variantes, `Tooltip describeChild` con `merchants.join(" · ")` (queda
+  como descripción accesible, no pisa el nombre).
 - **Movs.**: `count`. **Total**: `groupTotalLabel(group)`.
 - **Patrón**: `TextField size="small"` monoespaciado (reusa `patternInputProps`, que pasa a
   exportarse desde `RuleSheet.tsx`, más `aria-label="Patrón"`), `error={!check.valid}`,
