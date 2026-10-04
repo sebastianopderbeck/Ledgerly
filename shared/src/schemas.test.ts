@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parsedStatementSchema, type ParsedStatement } from "./index.js";
+import { UNCATEGORIZED_CATEGORY, parsedStatementSchema, type ParsedStatement } from "./index.js";
 
 const valid: ParsedStatement = {
   header: {
@@ -48,5 +48,11 @@ describe("parsedStatementSchema", () => {
     const bad = structuredClone(valid);
     bad.rows[0].amount = -1;
     expect(() => parsedStatementSchema.parse(bad)).toThrow();
+  });
+});
+
+describe("UNCATEGORIZED_CATEGORY", () => {
+  it("es la categoría que asignan las reglas cuando ninguna matchea", () => {
+    expect(UNCATEGORIZED_CATEGORY).toBe("Sin categoría");
   });
 });
