@@ -101,7 +101,9 @@ const fixture = (name: string) =>
   readFileSync(fileURLToPath(new URL(`../parsers/__fixtures__/${name}`, import.meta.url)), "utf8");
 const pdf = (label: string) => new TextEncoder().encode(`pdf-sintetico-${label}`);
 
-beforeEach(() => mocked.mockReset());
+beforeEach(() => {
+  mocked.mockReset();
+});
 
 describe("importPdf", () => {
   it("importa un resumen de tarjeta y describe el archivo", async () => {
@@ -303,7 +305,7 @@ const extract = async (data: Uint8Array): Promise<ExtractedPdf> => {
   }
 };
 
-const found = <T>(doc: T | null): T => {
+const found = <T>(doc: T): NonNullable<T> => {
   if (!doc) throw new Error("No se encontró el documento recién importado");
   return doc;
 };
@@ -905,11 +907,14 @@ describe("createGmailClient: API", () => {
   });
 
   it("listMessageIds corta en el límite", async () => {
-    const fetchMock = stubFetch((url) => (isToken(url)
-      ? tokenOk()
-      : json({ messages: [{ id: `msg-${Math.random()}` }, { id: `msg-${Math.random()}` }], nextPageToken: "siguiente" })));
+    let page = 0;
+    const fetchMock = stubFetch((url) => {
+      if (isToken(url)) return tokenOk();
+      page += 1;
+      return json({ messages: [{ id: `msg-${page}-a` }, { id: `msg-${page}-b` }], nextPageToken: `p${page + 1}` });
+    });
     const ids = await createGmailClient(credentials).listMessageIds("q", 3);
-    expect(ids).toHaveLength(3);
+    expect(ids).toEqual(["msg-1-a", "msg-1-b", "msg-2-a"]);
     expect(apiCalls(fetchMock)).toHaveLength(2);
   });
 
@@ -1809,6 +1814,9 @@ const readLedger = async (ids: string[]): Promise<GmailLedgerEntry[]> => {
   return docs.map(({ messageId, partId, outcome }) => ({ messageId, partId, outcome: outcome as GmailSyncOutcome }));
 };
 
+const settledKeys = (ledger: GmailLedgerEntry[]): Set<string> =>
+  new Set(ledger.filter(({ outcome }) => outcome !== "failed").map(({ messageId, partId }) => ledgerKey(messageId, partId)));
+
 const recordPart = async (
   ctx: RunContext, message: GmailMessage, partId: string, fileName: string, result: PartResult,
 ): Promise<void> => {
@@ -1855,15 +1863,13 @@ const processMessage = async (ctx: RunContext, message: GmailMessage): Promise<v
 };
 
 const scanMailbox = async (
-  ctx: RunContext, query: string, maxMessages: number, progress: RunProgress,
+  deps: Omit<RunContext, "settled">, query: string, maxMessages: number, progress: RunProgress,
 ): Promise<void> => {
-  const ids = await ctx.client.listMessageIds(query, GMAIL_LIST_LIMIT);
+  const ids = await deps.client.listMessageIds(query, GMAIL_LIST_LIMIT);
   const ledger = await readLedger(ids);
   const { batch, hasMore } = selectPendingMessages(ids, ledger, maxMessages);
+  const ctx: RunContext = { ...deps, settled: settledKeys(ledger) };
   progress.hasMore = hasMore;
-  ledger.forEach(({ messageId, partId, outcome }) => {
-    if (outcome !== "failed") ctx.settled.add(ledgerKey(messageId, partId));
-  });
   for (const messageId of batch) {
     const message = await ctx.client.getMessage(messageId);
     progress.messagesChecked += 1;
@@ -1878,10 +1884,9 @@ export async function syncGmail({
 }: SyncGmailDeps): Promise<GmailSyncRunDTO> {
   const runId = new Types.ObjectId();
   const startedAt = now();
-  const ctx: RunContext = { runId, client, importPdf, now, settled: new Set() };
   const progress: RunProgress = { messagesChecked: 0, hasMore: false, error: null };
   try {
-    await scanMailbox(ctx, query, maxMessages, progress);
+    await scanMailbox({ runId, client, importPdf, now }, query, maxMessages, progress);
   } catch (err) {
     progress.error = errorMessage(err);
   }
@@ -2508,9 +2513,10 @@ describe("exchangeGmailCode", () => {
 
   it("falla con el status y el código de Google si rechaza el código, sin el secreto", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json({ error: "invalid_grant", error_description: "Bad Request" }, 400)));
-    const error = await exchangeGmailCode(exchangeInput).catch((err: unknown) => err as Error);
-    expect(error.message).toBe("Google rechazó la autorización (400, invalid_grant).");
-    expect(error.message).not.toContain("secreto-sintetico");
+    const error: unknown = await exchangeGmailCode(exchangeInput).catch((err: unknown) => err);
+    const message = error instanceof Error ? error.message : "";
+    expect(message).toBe("Google rechazó la autorización (400, invalid_grant).");
+    expect(message).not.toContain("secreto-sintetico");
   });
 });
 
@@ -2633,8 +2639,8 @@ export async function exchangeGmailCode({
   });
   const body = (await response.json().catch(() => null)) as TokenExchangeResponse | null;
   if (!response.ok) {
-    const code = body?.error ? `, ${body.error}` : "";
-    throw new Error(`Google rechazó la autorización (${response.status}${code}).`);
+    const googleCode = body?.error ? `, ${body.error}` : "";
+    throw new Error(`Google rechazó la autorización (${response.status}${googleCode}).`);
   }
   if (!body?.refresh_token) throw new Error(NO_REFRESH_TOKEN_MESSAGE);
   return body.refresh_token;
