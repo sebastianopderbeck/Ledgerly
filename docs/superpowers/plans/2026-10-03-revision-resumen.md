@@ -1559,6 +1559,8 @@ import { StatementReviewChecklist } from "./StatementReviewChecklist.js";
 
 afterEach(cleanup);
 
+const money = (amount: number, currency: "ARS" | "USD"): string => formatMoney(amount, currency).replace(/\s/g, " ");
+
 const STATEMENT: StatementDTO = {
   id: "s1",
   issuer: "visa_signature",
@@ -1643,7 +1645,7 @@ describe("StatementReviewChecklist", () => {
     setup();
     expect(screen.getByText("Visa Signature ****1234")).toBeInTheDocument();
     expect(screen.getByText(
-      `Cierre 2026-09-25 · Vence 2026-10-06 · Saldo ${formatMoney(1234567.89, "ARS")} + ${formatMoney(45, "USD")}`,
+      `Cierre 2026-09-25 · Vence 2026-10-06 · Saldo ${money(1234567.89, "ARS")} + ${money(45, "USD")}`,
     )).toBeInTheDocument();
     expect(screen.getByText("1 de 4 revisados")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "progreso de la revisión" })).toHaveAttribute("aria-valuenow", "25");
@@ -1665,18 +1667,18 @@ describe("StatementReviewChecklist", () => {
     expect(within(duplicate).getByText("¿Duplicado?")).toBeInTheDocument();
     expect(within(duplicate).getByText("Comida")).toBeInTheDocument();
     expect(within(duplicate).getByText("2026-09-12")).toBeInTheDocument();
-    expect(within(duplicate).getByText(formatMoney(2500, "ARS"))).toBeInTheDocument();
+    expect(within(duplicate).getByText(money(2500, "ARS"))).toBeInTheDocument();
     expect(within(duplicate).getByText("Mismo comercio y monto que el cargo del 2026-09-11.")).toBeInTheDocument();
     const usd = rowOf("SERVICIO EXTERIOR");
     expect(within(usd).getByText("USD inusual")).toBeInTheDocument();
-    expect(within(usd).getByText(formatMoney(14.99, "USD"))).toBeInTheDocument();
-    expect(within(usd).getByText(`Hasta ahora, como mucho ${formatMoney(10.99, "USD")} (+36,4%).`)).toBeInTheDocument();
+    expect(within(usd).getByText(money(14.99, "USD"))).toBeInTheDocument();
+    expect(within(usd).getByText(`Hasta ahora, como mucho ${money(10.99, "USD")} (+36,4%).`)).toBeInTheDocument();
     const fresh = rowOf("COMERCIO NUEVO");
     expect(within(fresh).getByText("Comercio nuevo")).toBeInTheDocument();
     expect(within(fresh).getAllByText("Sin categoría")).toHaveLength(1);
     const category = rowOf("Supermercado");
-    expect(within(category).getByText(formatMoney(450000, "ARS"))).toBeInTheDocument();
-    expect(within(category).getByText(`Promedio de los últimos 6 resúmenes: ${formatMoney(250000, "ARS")}`)).toBeInTheDocument();
+    expect(within(category).getByText(money(450000, "ARS"))).toBeInTheDocument();
+    expect(within(category).getByText(`Promedio de los últimos 6 resúmenes: ${money(250000, "ARS")}`)).toBeInTheDocument();
     expect(within(category).getByText("+80,0%")).toBeInTheDocument();
   });
 
