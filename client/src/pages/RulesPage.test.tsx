@@ -7,14 +7,25 @@ import { emulateMobile } from "../testing/viewport.js";
 import { RulesPage } from "./RulesPage.js";
 
 const rule = { id: "r1", priority: 10, matchType: "contains", pattern: "UBER", category: "Transporte", source: "user", enabled: true };
+const inbox = {
+  pendingCount: 2, usdRate: 1415,
+  groups: [{ pattern: "KIOSCO EL SOL", merchants: ["KIOSCO EL SOL"], count: 2, totalArs: 3000, totalUsd: 0, equivalentArs: 3000, lastDate: "2026-09-20" }],
+};
+
+const readResponse = (url: string): unknown => {
+  if (url.includes("/category-rules/inbox")) return inbox;
+  if (url.includes("/transactions/categories")) return ["Comida", "Transporte"];
+  if (url.includes("/category-rules")) return [rule];
+  return {};
+};
 const calls: { url: string; method?: string; body?: string }[] = [];
 
 beforeEach(() => {
   calls.length = 0;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     calls.push({ url, method: init?.method, body: init?.body as string });
-    const isRead = url.includes("/category-rules") && (!init || !init.method || init.method === "GET");
-    return new Response(JSON.stringify(isRead ? [rule] : {}), { status: 200, headers: { "Content-Type": "application/json" } });
+    const isRead = !init || !init.method || init.method === "GET";
+    return new Response(JSON.stringify(isRead ? readResponse(url) : {}), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
 });
 afterEach(() => {
@@ -46,6 +57,14 @@ describe("RulesPage", () => {
     });
   });
 
+  it("muestra la bandeja «Sin categoría» antes de la lista de reglas", async () => {
+    renderWithProviders(<RulesPage />, { route: "/rules" });
+    const section = await screen.findByRole("region", { name: "Sin categoría" });
+    expect(await within(section).findByText("KIOSCO EL SOL")).toBeInTheDocument();
+    const rulesHeading = screen.getByRole("heading", { name: "Reglas" });
+    expect(section.compareDocumentPosition(rulesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("«Reaplicar a todo» manda el POST directo, sin confirmación", async () => {
     renderWithProviders(<RulesPage />, { route: "/rules" });
     await userEvent.click(await screen.findByRole("button", { name: "Reaplicar a todo" }));
@@ -71,6 +90,13 @@ describe("RulesPage en mobile", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByRole("grid")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Agregar" })).not.toBeInTheDocument();
+  });
+
+  it("la bandeja es una lista que abre una hoja, sin tabla", async () => {
+    renderWithProviders(<RulesPage />, { route: "/rules" });
+    await userEvent.click(await screen.findByRole("button", { name: /KIOSCO EL SOL/ }));
+    expect(screen.getByRole("dialog", { name: "KIOSCO EL SOL" })).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
   it("crea una regla desde «Nueva regla» con prioridad 100", async () => {
