@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  ALL_YEARS, filterInYears, globalSearch, matchesYears, parseYearKey, parseYears, resolveYearChange,
+  ALL_YEARS, filterInYears, globalSearch, matchesYears, monthRange, parseYearKey, parseYears, resolveYearChange,
   writeYears, yearKeyOf, yearOptionsWith, yearsForApi, yearsLabel, yearsOf, type YearSelection,
 } from "./globalFilters.js";
 
@@ -154,5 +154,17 @@ describe("parseYearKey", () => {
   it("separa por coma y respeta all", () => {
     expect(parseYearKey("2026,2025")).toEqual(only("2025", "2026"));
     expect(parseYearKey("all")).toEqual(ALL);
+  });
+});
+
+describe("monthRange", () => {
+  it("devuelve el primer y el último día del mes", () => {
+    expect(monthRange("2026-09")).toEqual({ from: "2026-09-01", to: "2026-09-30" });
+    expect(monthRange("2026-12")).toEqual({ from: "2026-12-01", to: "2026-12-31" });
+  });
+
+  it("contempla febrero bisiesto y no bisiesto", () => {
+    expect(monthRange("2028-02").to).toBe("2028-02-29");
+    expect(monthRange("2026-02").to).toBe("2026-02-28");
   });
 });

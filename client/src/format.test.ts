@@ -1,5 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { formatLocalDate, formatMoney, formatMoneyOrDash, formatUva } from "./format.js";
+import { formatLocalDate, formatMoney, formatMoneyOrDash, formatSignedPercent, formatUva } from "./format.js";
+
+describe("formatSignedPercent", () => {
+  it("antepone + a las subas, redondeando a un decimal", () => {
+    expect(formatSignedPercent(4.24)).toBe("+4,2%");
+    expect(formatSignedPercent(41.93)).toBe("+41,9%");
+  });
+
+  it("antepone el signo menos tipográfico a las bajas", () => {
+    expect(formatSignedPercent(-3.1)).toBe("−3,1%");
+  });
+
+  it("cero, o lo que redondea a cero, va sin signo", () => {
+    expect(formatSignedPercent(0)).toBe("0,0%");
+    expect(formatSignedPercent(-0.04)).toBe("0,0%");
+    expect(formatSignedPercent(0.04)).toBe("0,0%");
+  });
+});
 
 describe("formatUva", () => {
   it("usa separadores es-AR y sufijo UVA", () => {

@@ -18,6 +18,13 @@ export function formatPercent(value: number): string {
   return `${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)}%`;
 }
 
+export function formatSignedPercent(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  if (rounded === 0) return formatPercent(0);
+  const sign = rounded > 0 ? "+" : "−";
+  return `${sign}${formatPercent(Math.abs(rounded))}`;
+}
+
 export function formatUva(value: number): string {
   const formatted = new Intl.NumberFormat("es-AR", {
     minimumFractionDigits: 2,

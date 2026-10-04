@@ -52,6 +52,12 @@ export const yearsLabel = (years: string[]): string => {
 
 export const yearsOf = (values: string[]): string[] => uniqueSorted(values.map((value) => value.slice(0, 4)));
 
+export const monthRange = (month: string): { from: string; to: string } => {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return { from: `${month}-01`, to: `${month}-${String(lastDay).padStart(2, "0")}` };
+};
+
 export const writeYears = (params: URLSearchParams, selection: YearSelection): void => {
   params.delete("year");
   if (selection.kind === "all") {
