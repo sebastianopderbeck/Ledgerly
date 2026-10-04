@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { CreditSummaryDTO, MacroSeriesDTO } from "@ledgerly/shared";
 import {
   dolarRealSeries, tasaRealSeries, inflacionInteranual, variacion12m, raceSeries,
-  defaultAssumptions, buildVerdict, buildSignals, buildMacroView, macroChartsInYears,
+  defaultAssumptions, buildVerdict, buildSignals, buildMacroView, macroChartsInYears, retornoAdelantar,
   type MacroAssumptions, type MacroView, type RaceSerie,
 } from "./macroSignals.js";
 
@@ -337,5 +337,16 @@ describe("macroChartsInYears", () => {
     expect(charts.dolarReal.serie).toHaveLength(2);
     expect(charts.tasaReal).toHaveLength(2);
     expect(charts.race).toHaveLength(2);
+  });
+});
+
+describe("retornoAdelantar", () => {
+  it("anualiza la tasa real mensual del crédito", () => {
+    expect(retornoAdelantar(credit(0.0075))).toBeCloseTo((1.0075 ** 12 - 1) * 100, 10);
+    expect(retornoAdelantar(credit(0.0075))).toBeCloseTo(9.3807, 4);
+  });
+
+  it("sin crédito devuelve null", () => {
+    expect(retornoAdelantar(undefined)).toBeNull();
   });
 });
