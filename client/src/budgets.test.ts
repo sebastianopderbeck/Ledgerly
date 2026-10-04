@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import type { BudgetDTO, CategoryMonthStat, InflationRateDTO } from "@ledgerly/shared";
+import type { BudgetDTO, BudgetSpendingDTO, CategoryMonthStat, InflationRateDTO } from "@ledgerly/shared";
 import { formatMoney } from "./format.js";
 import {
-  budgetBalanceText, budgetCategoryOptions, budgetInflationNote, budgetLines, budgetStatus, budgetTotals, currentLimit,
-  formatPesos, limitForMonth, monthInText, unbudgetedCategories,
+  budgetBalanceText, budgetCategoryOptions, budgetHistory, budgetInflationNote, budgetLines, budgetStatus, budgetTotals,
+  budgetsView, closedMonths, currentLimit, defaultBudgetMonth, formatPesos, isPartialMonth, limitForMonth, monthInText,
+  selectableMonths, unbudgetedCategories,
 } from "./budgets.js";
 
 const budget = (category: string, topeArs: number, overrides: Partial<BudgetDTO> = {}): BudgetDTO => ({
@@ -170,5 +171,102 @@ describe("textos", () => {
     expect(budgetInflationNote(ajustado, "2026-08", "2026-08")).toBe(" · Ajustado por IPC");
     expect(budgetInflationNote(ajustado, "2026-09", "2026-08")).toBe(" · Ajustado por IPC (IPC hasta agosto de 2026)");
     expect(budgetInflationNote(ajustado, "2026-09", null)).toBe(" · Ajustado por IPC (sin IPC cargado)");
+  });
+});
+
+describe("meses", () => {
+  const gastos = [
+    gasto("2026-08", "Comida", 1),
+    gasto("2026-09", "Comida", 1),
+    gasto("2026-09", "Ropa", 1),
+    gasto("2026-10", "Comida", 1),
+  ];
+  const today = new Date(2026, 9, 3);
+
+  it("selectableMonths lista los meses con consumos y suma el elegido", () => {
+    expect(selectableMonths(gastos, null)).toEqual(["2026-08", "2026-09", "2026-10"]);
+    expect(selectableMonths(gastos, "2026-12")).toEqual(["2026-08", "2026-09", "2026-10", "2026-12"]);
+    expect(selectableMonths(gastos, "2026-09")).toEqual(["2026-08", "2026-09", "2026-10"]);
+  });
+
+  it("defaultBudgetMonth prefiere el último mes cerrado y cae al último o al actual", () => {
+    expect(defaultBudgetMonth(["2026-08", "2026-09", "2026-10"], "2026-09", today)).toBe("2026-09");
+    expect(defaultBudgetMonth(["2026-08", "2026-10"], "2026-09", today)).toBe("2026-08");
+    expect(defaultBudgetMonth(["2026-10", "2026-11"], "2026-09", today)).toBe("2026-11");
+    expect(defaultBudgetMonth(["2026-08", "2026-10"], null, today)).toBe("2026-10");
+    expect(defaultBudgetMonth([], "2026-09", today)).toBe("2026-10");
+  });
+
+  it("isPartialMonth marca los meses posteriores al último cerrado", () => {
+    expect(isPartialMonth("2026-10", "2026-09")).toBe(true);
+    expect(isPartialMonth("2026-09", "2026-09")).toBe(false);
+    expect(isPartialMonth("2026-10", null)).toBe(false);
+  });
+
+  it("closedMonths deja los meses con consumos hasta el último cerrado", () => {
+    expect(closedMonths(gastos, "2026-09")).toEqual(["2026-08", "2026-09"]);
+    expect(closedMonths(gastos, null)).toEqual(["2026-08", "2026-09", "2026-10"]);
+  });
+});
+
+describe("budgetHistory", () => {
+  it("agrupa por mes las categorías en cada estado con los topes actuales", () => {
+    const budgets = [budget("Comida", 300), budget("Transporte", 100), budget("Ropa", 100)];
+    const gastos = [
+      gasto("2026-08", "Comida", 250),
+      gasto("2026-08", "Ropa", 120),
+      gasto("2026-09", "Comida", 330),
+      gasto("2026-09", "Transporte", 85),
+    ];
+    expect(budgetHistory(budgets, gastos, ["2026-08", "2026-09"], [])).toEqual([
+      { month: "2026-08", ok: ["Transporte"], cerca: ["Comida"], pasado: ["Ropa"] },
+      { month: "2026-09", ok: ["Ropa"], cerca: ["Transporte"], pasado: ["Comida"] },
+    ]);
+  });
+});
+
+describe("budgetsView", () => {
+  const spending: BudgetSpendingDTO = {
+    ultimoMesCerrado: "2026-09",
+    gastos: [
+      gasto("2026-08", "Comida", 250),
+      gasto("2026-09", "Comida", 330),
+      gasto("2026-09", "Farmacia", 15),
+      gasto("2026-10", "Comida", 40),
+    ],
+  };
+  const budgets = [budget("Comida", 300)];
+  const today = new Date(2026, 9, 3);
+
+  it("sin Mes en la URL muestra el último mes cerrado", () => {
+    const view = budgetsView({ budgets, spending, inflation: [], selectedMonth: null, today });
+    expect(view).toMatchObject({
+      month: "2026-09", months: ["2026-08", "2026-09", "2026-10"], partial: false, hasSpending: true, latestIpc: null,
+    });
+    expect(view.lines.map((line) => line.estado)).toEqual(["pasado"]);
+    expect(view.totals).toMatchObject({ gastado: 330, tope: 300 });
+    expect(view.unbudgeted).toEqual([{ category: "Farmacia", total: 15 }]);
+  });
+
+  it("un mes posterior al cerrado es parcial y el histórico lo deja afuera", () => {
+    const view = budgetsView({ budgets, spending, inflation: [], selectedMonth: "2026-10", today });
+    expect(view).toMatchObject({ month: "2026-10", partial: true });
+    expect(view.history.map((summary) => summary.month)).toEqual(["2026-08", "2026-09"]);
+  });
+
+  it("un Mes sin consumos se respeta y se suma a los elegibles", () => {
+    const view = budgetsView({ budgets, spending, inflation: [], selectedMonth: "2026-12", today });
+    expect(view).toMatchObject({ month: "2026-12", hasSpending: false, months: ["2026-08", "2026-09", "2026-10", "2026-12"] });
+    expect(view.lines[0]).toMatchObject({ gastado: 0, estado: "ok" });
+  });
+
+  it("sin consumos cae en el mes calendario actual", () => {
+    const empty: BudgetSpendingDTO = { ultimoMesCerrado: null, gastos: [] };
+    const view = budgetsView({ budgets: [], spending: empty, inflation: [], selectedMonth: null, today });
+    expect(view).toMatchObject({ month: "2026-10", months: ["2026-10"], totals: null, history: [], hasSpending: false });
+  });
+
+  it("informa el último IPC publicado", () => {
+    expect(budgetsView({ budgets, spending, inflation: INFLATION, selectedMonth: null, today }).latestIpc).toBe("2026-09");
   });
 });

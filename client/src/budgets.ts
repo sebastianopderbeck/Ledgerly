@@ -1,4 +1,4 @@
-import type { BudgetDTO, CategoryMonthStat, CategoryRuleDTO, InflationRateDTO } from "@ledgerly/shared";
+import type { BudgetDTO, BudgetSpendingDTO, CategoryMonthStat, CategoryRuleDTO, InflationRateDTO } from "@ledgerly/shared";
 import { categoryOptions } from "./categoryOptions.js";
 import { formatMoney, formatMonthLabel } from "./format.js";
 import { inflationFactor, latestInflationPeriod } from "./inflationIndex.js";
@@ -37,6 +37,33 @@ export interface UnbudgetedCategory {
   total: number;
 }
 
+export interface BudgetMonthSummary {
+  month: string;
+  ok: string[];
+  cerca: string[];
+  pasado: string[];
+}
+
+export interface BudgetsViewInput {
+  budgets: BudgetDTO[];
+  spending: BudgetSpendingDTO;
+  inflation: InflationRateDTO[];
+  selectedMonth: string | null;
+  today: Date;
+}
+
+export interface BudgetsView {
+  months: string[];
+  month: string;
+  partial: boolean;
+  lines: BudgetLine[];
+  totals: BudgetTotals | null;
+  unbudgeted: UnbudgetedCategory[];
+  history: BudgetMonthSummary[];
+  latestIpc: string | null;
+  hasSpending: boolean;
+}
+
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
 const spendingIn = (gastos: CategoryMonthStat[], month: string): Map<string, number> =>
@@ -44,6 +71,15 @@ const spendingIn = (gastos: CategoryMonthStat[], month: string): Map<string, num
 
 const byRatioThenCategory = (a: BudgetLine, b: BudgetLine): number =>
   b.ratio - a.ratio || a.category.localeCompare(b.category, "es");
+
+const pad2 = (value: number): string => String(value).padStart(2, "0");
+
+const calendarMonth = (date: Date): string => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+
+const uniqueSorted = (values: string[]): string[] => [...new Set(values)].sort();
+
+const categoriesIn = (lines: BudgetLine[], estado: BudgetStatus): string[] =>
+  lines.filter((line) => line.estado === estado).map((line) => line.category);
 
 export function formatPesos(value: number): string {
   return formatMoney(Math.round(value) || 0, "ARS");
@@ -136,4 +172,51 @@ export function budgetInflationNote(budget: BudgetDTO, month: string, latestIpc:
   if (latestIpc === null) return " · Ajustado por IPC (sin IPC cargado)";
   if (month > latestIpc) return ` · Ajustado por IPC (IPC hasta ${monthInText(latestIpc)})`;
   return " · Ajustado por IPC";
+}
+
+export function isPartialMonth(month: string, ultimoMesCerrado: string | null): boolean {
+  return ultimoMesCerrado !== null && month > ultimoMesCerrado;
+}
+
+export function selectableMonths(gastos: CategoryMonthStat[], selected: string | null): string[] {
+  const months = gastos.map((gasto) => gasto.month);
+  return uniqueSorted(selected === null ? months : [...months, selected]);
+}
+
+export function defaultBudgetMonth(months: string[], ultimoMesCerrado: string | null, today: Date): string {
+  const closed = months.filter((month) => !isPartialMonth(month, ultimoMesCerrado));
+  return closed.at(-1) ?? months.at(-1) ?? calendarMonth(today);
+}
+
+export function closedMonths(gastos: CategoryMonthStat[], ultimoMesCerrado: string | null): string[] {
+  return selectableMonths(gastos, null).filter((month) => !isPartialMonth(month, ultimoMesCerrado));
+}
+
+export function budgetHistory(
+  budgets: BudgetDTO[],
+  gastos: CategoryMonthStat[],
+  months: string[],
+  inflation: InflationRateDTO[],
+): BudgetMonthSummary[] {
+  return months.map((month) => {
+    const lines = budgetLines(budgets, gastos, month, inflation);
+    return { month, ok: categoriesIn(lines, "ok"), cerca: categoriesIn(lines, "cerca"), pasado: categoriesIn(lines, "pasado") };
+  });
+}
+
+export function budgetsView({ budgets, spending, inflation, selectedMonth, today }: BudgetsViewInput): BudgetsView {
+  const { gastos, ultimoMesCerrado } = spending;
+  const month = selectedMonth ?? defaultBudgetMonth(selectableMonths(gastos, null), ultimoMesCerrado, today);
+  const lines = budgetLines(budgets, gastos, month, inflation);
+  return {
+    months: selectableMonths(gastos, month),
+    month,
+    partial: isPartialMonth(month, ultimoMesCerrado),
+    lines,
+    totals: budgetTotals(lines),
+    unbudgeted: unbudgetedCategories(budgets, gastos, month),
+    history: budgetHistory(budgets, gastos, closedMonths(gastos, ultimoMesCerrado), inflation),
+    latestIpc: latestInflationPeriod(inflation),
+    hasSpending: gastos.some((gasto) => gasto.month === month),
+  };
 }
