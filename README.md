@@ -25,6 +25,7 @@ bun run dev                # API :4000 + SPA :5173
 - `bun run service:install` — instala la versión publicada y su deploy automático (ver abajo)
 - `bun run deploy [ref]` — publica `origin/main` (o `ref`) en la versión publicada
 - `bun run test:scripts` — prueba `install-service.sh` / `deploy.sh` con `launchctl` y `lsof` simulados
+- `bun run gmail:auth` — autoriza a Ledgerly a leer tu Gmail (solo lectura) y guarda el refresh token en `.env`
 
 ## Versión publicada (privada)
 
@@ -70,6 +71,44 @@ rm ~/Library/LaunchAgents/com.ledgerly.server.plist
 tailscale serve reset
 ```
 
+## Importar desde Gmail (opcional)
+
+Ledgerly puede buscar en tu casilla los PDFs que te llegan por mail (resúmenes, cupones y recibos) y
+pasarlos por el mismo importador que la subida manual. Lee el mail con permiso de **solo lectura**.
+Sin las credenciales, la sección «Gmail» de Importar dice qué falta y el server no intenta conectarse.
+Diseño: `docs/superpowers/specs/2026-10-03-importacion-gmail-design.md`.
+
+1. [Google Cloud Console](https://console.cloud.google.com) → proyecto nuevo «Ledgerly».
+2. APIs y servicios → Biblioteca → **Gmail API** → Habilitar.
+3. Google Auth Platform → **Desarrollo de la marca**: nombre «Ledgerly» y tu mail como soporte y
+   contacto. **Público**: tipo **Externo** (si la casilla es de un Google Workspace propio,
+   **Interno**, y se saltea el paso 5).
+4. **Acceso a los datos** → Agregar permisos → `https://www.googleapis.com/auth/gmail.readonly`.
+5. **Público** → **Publicar app** (queda «En producción»). En estado «Prueba», Google vence el
+   refresh token a los 7 días. No hace falta pedir verificación: al autorizar aparece «Google no
+   verificó esta app» → Configuración avanzada → Ir a Ledgerly.
+6. **Clientes** → Crear cliente → tipo **App de escritorio**, nombre «Ledgerly». Copiar el ID y el
+   secreto a `GMAIL_CLIENT_ID` y `GMAIL_CLIENT_SECRET` del `.env`.
+7. `bun run gmail:auth` → abrir el link, elegir la cuenta y aceptar el permiso de **solo lectura**.
+   El script guarda `GMAIL_REFRESH_TOKEN` en `.env` y no lo muestra.
+8. Reiniciar `bun run dev` → Importar → **Buscar en Gmail**.
+9. (Opcional) Acotar la búsqueda: probarla antes en el buscador de Gmail y cargarla entre comillas,
+   p. ej. `GMAIL_QUERY="from:(resumenes@mibanco.com.ar OR recibos@miempresa.com) has:attachment filename:pdf newer_than:90d"`.
+10. Versión publicada: copiar las líneas `GMAIL_*` a `~/Services/ledgerly/.env`, sumar
+    `GMAIL_SYNC_INTERVAL_MINUTES=360` y correr
+    `launchctl kickstart -k gui/$(id -u)/com.ledgerly.server`. En `server.log` aparece
+    `Gmail: búsqueda automática cada 360 min`. Dejar la búsqueda automática **solo** en la publicada.
+11. Revocar: [myaccount.google.com/connections](https://myaccount.google.com/connections) →
+    Ledgerly → Borrar todas las conexiones, y borrar las líneas `GMAIL_*`. Si el secreto se filtró,
+    borrar el cliente en «Clientes» y crear otro.
+
+Si Google revoca el token (cambio de contraseña, revocación manual o 6 meses sin uso), la sección
+muestra el error: volver a correr `bun run gmail:auth`, copiar la línea nueva al `.env` que
+corresponda y reiniciar.
+
 ## Privacidad
 Los PDFs reales (`examples/`) están gitignoreados; los fixtures de test son sintéticos.
 No se commitea data financiera real.
+El refresh token de Gmail da lectura de todo el mail: vive solo en `.env` (gitignoreado), nunca se
+loguea ni se manda al cliente. Los PDFs de Gmail se procesan en memoria; no se guarda asunto,
+remitente ni cuerpo de ningún mail.
