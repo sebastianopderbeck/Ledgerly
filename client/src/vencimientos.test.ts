@@ -154,6 +154,7 @@ describe("vencimientosDeTarjetas", () => {
       tipo: "tarjeta",
       sentido: "pago",
       estado: "confirmado",
+      montoAproximado: false,
       fecha: "2026-10-13",
       titulo: "Visa Signature",
       detalle: `Resumen con cierre 02/10 · mín. ${formatMoney(42_000, "ARS")}`,
@@ -166,13 +167,45 @@ describe("vencimientosDeTarjetas", () => {
     const [fuente] = vencimientosDeTarjetas([visaOctubre], RANGO);
     expect(fuente.items.slice(1)).toEqual([
       {
-        id: "tarjeta-visa_signature-2026-11-13", tipo: "tarjeta", sentido: "pago", estado: "estimado", fecha: "2026-11-13",
-        titulo: "Visa Signature", detalle: "Según el último resumen", monto: null, montoUsd: null,
+        id: "tarjeta-visa_signature-2026-11-13", tipo: "tarjeta", sentido: "pago", estado: "estimado", montoAproximado: true,
+        fecha: "2026-11-13", titulo: "Visa Signature", detalle: "Según el último resumen", monto: null, montoUsd: null,
       },
       {
-        id: "tarjeta-visa_signature-2026-12-14", tipo: "tarjeta", sentido: "pago", estado: "estimado", fecha: "2026-12-14",
-        titulo: "Visa Signature", detalle: "Según el último resumen", monto: null, montoUsd: null,
+        id: "tarjeta-visa_signature-2026-12-14", tipo: "tarjeta", sentido: "pago", estado: "estimado", montoAproximado: true,
+        fecha: "2026-12-14", titulo: "Visa Signature", detalle: "Según el último resumen", monto: null, montoUsd: null,
       },
+    ]);
+  });
+
+  it("sin vencimiento estima la fecha a 12 días del cierre y lleva el saldo del resumen", () => {
+    const visa = statement({
+      id: "visa-09", issuer: "visa_signature", closingDate: "2026-09-24", dueDate: null, saldoArs: 812_000, minimoArs: 42_000,
+    });
+    const [fuente] = vencimientosDeTarjetas([visa], RANGO);
+    expect(fuente.items[0]).toEqual({
+      id: "tarjeta-visa_signature-2026-10-06",
+      tipo: "tarjeta",
+      sentido: "pago",
+      estado: "estimado",
+      montoAproximado: false,
+      fecha: "2026-10-06",
+      titulo: "Visa Signature",
+      detalle: `Resumen con cierre 24/09 · vencimiento estimado · mín. ${formatMoney(42_000, "ARS")}`,
+      monto: 812_000,
+      montoUsd: null,
+    });
+  });
+
+  it("el vencimiento estimado por el cierre se corre al lunes y arma el patrón", () => {
+    const statements = [
+      statement({ id: "visa-08", issuer: "visa_signature", closingDate: "2026-08-27", dueDate: null }),
+      statement({ id: "visa-09", issuer: "visa_signature", closingDate: "2026-09-29", dueDate: null, saldoArs: 500_000 }),
+    ];
+    const [fuente] = vencimientosDeTarjetas(statements, RANGO);
+    expect(fuente.items.map(({ fecha, estado, monto }) => [fecha, estado, monto])).toEqual([
+      ["2026-10-12", "estimado", 500_000],
+      ["2026-11-10", "estimado", null],
+      ["2026-12-10", "estimado", null],
     ]);
   });
 
@@ -183,10 +216,10 @@ describe("vencimientosDeTarjetas", () => {
     });
   });
 
-  it("ignora los resúmenes sin vencimiento", () => {
+  it("ignora los resúmenes sin vencimiento ni cierre", () => {
     const statements = [
       statement({ id: "icbc-09", issuer: "icbc", dueDate: "2026-09-14" }),
-      statement({ id: "icbc-10", issuer: "icbc", closingDate: "2026-10-01", dueDate: null }),
+      statement({ id: "icbc-10", issuer: "icbc", closingDate: null, dueDate: null }),
     ];
     const [fuente] = vencimientosDeTarjetas(statements, RANGO);
     expect(resumido(fuente.items)).toEqual([
@@ -333,11 +366,11 @@ describe("vencimientosDeSueldo", () => {
     expect(fuente.etiqueta).toBe("Sueldo");
     expect(fuente.items).toEqual([
       {
-        id: "sueldo-2026-10-30", tipo: "sueldo", sentido: "cobro", estado: "estimado", fecha: "2026-10-30",
+        id: "sueldo-2026-10-30", tipo: "sueldo", sentido: "cobro", estado: "estimado", montoAproximado: true, fecha: "2026-10-30",
         titulo: "Sueldo de octubre 2026", detalle: "Igual al neto de agosto 2026", monto: 2_100_000, montoUsd: null,
       },
       {
-        id: "sueldo-2026-12-01", tipo: "sueldo", sentido: "cobro", estado: "estimado", fecha: "2026-12-01",
+        id: "sueldo-2026-12-01", tipo: "sueldo", sentido: "cobro", estado: "estimado", montoAproximado: true, fecha: "2026-12-01",
         titulo: "Sueldo de noviembre 2026", detalle: "Igual al neto de agosto 2026", monto: 2_100_000, montoUsd: null,
       },
     ]);
@@ -481,6 +514,15 @@ describe("agruparVencimientos", () => {
     expect(grupo).toMatchObject({ pagosAproximados: false, cobrosAproximados: true });
     expect(resumenDeGrupo(grupo)).toBe(`Pagos ${formatMoney(812_000, "ARS")} · Cobros ≈ ${formatMoney(2_100_000, "ARS")}`);
   });
+
+  it("un resumen con fecha estimada pero saldo conocido no aproxima los pagos", () => {
+    const items = [
+      vencimiento({ fecha: "2026-10-06", titulo: "Visa Signature", estado: "estimado", montoAproximado: false, monto: 812_000 }),
+    ];
+    const [grupo] = agruparVencimientos(items, "semana", HOY);
+    expect(grupo.pagosAproximados).toBe(false);
+    expect(resumenDeGrupo(grupo)).toBe(`Pagos ${formatMoney(812_000, "ARS")}`);
+  });
 });
 
 describe("resumenDeGrupo", () => {
@@ -517,6 +559,11 @@ describe("textos de cada fila", () => {
       .toBe(`+${formatMoney(2_100_000, "ARS")}`);
     expect(montoTexto(vencimiento({ fecha: "2026-10-30", titulo: "Sueldo", sentido: "cobro", estado: "estimado", monto: 2_100_000 })))
       .toBe(`≈ +${formatMoney(2_100_000, "ARS")}`);
+  });
+
+  it("montoTexto no aproxima el saldo de un resumen aunque su fecha sea estimada", () => {
+    const visa = vencimiento({ fecha: "2026-10-06", titulo: "Visa", estado: "estimado", montoAproximado: false, monto: 812_000 });
+    expect(montoTexto(visa)).toBe(formatMoney(812_000, "ARS"));
   });
 
   it("montoUsdTexto suma el saldo en dólares si hay", () => {

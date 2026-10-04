@@ -67,6 +67,14 @@ describe("VencimientosList", () => {
     expect(within(sueldo).getByText(visible(`+${formatMoney(2_100_000, "ARS")}`))).toBeInTheDocument();
   });
 
+  it("un resumen con fecha estimada muestra Estimado y su saldo sin ≈", () => {
+    const visa = vencimiento({ fecha: "2026-10-06", titulo: "Visa Signature", estado: "estimado", montoAproximado: false, monto: 812_000 });
+    renderWithProviders(<VencimientosList grupos={agruparVencimientos([visa], "semana", HOY)} hoy={HOY} />);
+    const fila = screen.getByRole("listitem", { name: "Visa Signature, 6 de octubre, estimado" });
+    expect(within(fila).getByText("Estimado")).toBeInTheDocument();
+    expect(within(fila).getByText(visible(formatMoney(812_000, "ARS")))).toBeInTheDocument();
+  });
+
   it("la ficha de fecha dice hoy, mañana o el día corto", () => {
     renderList();
     expect(within(screen.getByRole("listitem", { name: /^ICBC/ })).getByText("hoy")).toBeInTheDocument();

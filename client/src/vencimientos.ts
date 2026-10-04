@@ -10,6 +10,7 @@ import {
 export const MESES_ADELANTE = 2;
 export const MUESTRA_PATRON = 6;
 export const MESES_SIN_DOCUMENTO_MAX = 3;
+export const DIAS_CIERRE_A_VENCIMIENTO = 12;
 
 export type VencimientoTipo = "tarjeta" | "credito" | "auto" | "sueldo";
 export type VencimientoSentido = "pago" | "cobro";
@@ -27,6 +28,7 @@ export interface Vencimiento {
   detalle: string;
   monto: number | null;
   montoUsd: number | null;
+  montoAproximado: boolean;
 }
 
 export interface RangoFechas { desde: string; hasta: string; }
@@ -66,6 +68,8 @@ interface Agrupador {
 
 type DatosVencimiento = Pick<Vencimiento, "fecha" | "titulo" | "detalle" | "monto" | "montoUsd">;
 
+type DatosDocumento = DatosVencimiento & Pick<Vencimiento, "estado">;
+
 interface DefinicionFuente {
   tipo: VencimientoTipo;
   sentido: VencimientoSentido;
@@ -73,12 +77,12 @@ interface DefinicionFuente {
   etiqueta: string;
   corrimiento: Corrimiento;
   ocurrencias: Ocurrencia[];
-  documentos: DatosVencimiento[];
+  documentos: DatosDocumento[];
   pasosRestantes: number;
   estimar: (proyectada: FechaProyectada) => Omit<DatosVencimiento, "fecha">;
 }
 
-type StatementConVencimiento = StatementDTO & { dueDate: string };
+interface ResumenConVencimiento { statement: StatementDTO; fecha: string; confirmado: boolean; }
 
 const CORRIMIENTO_DIAS: Record<Corrimiento, Record<number, number>> = {
   adelante: { 6: 2, 0: 1 },
@@ -157,41 +161,54 @@ const armarFuente = (
   { tipo, sentido, clave, etiqueta, corrimiento, ocurrencias, documentos, pasosRestantes, estimar }: DefinicionFuente,
   rango: RangoFechas,
 ): FuenteVencimientos => {
-  const crear = (estado: VencimientoEstado, datos: DatosVencimiento): Vencimiento => ({
+  const crear = (datos: DatosVencimiento, estado: VencimientoEstado, montoAproximado: boolean): Vencimiento => ({
     id: clave ? `${tipo}-${clave}-${datos.fecha}` : `${tipo}-${datos.fecha}`,
     tipo,
     sentido,
     estado,
+    montoAproximado,
     ...datos,
   });
   const ultimoMes = ordenarOcurrencias(ocurrencias).at(-1)?.mes;
   const terminada = pasosRestantes <= 0;
   const desactualizada = !terminada && ultimoMes !== undefined && estaDesactualizada(ultimoMes, rango.desde);
-  const confirmados = documentos.filter(({ fecha }) => enRango(fecha, rango)).map((datos) => crear("confirmado", datos));
+  const documentados = documentos
+    .filter(({ fecha }) => enRango(fecha, rango))
+    .map(({ estado, ...datos }) => crear(datos, estado, false));
   const proyectadas = terminada || desactualizada ? [] : proyectarFechas(ocurrencias, rango, corrimiento);
   const estimados = proyectadas
     .filter(({ paso }) => paso <= pasosRestantes)
-    .map((proyectada) => crear("estimado", { fecha: proyectada.fecha, ...estimar(proyectada) }));
-  return { etiqueta, items: unicosPorId([...confirmados, ...estimados]), desactualizada };
+    .map((proyectada) => crear({ fecha: proyectada.fecha, ...estimar(proyectada) }, "estimado", true));
+  return { etiqueta, items: unicosPorId([...documentados, ...estimados]), desactualizada };
 };
 
-const tieneVencimiento = (statement: StatementDTO): statement is StatementConVencimiento => statement.dueDate !== null;
+const estadoDe = (confirmado: boolean): VencimientoEstado => (confirmado ? "confirmado" : "estimado");
 
-const porVencimientoEImportacion = (a: StatementConVencimiento, b: StatementConVencimiento): number =>
-  a.dueDate.localeCompare(b.dueDate) || a.uploadedAt.localeCompare(b.uploadedAt);
+const vencimientoDeResumen = (statement: StatementDTO): ResumenConVencimiento | null => {
+  if (statement.dueDate) return { statement, fecha: statement.dueDate, confirmado: true };
+  if (!statement.closingDate) return null;
+  const fecha = ajustarFinDeSemana(addDays(statement.closingDate, DIAS_CIERRE_A_VENCIMIENTO), "adelante");
+  return { statement, fecha, confirmado: false };
+};
 
-const detalleResumen = ({ closingDate, totals }: StatementDTO): string => {
-  const origen = closingDate ? `Resumen con cierre ${formatDayMonth(closingDate)}` : "Resumen importado";
-  return `${origen} · mín. ${formatMoney(totals.pagoMinimo.ars, "ARS")}`;
+const tieneVencimiento = (resumen: ResumenConVencimiento | null): resumen is ResumenConVencimiento => resumen !== null;
+
+const porVencimientoEImportacion = (a: ResumenConVencimiento, b: ResumenConVencimiento): number =>
+  a.fecha.localeCompare(b.fecha) || a.statement.uploadedAt.localeCompare(b.statement.uploadedAt);
+
+const detalleResumen = ({ statement, confirmado }: ResumenConVencimiento): string => {
+  const origen = statement.closingDate ? `Resumen con cierre ${formatDayMonth(statement.closingDate)}` : "Resumen importado";
+  const vencimiento = confirmado ? "" : " · vencimiento estimado";
+  return `${origen}${vencimiento} · mín. ${formatMoney(statement.totals.pagoMinimo.ars, "ARS")}`;
 };
 
 const detallePatron = (cantidad: number): string =>
   cantidad === 1 ? "Según el último resumen" : `Según los últimos ${cantidad} resúmenes`;
 
-const fuenteDeTarjeta = (issuer: Issuer, statements: StatementConVencimiento[], rango: RangoFechas): FuenteVencimientos => {
-  const ordenados = [...statements].sort(porVencimientoEImportacion);
-  const ultimo = ordenados[ordenados.length - 1];
-  const ocurrencias = ordenados.map(({ dueDate }) => ({ mes: monthOf(dueDate), fecha: dueDate }));
+const fuenteDeTarjeta = (issuer: Issuer, resumenes: ResumenConVencimiento[], rango: RangoFechas): FuenteVencimientos => {
+  const ordenados = [...resumenes].sort(porVencimientoEImportacion);
+  const ultimo = ordenados[ordenados.length - 1].statement;
+  const ocurrencias = ordenados.map(({ fecha }) => ({ mes: monthOf(fecha), fecha }));
   const detalle = detallePatron(Math.min(MUESTRA_PATRON, ordenarOcurrencias(ocurrencias).length));
   return armarFuente({
     tipo: "tarjeta",
@@ -200,12 +217,13 @@ const fuenteDeTarjeta = (issuer: Issuer, statements: StatementConVencimiento[], 
     etiqueta: ultimo.cardLabel,
     corrimiento: "adelante",
     ocurrencias,
-    documentos: ordenados.map((statement) => ({
-      fecha: statement.dueDate,
-      titulo: statement.cardLabel,
-      detalle: detalleResumen(statement),
-      monto: statement.totals.saldoActual.ars,
-      montoUsd: statement.totals.saldoActual.usd > 0 ? statement.totals.saldoActual.usd : null,
+    documentos: ordenados.map((resumen) => ({
+      fecha: resumen.fecha,
+      estado: estadoDe(resumen.confirmado),
+      titulo: resumen.statement.cardLabel,
+      detalle: detalleResumen(resumen),
+      monto: resumen.statement.totals.saldoActual.ars,
+      montoUsd: resumen.statement.totals.saldoActual.usd > 0 ? resumen.statement.totals.saldoActual.usd : null,
     })),
     pasosRestantes: SIN_LIMITE,
     estimar: () => ({ titulo: ultimo.cardLabel, detalle, monto: null, montoUsd: null }),
@@ -213,10 +231,10 @@ const fuenteDeTarjeta = (issuer: Issuer, statements: StatementConVencimiento[], 
 };
 
 export function vencimientosDeTarjetas(statements: StatementDTO[], rango: RangoFechas): FuenteVencimientos[] {
-  const conVencimiento = statements.filter(tieneVencimiento);
-  const emisores = [...new Set(conVencimiento.map(({ issuer }) => issuer))].sort();
+  const resumenes = statements.map(vencimientoDeResumen).filter(tieneVencimiento);
+  const emisores = [...new Set(resumenes.map(({ statement }) => statement.issuer))].sort();
   return emisores.map((issuer) =>
-    fuenteDeTarjeta(issuer, conVencimiento.filter((statement) => statement.issuer === issuer), rango));
+    fuenteDeTarjeta(issuer, resumenes.filter(({ statement }) => statement.issuer === issuer), rango));
 }
 
 const ultimaCuota = <T extends { cuotaNro: number }>(coupons: T[]): T =>
@@ -248,6 +266,7 @@ export function vencimientosDeCredito(
     ocurrencias: coupons.map(({ fechaDebito }) => ({ mes: monthOf(fechaDebito), fecha: fechaDebito })),
     documentos: coupons.map((coupon) => ({
       fecha: coupon.fechaDebito,
+      estado: "confirmado",
       titulo: `${ETIQUETA_CREDITO} · cuota ${coupon.cuotaNro}`,
       detalle: `Cupón importado · ${formatUva(coupon.cuotaPuraUva)}`,
       monto: coupon.totalDebitado,
@@ -270,6 +289,7 @@ export function vencimientosDeAuto(coupons: AutoCouponDTO[], cuotasTotales: numb
     ocurrencias: coupons.map(({ fechaVencimiento }) => ({ mes: monthOf(fechaVencimiento), fecha: fechaVencimiento })),
     documentos: coupons.map((coupon) => ({
       fecha: coupon.fechaVencimiento,
+      estado: "confirmado",
       titulo: `${ETIQUETA_AUTO} · cuota ${coupon.cuotaNro}`,
       detalle: "Cupón importado",
       monto: coupon.totalAPagar,
@@ -298,6 +318,7 @@ export function vencimientosDeSueldo(payslips: PayslipDTO[], rango: RangoFechas)
     ocurrencias: mensuales.map(({ periodo, fechaPago }) => ({ mes: addMonths(periodo, 1), fecha: fechaPago })),
     documentos: mensuales.map(({ periodo, fechaPago, neto }) => ({
       fecha: fechaPago,
+      estado: "confirmado",
       titulo: `${ETIQUETA_SUELDO} de ${formatMonthYear(periodo)}`,
       detalle: "Recibo importado",
       monto: neto,
@@ -358,8 +379,8 @@ const AGRUPADORES: Record<Agrupacion, Agrupador> = {
 const sumar = (items: Vencimiento[], valor: (item: Vencimiento) => number | null): number =>
   items.reduce((total, item) => total + (valor(item) ?? 0), 0);
 
-const hayEstimadoConMonto = (items: Vencimiento[]): boolean =>
-  items.some(({ estado, monto }) => estado === "estimado" && monto !== null);
+const hayMontoAproximado = (items: Vencimiento[]): boolean =>
+  items.some(({ montoAproximado, monto }) => montoAproximado && monto !== null);
 
 const armarGrupo = (clave: string, titulo: string, items: Vencimiento[]): GrupoVencimientos => {
   const pagos = items.filter(({ sentido }) => sentido === "pago");
@@ -371,8 +392,8 @@ const armarGrupo = (clave: string, titulo: string, items: Vencimiento[]): GrupoV
     totalPagos: sumar(pagos, ({ monto }) => monto),
     totalPagosUsd: sumar(pagos, ({ montoUsd }) => montoUsd),
     totalCobros: sumar(cobros, ({ monto }) => monto),
-    pagosAproximados: hayEstimadoConMonto(pagos),
-    cobrosAproximados: hayEstimadoConMonto(cobros),
+    pagosAproximados: hayMontoAproximado(pagos),
+    cobrosAproximados: hayMontoAproximado(cobros),
     aConfirmar: items.filter(({ monto }) => monto === null).length,
   };
 };
@@ -406,10 +427,10 @@ export function resumenDeGrupo({
   return partes.filter((parte): parte is string => parte !== null).join(" · ");
 }
 
-export function montoTexto({ monto, sentido, estado }: Vencimiento): string {
+export function montoTexto({ monto, sentido, montoAproximado }: Vencimiento): string {
   if (monto === null) return "A confirmar";
   const signo = sentido === "cobro" ? "+" : "";
-  return `${prefijoAproximado(estado === "estimado")}${signo}${formatMoney(monto, "ARS")}`;
+  return `${prefijoAproximado(montoAproximado)}${signo}${formatMoney(monto, "ARS")}`;
 }
 
 export function montoUsdTexto({ montoUsd }: Vencimiento): string | null {

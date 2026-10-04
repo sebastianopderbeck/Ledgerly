@@ -151,6 +151,7 @@ export const vencimiento = (overrides: VencimientoFixture): Vencimiento => ({
   detalle: "Detalle sintético",
   monto: 100_000,
   montoUsd: null,
+  montoAproximado: overrides.estado === "estimado",
   ...overrides,
 });
 
