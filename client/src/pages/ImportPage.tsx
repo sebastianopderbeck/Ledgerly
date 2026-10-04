@@ -3,8 +3,10 @@ import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material"
 import type { ImportResultUnionDTO } from "@ledgerly/shared";
 import { useImportFile } from "../api/hooks.js";
 import { FileDropzone } from "../components/FileDropzone.js";
+import { GmailImportSection } from "../components/GmailImportSection.js";
 import { ImportedFilesSection } from "../components/ImportedFilesSection.js";
 import { ReconciliationBanner } from "../components/ReconciliationBanner.js";
+import { StatementReviewSection } from "../components/StatementReviewSection.js";
 
 export const ImportPage = () => {
   const upload = useImportFile();
@@ -19,6 +21,8 @@ export const ImportPage = () => {
   const handleReplace = () => {
     if (lastFile) upload.mutate({ file: lastFile, replace: true }, { onSuccess: setLast });
   };
+
+  const focusStatement = last?.kind === "statement" ? last.statement : null;
 
   const replaceAction = (
     <Button color="inherit" size="small" onClick={handleReplace} disabled={upload.isPending}>
@@ -82,6 +86,9 @@ export const ImportPage = () => {
             : `Importado: recibo de ${last.payslip.periodo}`}
         </Alert>
       )}
+
+      <GmailImportSection />
+      <StatementReviewSection key={focusStatement?.id ?? "latest"} focusStatement={focusStatement} />
 
       <Typography variant="h6" component="h2" sx={{ mt: 4, mb: 2 }}>Archivos importados</Typography>
       <ImportedFilesSection />

@@ -10,8 +10,17 @@ describe("secciones en mobile", () => {
     expect(BAR_ITEMS[0].shortLabel).toBe("Inicio");
   });
 
-  it("«Más» lleva Créditos, Auto, Sueldo, Contexto y Reglas", () => {
-    expect(MORE_ITEMS.map((item) => item.label)).toEqual(["Créditos", "Auto", "Sueldo", "Contexto", "Reglas"]);
+  it("«Más» lleva Créditos, Auto, Patrimonio, Sueldo, Vencimientos, Contexto, Flujo, Presupuestos, Suscripciones y Reglas", () => {
+    expect(MORE_ITEMS.map((item) => item.label)).toEqual([
+      "Créditos", "Auto", "Patrimonio", "Sueldo", "Vencimientos", "Contexto", "Flujo", "Presupuestos", "Suscripciones", "Reglas",
+    ]);
+  });
+
+  it("en la sidebar, Suscripciones va después de Movimientos y las demás secciones nuevas antes", () => {
+    expect(NAV_ITEMS.map((item) => item.to)).toEqual([
+      "/", "/installments", "/credits", "/auto", "/patrimonio", "/sueldo", "/vencimientos", "/contexto", "/flujo",
+      "/presupuestos", "/transactions", "/suscripciones", "/rules", "/import",
+    ]);
   });
 
   it("entre la barra y «Más» están todas las secciones, sin repetir", () => {
@@ -23,6 +32,9 @@ describe("secciones en mobile", () => {
   it("isMoreRoute reconoce solo las rutas de «Más»", () => {
     expect(isMoreRoute("/credits")).toBe(true);
     expect(isMoreRoute("/rules")).toBe(true);
+    for (const route of ["/patrimonio", "/vencimientos", "/flujo", "/presupuestos", "/suscripciones"]) {
+      expect(isMoreRoute(route)).toBe(true);
+    }
     expect(isMoreRoute("/")).toBe(false);
     expect(isMoreRoute("/transactions")).toBe(false);
     expect(isMoreRoute("/creditsx")).toBe(false);
