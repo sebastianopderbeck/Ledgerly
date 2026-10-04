@@ -16,6 +16,7 @@ import { InstallmentsByMerchantChart } from "../components/charts/InstallmentsBy
 import { PendingInstallmentsByCategoryChart } from "../components/charts/PendingInstallmentsByCategoryChart.js";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
 import { Kpi } from "../components/Kpi.js";
+import { InstallmentSavingsSection } from "../components/InstallmentSavingsSection.js";
 import { useIsMobile } from "../useIsMobile.js";
 
 const INSTALLMENT_FIELDS: FilterField[] = ["year", "currency", "card"];
@@ -33,6 +34,7 @@ export const InstallmentsPage = () => {
   const mesesLabel = months.length === 1 ? "1 mes" : `${months.length} meses`;
   const money = (value: number) => formatMoney(value, filters.currency);
   const emptyLabel = years ? `No hay cuotas que venzan en ${yearsLabel(years)}` : "Sin cuotas pendientes";
+  const hasMonths = !isLoading && months.length > 0;
 
   return (
     <>
@@ -42,7 +44,7 @@ export const InstallmentsPage = () => {
       {isLoading && <CircularProgress />}
       {!isLoading && months.length === 0 && <Typography color="text.secondary">{emptyLabel}</Typography>}
 
-      {!isLoading && months.length > 0 && (
+      {hasMonths && (
         <>
           <MotionBox variants={staggerContainer} initial="hidden" animate="visible" sx={{ mb: 3, maxWidth: { sm: 320 } }}>
             <Kpi label="Cuotas pendientes" value={totalFuturo} format={money} icon={<CreditCardIcon />} color="warning" />
@@ -59,7 +61,13 @@ export const InstallmentsPage = () => {
             <ChartCard title="Por comercio"><InstallmentsByMerchantChart {...filters} /></ChartCard>
             <ChartCard title="Cuotas pendientes por categoría"><PendingInstallmentsByCategoryChart {...filters} /></ChartCard>
           </MotionBox>
+        </>
+      )}
 
+      {currency === "ARS" && <InstallmentSavingsSection cardLabel={cardLabel} years={years} />}
+
+      {hasMonths && (
+        <>
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             {plural(totalCuotas, "cuota")} por {formatMoney(totalFuturo, filters.currency)} en {mesesLabel}
           </Typography>
