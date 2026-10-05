@@ -4,7 +4,7 @@ import {
   ImapFlow, type FetchMessageObject, type FetchQueryObject, type ImapFlowOptions, type MessageStructureObject,
 } from "imapflow";
 import type { MailClient, MailPdfPart } from "../mail/mailClient.js";
-import { fetchCertisendCouponPdf, extractCertisendCouponIds, type CertisendDeps } from "./certisend.js";
+import { fetchCertisendCouponPdf, extractCertisendCouponIds, isCertisendSender, type CertisendDeps } from "./certisend.js";
 import { ICLOUD_HOST, ICLOUD_PORT } from "./icloudConfig.js";
 import { IcloudApiError, IcloudAuthError, ICLOUD_AUTH_FAILED_MESSAGE } from "./icloudErrors.js";
 
@@ -33,7 +33,7 @@ export interface ImapSession {
   readonly mailbox: false | { uidValidity: bigint };
   connect(): Promise<void>;
   getMailboxLock(path: string, options: { readOnly: boolean }): Promise<{ release(): void }>;
-  search(query: { since: Date; body?: string }, options: { uid: true }): Promise<number[] | false | undefined>;
+  search(query: { since: Date }, options: { uid: true }): Promise<number[] | false | undefined>;
   fetchAll(range: number[], query: FetchQueryObject, options: { uid: true }): Promise<FetchMessageObject[]>;
   download(range: string, part: string, options: { uid: true }): Promise<{ content?: Readable }>;
   logout(): Promise<void>;
@@ -53,7 +53,6 @@ const PDF_MIME = "application/pdf";
 const PDF_FILE_NAME = /\.pdf$/i;
 const UNEXPECTED_ERROR = "Error inesperado";
 const HTML_MIME = "text/html";
-const COUPON_BODY_QUERY = "go.certisend.com/coupon/";
 const FETCH_QUERY: FetchQueryObject = { uid: true, envelope: true, internalDate: true, bodyStructure: true };
 
 const messageOf = (err: unknown): string => (err instanceof Error && err.message ? err.message : UNEXPECTED_ERROR);
@@ -194,14 +193,9 @@ export async function openIcloudClient({
       const uids = await session.search({ since }, { uid: true });
       if (!uids || uids.length === 0) return [];
       const fetched = await session.fetchAll(uids, FETCH_QUERY, { uid: true });
-      const withLinks = (await session.search({ since, body: COUPON_BODY_QUERY }, { uid: true })) || [];
-      const fetchedUids = new Set(fetched.map(({ uid }) => uid));
-      const missing = withLinks.filter((uid) => !fetchedUids.has(uid));
-      const extra = missing.length > 0 ? await session.fetchAll(missing, FETCH_QUERY, { uid: true }) : [];
-      const messages = [...fetched, ...extra];
-      const linked = new Set(withLinks);
+      const messages = fetched;
       const couponIds = new Map<number, string[]>();
-      for (const message of messages.filter(({ uid }) => linked.has(uid))) {
+      for (const message of messages.filter(({ envelope }) => isCertisendSender(envelope?.from?.[0]?.address))) {
         couponIds.set(message.uid, await couponIdsOf(message));
       }
       return messages

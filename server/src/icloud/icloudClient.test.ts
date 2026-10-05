@@ -5,6 +5,7 @@ import {
   collectImapPdfParts, createImapFlow, imapMessageId, newestFirst, openIcloudClient,
   type IcloudCandidate, type ImapSession,
 } from "./icloudClient.js";
+import { isCertisendSender } from "./certisend.js";
 import { IcloudApiError, IcloudAuthError, ICLOUD_AUTH_FAILED_MESSAGE } from "./icloudErrors.js";
 
 const SINCE = new Date(2026, 8, 1);
@@ -26,7 +27,14 @@ const multipart = (...childNodes: MessageStructureObject[]): MessageStructureObj
 
 const message = (
   uid: number, receivedAt: string, bodyStructure: MessageStructureObject, messageId?: string,
-): FetchMessageObject => ({ seq: uid, uid, internalDate: new Date(receivedAt), envelope: { messageId }, bodyStructure });
+  fromAddress?: string,
+): FetchMessageObject => ({
+  seq: uid,
+  uid,
+  internalDate: new Date(receivedAt),
+  envelope: { messageId, ...(fromAddress ? { from: [{ address: fromAddress }] } : {}) },
+  bodyStructure,
+});
 
 const fakeSession = (mailboxes: Record<string, FakeMailbox>) => {
   const state: { open: FakeMailbox | null } = { open: null };
@@ -45,13 +53,8 @@ const fakeSession = (mailboxes: Record<string, FakeMailbox>) => {
         },
       };
     }),
-    search: vi.fn(async (query: { since: Date; body?: string }, _options: { uid: true }): Promise<number[]> => {
-      const { body } = query;
-      const box = state.open;
-      if (!box) return [];
-      const uids = box.messages.map(({ uid }) => uid);
-      return body === undefined ? uids : uids.filter((uid) => box.html?.[uid]?.includes(body));
-    }),
+    search: vi.fn(async (_query: { since: Date }, _options: { uid: true }): Promise<number[]> =>
+      state.open?.messages.map(({ uid }) => uid) ?? []),
     fetchAll: vi.fn(async (range: number[]): Promise<FetchMessageObject[]> =>
       state.open?.messages.filter(({ uid }) => range.includes(uid)) ?? []),
     download: vi.fn(async (range: string, part: string): Promise<{ content?: Readable }> => {
@@ -86,10 +89,13 @@ const COUPON_ID = "0a1b2c3d-1111-4222-8333-444455556666";
 const SECOND_COUPON_ID = "ffffffff-aaaa-4bbb-8ccc-000000000001";
 const COUPON_LINK_HTML = `<a href="https://go.certisend.com/AbC123/xYz789">x</a><a href="https://go.certisend.com/coupon/${COUPON_ID}">cupón</a>`;
 const PLAN_AUTO = message(
-  21, "2026-10-02T07:00:00.000Z", multipart(htmlNode("1")), "<plan-auto@banco.example>",
+  21, "2026-10-02T07:00:00.000Z", multipart(htmlNode("1")), "<plan-auto@banco.example>", "cuotas@enviocertificado.com",
+);
+const LINK_AJENO = message(
+  23, "2026-10-04T07:00:00.000Z", multipart(htmlNode("1")), "<ajeno@tienda.example>", "promo@tienda.example",
 );
 const PLAN_AUTO_CON_PDF = message(
-  22, "2026-10-03T07:00:00.000Z", multipart(htmlNode("1"), pdfNode("2", "adjunto.pdf")), "<plan-auto-pdf@banco.example>",
+  22, "2026-10-03T07:00:00.000Z", multipart(htmlNode("1"), pdfNode("2", "adjunto.pdf")), "<plan-auto-pdf@banco.example>", "cuotas@enviocertificado.com",
 );
 const CUPON = message(
   3, "2026-09-10T08:00:00.000Z", { type: "application/pdf", parameters: { name: "cupon.pdf" }, size: 2048 }, "<cupon@banco.example>",
@@ -119,6 +125,21 @@ describe("collectImapPdfParts", () => {
   it("un PDF sin nombre recibe uno por su parte", () => {
     expect(collectImapPdfParts(multipart({ part: "2", type: "APPLICATION/PDF" })))
       .toEqual([{ partId: "2", fileName: "adjunto-2.pdf", size: 0 }]);
+  });
+});
+
+describe("isCertisendSender", () => {
+  it("acepta solo el dominio exacto, sin importar mayúsculas", () => {
+    expect(isCertisendSender("cuotas@enviocertificado.com")).toBe(true);
+    expect(isCertisendSender("Cuotas@EnvioCertificado.COM")).toBe(true);
+  });
+
+  it("rechaza dominios parecidos y valores vacíos", () => {
+    expect(isCertisendSender("x@evil-enviocertificado.com")).toBe(false);
+    expect(isCertisendSender("x@enviocertificado.com.evil")).toBe(false);
+    expect(isCertisendSender("x@sub.enviocertificado.com")).toBe(false);
+    expect(isCertisendSender("enviocertificado.com")).toBe(false);
+    expect(isCertisendSender(undefined)).toBe(false);
   });
 });
 
@@ -188,11 +209,19 @@ describe("openIcloudClient", () => {
     });
     const mail = await client;
     expect(await mail.listMessageIds(500)).toEqual(["plan-auto@banco.example"]);
-    expect(session.search).toHaveBeenCalledWith({ since: SINCE, body: "go.certisend.com/coupon/" }, { uid: true });
+    expect(session.search).toHaveBeenCalledTimes(2);
     expect((await mail.getMessage("plan-auto@banco.example")).pdfParts).toEqual([{
       kind: "certisend", couponId: COUPON_ID, partId: `certisend:${COUPON_ID}`, fileName: "certisend-0a1b2c3d.pdf", size: 0,
     }]);
     expect(session.mailbox).toBe(false);
+  });
+
+  it("un mail de otro remitente con un link de cupón no genera parte ni se descarga", async () => {
+    const { session, client } = open({
+      Auto: { uidValidity: 8n, messages: [LINK_AJENO], html: { 23: COUPON_LINK_HTML } },
+    });
+    expect(await (await client).listMessageIds(500)).toEqual([]);
+    expect(session.download).not.toHaveBeenCalled();
   });
 
   it("un mail con adjunto y link devuelve las dos partes, y un link repetido cuenta una vez", async () => {

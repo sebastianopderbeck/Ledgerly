@@ -7,6 +7,15 @@ export interface CertisendDeps {
   maxBytes?: number;
 }
 
+export const CERTISEND_SENDER_DOMAINS = ["enviocertificado.com"];
+
+export function isCertisendSender(address: string | undefined): boolean {
+  const normalized = (address ?? "").trim().toLowerCase();
+  const at = normalized.lastIndexOf("@");
+  if (at <= 0) return false;
+  return CERTISEND_SENDER_DOMAINS.includes(normalized.slice(at + 1));
+}
+
 const COUPON_ID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const COUPON_LINK = new RegExp(`https://go\\.certisend\\.com/coupon/(${COUPON_ID_PATTERN})(?![0-9a-f])`, "gi");
 const COUPON_ID = new RegExp(`^${COUPON_ID_PATTERN}$`, "i");
