@@ -5,9 +5,9 @@ import {
   normalizeMerchant,
   parseArAmount,
   parseInstallment,
-  parseSpanishDate,
   shortDate,
 } from "./normalize.js";
+import { isIcbcEresumen } from "./icbcEresumen.js";
 
 const PAGE_HEADER = /CUIT[\s\S]*?FINANCIACION \$\s*[\d.]+,\d{2}/g;
 const SALDO_ANTERIOR = /SALDO ANTERIOR\s+[\d.]+,\d{2}\s+[\d.]+,\d{2}/;
@@ -15,26 +15,11 @@ const REGION_END = /Tarjeta\s+\d+\s+Total Consumos|TOTAL CONSUMOS/i;
 const RECORD =
   /(?:(\d{2})\s+([A-Za-zÁÉÍÓÚÑñáéíóú]+)\s+)?(\d{2})\s+(?:(\d{4,6})\s+[*K]?\s*)?(.+?)\s+(\d[\d.]*,\d{2}-?)(?=\s|$)/g;
 
-const LABELS_FIRST_HEADER = /VENCIMIENTO ACTUAL\s*\n\s*CIERRE ACTUAL/;
-const WHOLE_LINE_DATE = /^\s*(\d{2}) ([A-Za-z]{3}) (\d{2})\s*$/gm;
-
-function wholeLineDates(text: string): string[] {
-  return [...text.matchAll(WHOLE_LINE_DATE)]
-    .filter(([, , monthName]) => MONTHS_ES[monthName.toLowerCase()] !== undefined)
-    .map(([, dd, monthName, yy]) => parseSpanishDate(dd, monthName, yy));
-}
-
-function labelsFirstDates(text: string): { dueDate: string | null; closingDate: string | null } {
-  if (!LABELS_FIRST_HEADER.test(text)) return { dueDate: null, closingDate: null };
-  const [dueDate = null, closingDate = null] = wholeLineDates(text);
-  return { dueDate, closingDate };
-}
-
 export const icbcParser: StatementParser = {
   issuer: "icbc",
 
   detect(text) {
-    return text.includes("ICBC") && text.includes("SALDO ANTERIOR");
+    return text.includes("ICBC") && text.includes("SALDO ANTERIOR") && !isIcbcEresumen(text);
   },
 
   parse(text, _meta: PdfMeta): ParsedStatement {
@@ -97,9 +82,8 @@ export const icbcParser: StatementParser = {
         ? parseArAmount(totalsFooter[2]).amount
         : 0;
 
-    const fallbackDates = labelsFirstDates(text);
-    const closingDate = shortDate(flat, "CIERRE") ?? fallbackDates.closingDate;
-    const dueDate = shortDate(flat, "VENCIMIENTO") ?? fallbackDates.dueDate;
+    const closingDate = shortDate(flat, "CIERRE");
+    const dueDate = shortDate(flat, "VENCIMIENTO");
 
     return {
       header: {
