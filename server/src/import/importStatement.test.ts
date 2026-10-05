@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { withDb } from "../testing/withDb.js";
 import type { ParsedStatement } from "@ledgerly/shared";
 
@@ -135,5 +135,44 @@ describe("importStatement dedup por clave natural", () => {
     const res = await importStatement({ data: new Uint8Array([2]), fileName: "b.pdf" });
     expect(res.status).toBe("imported");
     expect(await StatementModel.countDocuments()).toBe(2);
+  });
+});
+
+describe("importStatement atómico", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("si insertMany falla no queda ni el resumen ni sus movimientos", async () => {
+    vi.spyOn(TransactionModel, "insertMany").mockRejectedValueOnce(new Error("insertMany roto"));
+    await expect(importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" })).rejects.toThrow("insertMany roto");
+    expect(await StatementModel.countDocuments()).toBe(0);
+    expect(await TransactionModel.countDocuments()).toBe(0);
+  });
+
+  it("un movimiento que no valida aborta antes de escribir nada", async () => {
+    const [first, second] = parsed.rows;
+    mocked.mockResolvedValueOnce({
+      statement: { ...parsed, rows: [first, { ...second, date: "2026-01-64" }] },
+      ...okMeta,
+    });
+    await expect(importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" })).rejects.toThrow();
+    expect(await StatementModel.countDocuments()).toBe(0);
+    expect(await TransactionModel.countDocuments()).toBe(0);
+  });
+
+  it("con replace, un movimiento que no valida deja intacto el resumen anterior", async () => {
+    await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "viejo.pdf" });
+    const [first, second] = parsed.rows;
+    mocked.mockResolvedValueOnce({
+      statement: { ...parsed, rows: [first, { ...second, date: "2026-01-64" }] },
+      ...okMeta,
+    });
+    await expect(
+      importStatement({ data: new Uint8Array([4, 5, 6]), fileName: "nuevo.pdf", replace: true }),
+    ).rejects.toThrow();
+    expect(await StatementModel.countDocuments()).toBe(1);
+    expect((await StatementModel.findOne())?.sourceFileName).toBe("viejo.pdf");
+    expect(await TransactionModel.countDocuments()).toBe(2);
   });
 });

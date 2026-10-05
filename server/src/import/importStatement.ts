@@ -1,5 +1,5 @@
 import type { ExtractedPdf, ParsedStatement } from "@ledgerly/shared";
-import type { Types } from "mongoose";
+import { Types } from "mongoose";
 import { createHash } from "node:crypto";
 import { parseStatement } from "../ingestion/parseStatement.js";
 import { CategoryRuleModel, StatementModel, TransactionModel } from "../db/models.js";
@@ -42,6 +42,11 @@ const findSameStatement = async (header: ParsedStatement["header"]) => {
   });
 };
 
+const assertValid = (doc: object, model: typeof StatementModel | typeof TransactionModel): void => {
+  const error = new model(doc).validateSync();
+  if (error) throw error;
+};
+
 export async function importStatement(input: {
   data: Uint8Array;
   fileName: string;
@@ -52,16 +57,16 @@ export async function importStatement(input: {
 
   const sameFile = await StatementModel.findOne({ sourceHash });
   if (sameFile && !input.replace) return duplicateOf(sameFile._id);
-  if (sameFile) await removeStatement(sameFile._id);
 
   const { statement, reconciliation, meta } = await parseStatement(input.data, input.extracted);
   const sameStatement = await findSameStatement(statement.header);
   if (sameStatement && !input.replace) return duplicateOf(sameStatement._id);
-  if (sameStatement) await removeStatement(sameStatement._id);
 
   const rules = (await CategoryRuleModel.find({ enabled: true }).lean()) as unknown as RuleInput[];
+  const statementId = new Types.ObjectId();
 
-  const created = await StatementModel.create({
+  const statementDoc = {
+    _id: statementId,
     issuer: statement.header.issuer,
     cardLabel: statement.header.cardLabel,
     last4: statement.header.last4,
@@ -74,12 +79,12 @@ export async function importStatement(input: {
     parserVersion: PARSER_VERSION,
     needsReview: !reconciliation.ok,
     reconciliation,
-  });
+  };
 
   const docs = statement.rows.map((row) => {
     const { category, source } = categorize(row.descriptionRaw, row.merchant, rules);
     return {
-      statementId: created._id,
+      statementId,
       issuer: statement.header.issuer,
       cardLabel: statement.header.cardLabel,
       date: new Date(row.date),
@@ -102,16 +107,29 @@ export async function importStatement(input: {
     };
   });
 
-  const existingFingerprints = new Set(
-    (await TransactionModel.find({ fingerprint: { $in: docs.map((d) => d.fingerprint) } }).distinct("fingerprint")) as string[],
-  );
-  const seen = new Set<string>();
-  const toInsert = docs.filter((doc) => {
-    if (existingFingerprints.has(doc.fingerprint) || seen.has(doc.fingerprint)) return false;
-    seen.add(doc.fingerprint);
-    return true;
-  });
-  if (toInsert.length > 0) await TransactionModel.insertMany(toInsert);
+  assertValid(statementDoc, StatementModel);
+  docs.forEach((doc) => assertValid(doc, TransactionModel));
 
-  return { status: "imported", statementId: created._id.toString(), transactionCount: toInsert.length };
+  if (sameFile) await removeStatement(sameFile._id);
+  if (sameStatement && !sameStatement._id.equals(sameFile?._id)) await removeStatement(sameStatement._id);
+
+  try {
+    await StatementModel.create(statementDoc);
+
+    const existingFingerprints = new Set(
+      (await TransactionModel.find({ fingerprint: { $in: docs.map((d) => d.fingerprint) } }).distinct("fingerprint")) as string[],
+    );
+    const seen = new Set<string>();
+    const toInsert = docs.filter((doc) => {
+      if (existingFingerprints.has(doc.fingerprint) || seen.has(doc.fingerprint)) return false;
+      seen.add(doc.fingerprint);
+      return true;
+    });
+    if (toInsert.length > 0) await TransactionModel.insertMany(toInsert);
+
+    return { status: "imported", statementId: statementId.toString(), transactionCount: toInsert.length };
+  } catch (error) {
+    await removeStatement(statementId);
+    throw error;
+  }
 }
