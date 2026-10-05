@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { InflationRateDTO, PayslipDTO } from "@ledgerly/shared";
-import { ipcWindowLabel, raiseFor, raiseVerdictLabel, salaryRaises, type SalaryRaise } from "./salaryRaises.js";
+import { ipcWindowLabel, raiseVerdictLabel, salaryRaises, type SalaryRaise } from "./salaryRaises.js";
 
 interface PayslipInput {
   periodo: string;
@@ -201,20 +201,5 @@ describe("ipcWindowLabel", () => {
 
   it("agrega los meses sin IPC publicado", () => {
     expect(ipcWindowLabel(raise({ ipcFaltantes: ["2025-03", "2025-04"] }))).toBe("2025-01 a 2025-04 · falta 2025-03, 2025-04");
-  });
-});
-
-describe("raiseFor", () => {
-  const raises = salaryRaises(
-    [payslip({ periodo: "2025-05", basico: 1000 }), payslip({ periodo: "2025-06", basico: 1100 })],
-    [],
-  );
-
-  it("devuelve el ajuste del recibo mensual", () => {
-    expect(raiseFor(raises, payslip({ periodo: "2025-06", basico: 1100 }))?.periodo).toBe("2025-06");
-  });
-
-  it("no le asigna al SAC el ajuste del mensual del mismo mes", () => {
-    expect(raiseFor(raises, payslip({ periodo: "2025-06", basico: null, tipo: "sac" }))).toBeUndefined();
   });
 });

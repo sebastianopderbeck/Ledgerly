@@ -3,8 +3,8 @@ import { CircularProgress, Typography } from "@mui/material";
 import { usePayslips, useInflation } from "../api/hooks.js";
 import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { PayslipKpiCards } from "../components/PayslipKpiCards.js";
-import { PayslipCards } from "../components/PayslipCards.js";
-import { PayslipsTable } from "../components/PayslipsTable.js";
+import { PayslipDetailSection } from "../components/PayslipDetailSection.js";
+import { SalaryRaisesSection } from "../components/SalaryRaisesSection.js";
 import { PayslipDescuentoKpis } from "../components/PayslipDescuentoKpis.js";
 import { MotionBox } from "../components/motion/motion.js";
 import { staggerContainer } from "../components/motion/variants.js";
@@ -19,7 +19,6 @@ import { payslipYears } from "../payslipConcepts.js";
 import { salaryRaises } from "../salaryRaises.js";
 import { matchesYears } from "../filters/globalFilters.js";
 import { useGlobalFilters } from "../filters/useGlobalFilters.js";
-import { useIsMobile } from "../useIsMobile.js";
 
 const CHART_EXCLUDED_PERIODS = ["2023-12"];
 const PAYSLIP_FIELDS: FilterField[] = ["year"];
@@ -28,7 +27,6 @@ export const PayslipsPage = () => {
   const { data, isLoading } = usePayslips();
   const { data: inflationData } = useInflation();
   const { yearSelection } = useGlobalFilters();
-  const isMobile = useIsMobile();
   const inflation = useMemo(() => inflationData ?? [], [inflationData]);
   const payslips = useMemo(() => data ?? [], [data]);
   const raises = useMemo(() => salaryRaises(payslips, inflation), [payslips, inflation]);
@@ -36,6 +34,10 @@ export const PayslipsPage = () => {
   const inYears = useMemo(
     () => payslips.filter((payslip) => matchesYears(payslip.periodo, yearSelection)),
     [payslips, yearSelection],
+  );
+  const raisesInYears = useMemo(
+    () => [...raises.values()].filter((raise) => matchesYears(raise.periodo, yearSelection)),
+    [raises, yearSelection],
   );
   const filtered = useMemo(
     () => inYears.filter((payslip) => payslip.tipo === "mensual" && !CHART_EXCLUDED_PERIODS.includes(payslip.periodo)),
@@ -64,10 +66,6 @@ export const PayslipsPage = () => {
     );
   }
 
-  const payslipDetail = isMobile
-    ? <PayslipCards payslips={inYears} raises={raises} />
-    : <PayslipsTable payslips={inYears} raises={raises} />;
-
   return (
     <>
       <Typography variant="h4" sx={{ mb: 3 }}>Sueldo</Typography>
@@ -92,8 +90,8 @@ export const PayslipsPage = () => {
       <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>Descuentos acumulados</Typography>
       <PayslipDescuentoKpis payslips={payslips} />
 
-      {inYears.length > 0 && <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>}
-      {payslipDetail}
+      <PayslipDetailSection payslips={inYears} />
+      <SalaryRaisesSection raises={raisesInYears} />
     </>
   );
 };
