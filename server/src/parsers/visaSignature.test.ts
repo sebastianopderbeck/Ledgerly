@@ -89,6 +89,19 @@ describe("visaSignatureParser.parse con compras en otra moneda", () => {
   });
 });
 
+describe("visaSignatureParser.parse del vencimiento", () => {
+  it("toma la fecha de la fila de valores debajo del encabezado VENCIMIENTO", () => {
+    const header = [
+      "VISA SIGNATURE",
+      "CIERRE ACTUAL: 01 Oct 26",
+      "VENCIMIENTO SALDO $ SALDO U$S PAGO MIN.$ PAGO MIN.U$S",
+      "09 Oct 26 2.816.360,67 2.083,39 1.359.159,00 -,--",
+      "TNA $ TEM $",
+    ].join("\n");
+    expect(visaSignatureParser.parse(header, meta).header.dueDate).toBe("2026-10-09");
+  });
+});
+
 const realPath = fileURLToPath(new URL("../../../examples/visa-real.txt", import.meta.url));
 const hasReal = existsSync(realPath);
 const realMeta: PdfMeta = { producer: "Adobe LiveCycle", creator: null, pageCount: 2, encrypted: false };
@@ -107,6 +120,7 @@ describe.skipIf(!hasReal)("visaSignatureParser.parse (extracción real)", () => 
   it("extrae el header del resumen real", () => {
     expect(result.header.last4).toBe("8883");
     expect(result.header.closingDate).toBe("2026-07-02");
+    expect(result.header.dueDate).toBe("2026-07-13");
     expect(result.header.totals.totalConsumos).toEqual({ ars: 2585250.04, usd: 691.71 });
     expect(result.header.totals.saldoActual).toEqual({ ars: 2895556.7, usd: 691.71 });
     expect(result.header.totals.pagoMinimo).toEqual({ ars: 544016, usd: 0 });

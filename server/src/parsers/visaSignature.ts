@@ -5,6 +5,7 @@ import {
   normalizeMerchant,
   parseArAmount,
   parseInstallment,
+  parseSpanishDate,
   parseVisaDate,
   shortDate,
 } from "./normalize.js";
@@ -12,6 +13,7 @@ import {
 const ROW = /^\s*(\d{2}\.\d{2}\.\d{2})\s+(?:(\d{4,6})[*FK]?\s+)?(.*)$/;
 const SKIP = /SALDO ANTERIOR|Total Consumos|SALDO ACTUAL|PAGO MINIMO|DEBITAREMOS/;
 const BILLED_IN_USD = /USD|U\$S|\b[A-Z]{3}\s+\d[\d.]*,\d{2}\s+\d[\d.]*,\d{2}/;
+const DUE_DATE = /VENCIMIENTO\D*?(\d{2})\s+([A-Za-z]{3})\s+(\d{2})/;
 
 export const visaSignatureParser: StatementParser = {
   issuer: "visa_signature",
@@ -62,6 +64,7 @@ export const visaSignatureParser: StatementParser = {
     const saldoAnterior = flat.match(/SALDO ANTERIOR\s+([\d.]+,\d{2})\s+([\d.]+,\d{2})/);
     const pagoMinimo = flat.match(/PAGO MINIMO\s+\$\s+([\d.]+,\d{2})/);
     const last4 = flat.match(/Tarjeta\s+(\d{4})/);
+    const due = flat.match(DUE_DATE);
 
     return {
       header: {
@@ -69,7 +72,7 @@ export const visaSignatureParser: StatementParser = {
         cardLabel: last4 ? `Visa Signature ****${last4[1]}` : "Visa Signature",
         last4: last4?.[1] ?? null,
         closingDate: shortDate(flat, "CIERRE ACTUAL:"),
-        dueDate: shortDate(flat, "VENCIMIENTO"),
+        dueDate: due ? parseSpanishDate(due[1], due[2], due[3]) : null,
         totals: {
           totalConsumos: {
             ars: totalConsumos ? parseArAmount(totalConsumos[1]).amount : 0,
