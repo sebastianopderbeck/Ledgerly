@@ -1,7 +1,9 @@
 import { Types } from "mongoose";
 import type { ImportedFileKind, MailSource, MailSyncOutcome, MailSyncRunDTO, MailSyncTrigger } from "@ledgerly/shared";
 import { MailAttachmentModel, MailSyncRunModel } from "../db/models.js";
-import { IngestionError } from "../ingestion/errors.js";
+import {
+  IngestionError, InvalidAutoCouponError, InvalidCouponError, InvalidPayslipError, NoTransactionsError,
+} from "../ingestion/errors.js";
 import {
   importPdf as importPdfFile, MAX_PDF_BYTES, type ImportPdfInput, type ImportPdfOutcome,
 } from "../import/importPdf.js";
@@ -40,6 +42,7 @@ interface PendingSelection {
 interface ImportErrorOutcome {
   outcome: "skipped" | "failed";
   detail: string;
+  kind: ImportedFileKind | null;
 }
 
 interface PartResult {
@@ -85,9 +88,17 @@ export function selectPendingMessages(ids: string[], ledger: MailLedgerEntry[], 
   return { batch: pending.slice(0, max), hasMore: pending.length > max };
 }
 
+const recognizedKindOf = (err: IngestionError): ImportedFileKind | null => {
+  if (err instanceof NoTransactionsError) return "statement";
+  if (err instanceof InvalidCouponError) return "coupon";
+  if (err instanceof InvalidAutoCouponError) return "auto";
+  if (err instanceof InvalidPayslipError) return "payslip";
+  return null;
+};
+
 export function classifyImportError(err: unknown): ImportErrorOutcome {
-  if (err instanceof IngestionError) return { outcome: "skipped", detail: err.message };
-  return { outcome: "failed", detail: errorMessage(err) };
+  if (err instanceof IngestionError) return { outcome: "skipped", detail: err.message, kind: recognizedKindOf(err) };
+  return { outcome: "failed", detail: errorMessage(err), kind: null };
 }
 
 const readLedger = async (source: MailSource, ids: string[]): Promise<MailLedgerEntry[]> => {
@@ -115,7 +126,7 @@ const importPart = async (ctx: RunContext, data: Uint8Array, fileName: string): 
     const { result, file } = await ctx.importPdf({ data, fileName });
     return { outcome: result.status, kind: result.kind, documentId: file.id, detail: file.description };
   } catch (err) {
-    return { ...classifyImportError(err), ...NO_DOCUMENT };
+    return { ...classifyImportError(err), documentId: null };
   }
 };
 

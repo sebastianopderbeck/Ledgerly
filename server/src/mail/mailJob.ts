@@ -2,6 +2,7 @@ import {
   MAIL_SOURCE_LABELS, type MailSource, type MailSyncOutcome, type MailSyncRunDTO, type MailSyncTrigger,
 } from "@ledgerly/shared";
 import type { MailSourceSetup } from "./mailSourceSetup.js";
+import { notifyRun } from "./notifyRun.js";
 import { findLastMailRun, runMailSync } from "./syncMail.js";
 
 export const MAIL_STARTUP_DELAY_MS = 60_000;
@@ -42,10 +43,9 @@ const logRun = (run: MailSyncRunDTO): void => {
   else console.log(line);
 };
 
-const lastStartedAt = async (source: MailSource): Promise<Date | null> => {
+const previousRun = async (source: MailSource): Promise<MailSyncRunDTO | null> => {
   try {
-    const run = await findLastMailRun(source);
-    return run ? new Date(run.startedAt) : null;
+    return await findLastMailRun(source);
   } catch {
     return null;
   }
@@ -59,8 +59,11 @@ export async function startMailJob(setup: MailSourceSetup): Promise<() => void> 
   let stopped = false;
 
   const runOnce = async (): Promise<void> => {
+    const previous = await previousRun(source);
     try {
-      logRun(await runMailSync(source, openClient, "job"));
+      const run = await runMailSync(source, openClient, "job");
+      logRun(run);
+      await notifyRun(run, previous);
     } catch (err) {
       console.error(`${logPrefix(source, "job")}: error — ${err instanceof Error ? err.message : UNEXPECTED_ERROR}`);
     }
@@ -75,7 +78,8 @@ export async function startMailJob(setup: MailSourceSetup): Promise<() => void> 
     timer.unref();
   };
 
-  schedule(nextMailRunDelayMs(await lastStartedAt(source), intervalMinutes, new Date()));
+  const last = await previousRun(source);
+  schedule(nextMailRunDelayMs(last ? new Date(last.startedAt) : null, intervalMinutes, new Date()));
 
   return () => {
     stopped = true;

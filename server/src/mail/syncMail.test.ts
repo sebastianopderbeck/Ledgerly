@@ -4,7 +4,9 @@ import { withDb } from "../testing/withDb.js";
 import { FAKE_RECEIVED_AT, fakeMailClient, fakePdfBytes, pdfPart } from "../testing/mailFixtures.js";
 import { GmailApiError, GmailAuthError } from "../gmail/gmailClient.js";
 import { MailAttachmentModel, MailSyncRunModel } from "../db/models.js";
-import { EncryptedPdfError, UnsupportedFormatError } from "../ingestion/errors.js";
+import {
+  EncryptedPdfError, InvalidAutoCouponError, InvalidCouponError, InvalidPayslipError, NoTransactionsError, UnsupportedFormatError,
+} from "../ingestion/errors.js";
 import { MAX_PDF_BYTES, type ImportPdfInput, type ImportPdfOutcome } from "../import/importPdf.js";
 import type { MailClient } from "./mailClient.js";
 import {
@@ -76,19 +78,35 @@ describe("selectPendingMessages", () => {
 });
 
 describe("classifyImportError", () => {
-  it("un error de ingestión es omitido con su motivo", () => {
-    expect(classifyImportError(new UnsupportedFormatError())).toEqual({ outcome: "skipped", detail: "Formato de resumen no reconocido" });
-    expect(classifyImportError(new EncryptedPdfError())).toEqual({ outcome: "skipped", detail: "El PDF está protegido con contraseña" });
+  it("un error de ingestión es omitido con su motivo y sin tipo", () => {
+    expect(classifyImportError(new UnsupportedFormatError()))
+      .toEqual({ outcome: "skipped", detail: "Formato de resumen no reconocido", kind: null });
+    expect(classifyImportError(new EncryptedPdfError()))
+      .toEqual({ outcome: "skipped", detail: "El PDF está protegido con contraseña", kind: null });
+  });
+
+  it("un documento reconocido que no se pudo leer guarda su tipo", () => {
+    expect(classifyImportError(new NoTransactionsError())).toMatchObject({ outcome: "skipped", kind: "statement" });
+    expect(classifyImportError(new InvalidCouponError())).toMatchObject({ outcome: "skipped", kind: "coupon" });
+    expect(classifyImportError(new InvalidAutoCouponError())).toMatchObject({ outcome: "skipped", kind: "auto" });
+    expect(classifyImportError(new InvalidPayslipError())).toMatchObject({ outcome: "skipped", kind: "payslip" });
   });
 
   it("cualquier otro error es fallido, con su mensaje o «Error inesperado»", () => {
-    expect(classifyImportError(new Error("Mongo se cayó"))).toEqual({ outcome: "failed", detail: "Mongo se cayó" });
-    expect(classifyImportError(new Error(""))).toEqual({ outcome: "failed", detail: "Error inesperado" });
-    expect(classifyImportError("texto")).toEqual({ outcome: "failed", detail: "Error inesperado" });
+    expect(classifyImportError(new Error("Mongo se cayó"))).toEqual({ outcome: "failed", detail: "Mongo se cayó", kind: null });
+    expect(classifyImportError(new Error(""))).toEqual({ outcome: "failed", detail: "Error inesperado", kind: null });
+    expect(classifyImportError("texto")).toEqual({ outcome: "failed", detail: "Error inesperado", kind: null });
   });
 });
 
 describe("syncMail", () => {
+  it("un documento reconocido que no se puede leer queda omitido con su tipo", async () => {
+    const client = fakeMailClient([{ id: "msg-1", pdfParts: [pdfPart("1", "resumen-roto.pdf")] }]);
+    const importPdf = importByName({ "resumen-roto.pdf": new NoTransactionsError() });
+    const run = await syncMail({ ...gmail(client), trigger: "manual", importPdf });
+    expect(summaryOf(run.items)).toEqual([{ fileName: "resumen-roto.pdf", outcome: "skipped", kind: "statement", documentId: null }]);
+  });
+
   it("registra importados, duplicados y omitidos en el registro y en la corrida", async () => {
     const client = fakeMailClient([
       { id: "msg-1", pdfParts: [pdfPart("1", "resumen-sintetico.pdf")] },

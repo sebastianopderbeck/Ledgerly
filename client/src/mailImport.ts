@@ -44,7 +44,6 @@ const OUTCOME_COUNT_LABELS: Record<MailSyncOutcome, CountLabels> = {
 };
 
 const SUMMARY_ORDER: MailSyncOutcome[] = ["imported", "duplicate", "skipped", "failed"];
-const VISIBLE_ORDER: MailSyncOutcome[] = ["imported", "failed", "duplicate"];
 const MINUTES_PER_HOUR = 60;
 const DATE_TIME_FORMAT = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" });
 
@@ -99,9 +98,16 @@ export const mailRunSummary = (run: MailSyncRunDTO): string | null => {
   return `Revisé ${mails}: ${counts.join(" · ")}`;
 };
 
+const isUnreadable = ({ outcome, kind }: MailSyncItemDTO): boolean => outcome === "skipped" && kind !== null;
+
+const byOutcome = (items: MailSyncItemDTO[], outcome: MailSyncOutcome): MailSyncItemDTO[] =>
+  items.filter((item) => item.outcome === outcome);
+
 export const splitMailItems = (items: MailSyncItemDTO[]): MailItemsSplit => ({
-  visible: VISIBLE_ORDER.flatMap((outcome) => items.filter((item) => item.outcome === outcome)),
-  skipped: items.filter((item) => item.outcome === "skipped"),
+  visible: [
+    ...byOutcome(items, "imported"), ...byOutcome(items, "failed"), ...items.filter(isUnreadable), ...byOutcome(items, "duplicate"),
+  ],
+  skipped: byOutcome(items, "skipped").filter((item) => !isUnreadable(item)),
 });
 
 export const mailItemSecondary = ({ kind, detail, receivedAt }: MailSyncItemDTO): string =>

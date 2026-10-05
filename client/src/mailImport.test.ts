@@ -124,6 +124,15 @@ describe("splitMailItems", () => {
     expect(visible.map(({ id }) => id)).toEqual(["imp", "err", "dup"]);
     expect(skipped.map(({ id }) => id)).toEqual(["omit"]);
   });
+
+  it("un documento reconocido que no se pudo leer queda a la vista, después de los errores", () => {
+    const items = [
+      item("dup", "duplicate"), item("roto", "skipped", { kind: "statement" }), item("err", "failed"), item("omit", "skipped"),
+    ];
+    const { visible, skipped } = splitMailItems(items);
+    expect(visible.map(({ id }) => id)).toEqual(["err", "roto", "dup"]);
+    expect(skipped.map(({ id }) => id)).toEqual(["omit"]);
+  });
 });
 
 describe("mailItemSecondary", () => {

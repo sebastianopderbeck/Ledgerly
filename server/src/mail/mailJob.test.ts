@@ -3,6 +3,8 @@ import type { MailSyncItemDTO, MailSyncRunDTO } from "@ledgerly/shared";
 
 vi.mock("./syncMail.js", () => ({ runMailSync: vi.fn(), findLastMailRun: vi.fn() }));
 import { findLastMailRun, runMailSync } from "./syncMail.js";
+vi.mock("./notifyRun.js", () => ({ notifyRun: vi.fn() }));
+import { notifyRun } from "./notifyRun.js";
 import type { MailSourceSetup } from "./mailSourceSetup.js";
 import { formatMailRunLog, MAIL_STARTUP_DELAY_MS, nextMailRunDelayMs, startMailJob } from "./mailJob.js";
 
@@ -80,6 +82,8 @@ describe("startMailJob", () => {
     vi.mocked(findLastMailRun).mockReset();
     vi.mocked(findLastMailRun).mockResolvedValue(null);
     vi.mocked(runMailSync).mockResolvedValue(runOf());
+    vi.mocked(notifyRun).mockReset();
+    vi.mocked(notifyRun).mockResolvedValue(undefined);
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -163,6 +167,25 @@ describe("startMailJob", () => {
     expect(findLastMailRun).toHaveBeenCalledWith("icloud");
     await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS);
     expect(runMailSync).toHaveBeenCalledWith("icloud", openClient, "job");
+    stop();
+  });
+
+  it("después de cada corrida automática avisa con la corrida y la anterior de su fuente", async () => {
+    const previous = runOf({ startedAt: minutesBefore(400).toISOString(), status: "error", error: "x" });
+    const run = runOf({ status: "error", error: "x" });
+    vi.mocked(findLastMailRun).mockResolvedValue(previous);
+    vi.mocked(runMailSync).mockResolvedValue(run);
+    const stop = await startMailJob(setup(360));
+    await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS);
+    expect(notifyRun).toHaveBeenCalledWith(run, previous);
+    stop();
+  });
+
+  it("si no puede leer la corrida anterior avisa igual, sin anterior", async () => {
+    vi.mocked(findLastMailRun).mockRejectedValue(new Error("Mongo caído"));
+    const stop = await startMailJob(setup(360));
+    await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS);
+    expect(notifyRun).toHaveBeenCalledWith(runOf(), null);
     stop();
   });
 });
