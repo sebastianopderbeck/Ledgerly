@@ -2,10 +2,19 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { icbcParser } from "./icbc.js";
+import { reconcile } from "./reconcile.js";
 import type { ParsedStatement, PdfMeta } from "@ledgerly/shared";
 
 const text = readFileSync(
   fileURLToPath(new URL("./__fixtures__/icbc.sample.txt", import.meta.url)),
+  "utf8",
+);
+const eresumenText = readFileSync(
+  fileURLToPath(new URL("./__fixtures__/icbc-eresumen.sample.txt", import.meta.url)),
+  "utf8",
+);
+const cotoVoucherText = readFileSync(
+  fileURLToPath(new URL("./__fixtures__/coto-voucher.sample.txt", import.meta.url)),
   "utf8",
 );
 const realPath = fileURLToPath(new URL("../../../examples/icbc-real.txt", import.meta.url));
@@ -16,6 +25,28 @@ describe("icbcParser.detect", () => {
   it("detecta por el marker ICBC", () => {
     expect(icbcParser.detect(text, meta)).toBe(true);
     expect(icbcParser.detect("otro banco", meta)).toBe(false);
+  });
+
+  it("detecta el e-resumen de ICBC", () => {
+    expect(icbcParser.detect(eresumenText, meta)).toBe(true);
+  });
+
+  it("no detecta un voucher de supermercado que menciona ICBC", () => {
+    expect(icbcParser.detect(cotoVoucherText, meta)).toBe(false);
+  });
+});
+
+describe("icbcParser.parse (e-resumen con etiquetas primero)", () => {
+  const result = icbcParser.parse(eresumenText, meta);
+
+  it("toma cierre y vencimiento actuales, no los anteriores ni los próximos", () => {
+    expect(result.header.closingDate).toBe("2026-10-01");
+    expect(result.header.dueDate).toBe("2026-10-14");
+  });
+
+  it("parsea los movimientos y concilia", () => {
+    expect(result.rows).toHaveLength(5);
+    expect(reconcile(result).ok).toBe(true);
   });
 });
 

@@ -327,6 +327,15 @@ TDD, vitest, `mongodb-memory-server` y `fetch` / `execFile` stubbeados, como el 
 El README suma la sección «Importar desde iCloud» con estos pasos, y cómo revocar el acceso
 (borrar la contraseña de app en account.apple.com y el ítem del Llavero).
 
+## Resultado del descubrimiento (2026-10-05)
+
+- El resumen de la tarjeta ICBC llega a INBOX como PDF de e-resumen, con un encabezado que lista primero las etiquetas y después los valores. El parser ya lo lee.
+- Los PDFs de la cuenta de ICBC llegan protegidos con contraseña y se omiten.
+- El banco detrás de Visa Signature envía PDFs que son solo imagen, así que ese resumen no se puede importar desde el correo.
+- Los cupones de hipotecario y de plan de auto no llegan a INBOX.
+- `ICLOUD_MAILBOXES` se queda en `INBOX`: Enviados contiene copias que el propio usuario se envió y no debe escanearse.
+- La detección de ICBC ahora exige "SALDO ANTERIOR", porque los vouchers de supermercado mencionan ICBC y se confundían con resúmenes.
+
 ## Fuera de alcance
 
 - Recibos de sueldo por iCloud (no llegan ahí) y cualquier cambio a cómo Gmail los trata.

@@ -8,6 +8,7 @@ const meta: PdfMeta = { producer: null, creator: null, pageCount: 1, encrypted: 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const coupon = read("../parsers/__fixtures__/icbc-mortgage.sample.txt");
 const statement = read("../parsers/__fixtures__/icbc.sample.txt");
+const cotoVoucher = read("../parsers/__fixtures__/coto-voucher.sample.txt");
 const autoCoupon = read("../parsers/__fixtures__/auto-plan.sample.txt");
 
 describe("detectDocumentKind", () => {
@@ -19,6 +20,9 @@ describe("detectDocumentKind", () => {
   });
   it("devuelve unknown para texto ajeno", () => {
     expect(detectDocumentKind("texto de un documento cualquiera", meta)).toBe("unknown");
+  });
+  it("devuelve unknown para un voucher de supermercado que menciona ICBC", () => {
+    expect(detectDocumentKind(cotoVoucher, meta)).toBe("unknown");
   });
 });
 
