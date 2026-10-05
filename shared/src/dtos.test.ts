@@ -134,7 +134,7 @@ describe("macroRefreshDtoSchema", () => {
 
 import {
   budgetDtoSchema, budgetInputSchema, budgetPatchSchema, budgetSpendingDtoSchema, cashFlowDtoSchema,
-  gmailStatusDtoSchema, inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSyncRunDtoSchema,
+  inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSourceStatusDtoSchema, mailSyncRunDtoSchema,
   MANUAL_ASSET_TYPE_LABELS, manualAssetCreateSchema, manualAssetTypeSchema, manualAssetUpdateSchema, netWorthDtoSchema,
   statementReviewDtoSchema, statementReviewKeysDtoSchema, statementReviewPatchSchema, subscriptionsReportDtoSchema,
   uncategorizedInboxDtoSchema,
@@ -364,12 +364,12 @@ describe("uncategorizedInboxDtoSchema", () => {
   });
 });
 
-describe("gmailStatusDtoSchema", () => {
+describe("mailSourceStatusDtoSchema", () => {
   it("valida un status habilitado con la última corrida", () => {
     const dto = {
-      enabled: true, missing: [], query: "has:attachment filename:pdf newer_than:90d", intervalMinutes: 360,
+      source: "icloud", enabled: true, missing: [], scope: "INBOX · desde el 01/09/2026", intervalMinutes: 360,
       lastRun: {
-        source: "gmail", trigger: "job", startedAt: "2026-10-03T14:05:00.000Z", finishedAt: "2026-10-03T14:05:09.000Z",
+        source: "icloud", trigger: "job", startedAt: "2026-10-03T14:05:00.000Z", finishedAt: "2026-10-03T14:05:09.000Z",
         status: "ok", error: null, messagesChecked: 2, hasMore: false,
         items: [
           { id: "g1", fileName: "resumen-sintetico.pdf", receivedAt: "2026-09-28T10:00:00.000Z", outcome: "imported",
@@ -379,15 +379,15 @@ describe("gmailStatusDtoSchema", () => {
         ],
       },
     };
-    expect(gmailStatusDtoSchema.parse(dto)).toEqual(dto);
+    expect(mailSourceStatusDtoSchema.parse(dto)).toEqual(dto);
   });
 
   it("valida un status deshabilitado", () => {
     const dto = {
-      enabled: false, missing: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"],
-      query: null, intervalMinutes: null, lastRun: null,
+      source: "gmail", enabled: false, missing: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"],
+      scope: null, intervalMinutes: null, lastRun: null,
     };
-    expect(gmailStatusDtoSchema.parse(dto)).toEqual(dto);
+    expect(mailSourceStatusDtoSchema.parse(dto)).toEqual(dto);
   });
 });
 

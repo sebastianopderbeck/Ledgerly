@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { MailSyncItemDTO, MailSyncRunDTO } from "@ledgerly/shared";
 import { formatLocalDate } from "./format.js";
 import {
-  formatDateTime, mailIntervalLabel, mailItemSecondary, gmailLastRunLabel, gmailMissingVarsMessage, mailRunSummary,
-  joinWithY, splitMailItems,
+  formatDateTime, joinWithY, mailDisabledTitle, mailHasMoreMessage, mailIntervalLabel, mailItemSecondary, mailLastRunLabel,
+  mailMissingMessage, mailRunSummary, mailScopeLabel, mailSearchLabel, splitMailItems,
 } from "./mailImport.js";
 
 const RECEIVED_AT = "2026-09-28T12:00:00.000Z";
@@ -28,16 +28,16 @@ describe("joinWithY", () => {
   });
 });
 
-describe("gmailMissingVarsMessage", () => {
-  it("nombra las variables que faltan", () => {
-    expect(gmailMissingVarsMessage(["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"])).toBe(
-      "Faltan GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET y GMAIL_REFRESH_TOKEN en el .env del server. Los pasos para obtenerlas están en el README, sección «Importar desde Gmail»; después reiniciá el server.",
+describe("mailMissingMessage", () => {
+  it("nombra lo que falta y la sección del README de la fuente", () => {
+    expect(mailMissingMessage("gmail", ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"])).toBe(
+      "Faltan GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET y GMAIL_REFRESH_TOKEN. Los pasos están en el README, sección «Importar desde Gmail»; después reiniciá el server.",
     );
   });
 
-  it("concuerda en singular cuando falta una sola", () => {
-    expect(gmailMissingVarsMessage(["GMAIL_REFRESH_TOKEN"])).toBe(
-      "Falta GMAIL_REFRESH_TOKEN en el .env del server. Los pasos para obtenerla están en el README, sección «Importar desde Gmail»; después reiniciá el server.",
+  it("concuerda en singular cuando falta una sola cosa", () => {
+    expect(mailMissingMessage("icloud", ["la contraseña de app en el Llavero"])).toBe(
+      "Falta la contraseña de app en el Llavero. Los pasos están en el README, sección «Importar desde iCloud»; después reiniciá el server.",
     );
   });
 });
@@ -51,16 +51,28 @@ describe("mailIntervalLabel", () => {
   });
 });
 
-describe("gmailLastRunLabel y formatDateTime", () => {
-  it("sin corridas invita a buscar", () => {
-    expect(gmailLastRunLabel(null)).toBe("Todavía no buscaste en Gmail.");
+describe("mailLastRunLabel y formatDateTime", () => {
+  it("sin corridas invita a buscar en la fuente", () => {
+    expect(mailLastRunLabel("gmail", null)).toBe("Todavía no buscaste en Gmail.");
+    expect(mailLastRunLabel("icloud", null)).toBe("Todavía no buscaste en iCloud.");
   });
 
   it("muestra la fecha corta y quién la disparó", () => {
     const expected = SHORT_DATE_TIME.format(new Date("2026-10-03T17:05:00.000Z"));
     expect(formatDateTime("2026-10-03T17:05:00.000Z")).toBe(expected);
-    expect(gmailLastRunLabel(runOf())).toBe(`Última búsqueda: ${expected} (manual)`);
-    expect(gmailLastRunLabel(runOf({ trigger: "job" }))).toBe(`Última búsqueda: ${expected} (automática)`);
+    expect(mailLastRunLabel("gmail", runOf())).toBe(`Última búsqueda: ${expected} (manual)`);
+    expect(mailLastRunLabel("icloud", runOf({ trigger: "job" }))).toBe(`Última búsqueda: ${expected} (automática)`);
+  });
+});
+
+describe("textos por fuente", () => {
+  it("botón, título deshabilitado, alcance y aviso de pendientes", () => {
+    expect(mailSearchLabel("icloud")).toBe("Buscar en iCloud");
+    expect(mailSearchLabel("gmail")).toBe("Buscar en Gmail");
+    expect(mailDisabledTitle("gmail")).toBe("Importación desde Gmail deshabilitada");
+    expect(mailScopeLabel("gmail", "has:attachment")).toBe("Consulta: has:attachment");
+    expect(mailScopeLabel("icloud", "INBOX · desde el 01/09/2026")).toBe("Revisa: INBOX · desde el 01/09/2026");
+    expect(mailHasMoreMessage("icloud")).toBe("Quedan mails por revisar: tocá «Buscar en iCloud» otra vez.");
   });
 });
 

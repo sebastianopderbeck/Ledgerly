@@ -17,7 +17,7 @@ import { statementReviewRouter } from "./routes/statementReview.js";
 import { cashFlowRouter } from "./routes/cashFlow.js";
 import { subscriptionsRouter } from "./routes/subscriptions.js";
 import { netWorthRouter } from "./routes/netWorth.js";
-import { gmailRouter } from "./routes/gmail.js";
+import { mailRouter } from "./routes/mail.js";
 import { budgetsRouter } from "./routes/budgets.js";
 
 export function createApp(): express.Express {
@@ -44,7 +44,7 @@ export function createApp(): express.Express {
   app.use("/api/net-worth", netWorthRouter);
   app.use("/api/import", importRouter);
   app.use("/api/imports", importsRouter);
-  app.use("/api/gmail", gmailRouter);
+  app.use("/api/mail", mailRouter);
   app.use("/api/budgets", budgetsRouter);
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "No encontrado")));

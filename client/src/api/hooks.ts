@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, BudgetDTO, BudgetInput, BudgetPatch, BudgetSpendingDTO, CashFlowDTO, CategoryRuleDTO, CategoryStat,
-  CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth, GmailStatusDTO, MailSyncRunDTO, ImportResultUnionDTO,
+  CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth, MailSource, MailSourceStatusDTO, MailSyncRunDTO, ImportResultUnionDTO,
   ImportedFileDTO, InboxRuleResultDTO, InflationRateDTO, InstallmentPurchaseDTO, MacroRefreshDTO, MacroSeriesDTO,
   ManualAssetCreateDTO, ManualAssetDTO, ManualAssetUpdateDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO,
   NetWorthDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, StatementReviewDTO, StatementReviewKeysDTO,
@@ -380,14 +380,14 @@ export function useCreateInboxRule() {
   });
 }
 
-export function useGmailStatus() {
-  return useQuery({ queryKey: ["gmail-status"], queryFn: () => apiFetch<GmailStatusDTO>("/gmail/status") });
+export function useMailStatus() {
+  return useQuery({ queryKey: ["mail-status"], queryFn: () => apiFetch<MailSourceStatusDTO[]>("/mail/status") });
 }
 
-export function useGmailSync() {
+export function useMailSync(source: MailSource) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => apiFetch<MailSyncRunDTO>("/gmail/sync", { method: "POST" }),
+    mutationFn: () => apiFetch<MailSyncRunDTO>(`/mail/${source}/sync`, { method: "POST" }),
     onSuccess: () => qc.invalidateQueries(),
   });
 }

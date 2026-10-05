@@ -574,10 +574,11 @@ export const mailSyncRunDtoSchema = z.object({
   items: z.array(mailSyncItemDtoSchema),
 });
 
-export const gmailStatusDtoSchema = z.object({
+export const mailSourceStatusDtoSchema = z.object({
+  source: mailSourceSchema,
   enabled: z.boolean(),
   missing: z.array(z.string()),
-  query: z.string().nullable(),
+  scope: z.string().nullable(),
   intervalMinutes: z.number().int().nullable(),
   lastRun: mailSyncRunDtoSchema.nullable(),
 });
@@ -651,4 +652,4 @@ export type MailSource = z.infer<typeof mailSourceSchema>;
 export type MailSyncTrigger = z.infer<typeof mailSyncTriggerSchema>;
 export type MailSyncItemDTO = z.infer<typeof mailSyncItemDtoSchema>;
 export type MailSyncRunDTO = z.infer<typeof mailSyncRunDtoSchema>;
-export type GmailStatusDTO = z.infer<typeof gmailStatusDtoSchema>;
+export type MailSourceStatusDTO = z.infer<typeof mailSourceStatusDtoSchema>;

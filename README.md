@@ -71,11 +71,41 @@ rm ~/Library/LaunchAgents/com.ledgerly.server.plist
 tailscale serve reset
 ```
 
+## Importar desde iCloud (opcional)
+
+Ledgerly puede revisar tu casilla de iCloud por IMAP en **solo lectura** (no marca, no mueve y no
+borra nada) y pasar los PDFs adjuntos por el mismo importador que la subida manual. Sirve para los
+resúmenes de tarjeta y los cupones que llegan a iCloud. Sin configurar, la tarjeta «iCloud» de la
+sección «Mails» de Importar dice qué falta y el server no intenta conectarse.
+Diseño: `docs/superpowers/specs/2026-10-05-importacion-icloud-design.md`.
+
+1. [account.apple.com](https://account.apple.com) → Inicio de sesión y seguridad → **Contraseñas de
+   apps** → generar una con el nombre «Ledgerly».
+2. Guardarla en el Llavero. El comando la pide, así no queda en el historial:
+   `security add-generic-password -s ledgerly-icloud-imap -a <tu-cuenta>@icloud.com -w`
+3. En el `.env`: `ICLOUD_USER=<tu-cuenta>@icloud.com` y, si hace falta, `ICLOUD_SINCE=AAAA-MM-DD`
+   (desde cuándo buscar; sin ella, los últimos 90 días) e `ICLOUD_MAILBOXES=INBOX,Otra carpeta`.
+4. Reiniciar `bun run dev` → Importar → **Buscar en iCloud**.
+5. Versión publicada: copiar las líneas `ICLOUD_*` a `~/Services/ledgerly/.env`, sumar
+   `ICLOUD_SYNC_INTERVAL_MINUTES=360` y correr
+   `launchctl kickstart -k gui/$(id -u)/com.ledgerly.server`. En `server.log` aparece
+   `iCloud: búsqueda automática cada 360 min (…)`. Dejar la búsqueda automática **solo** en la
+   publicada. Las corridas automáticas avisan con una notificación de macOS cuando importan algo o
+   algo falla; la primera vez puede hacer falta habilitar las notificaciones de «Script Editor» en
+   Ajustes → Notificaciones.
+6. Revocar: borrar la contraseña de app en account.apple.com, el ítem del Llavero
+   (`security delete-generic-password -s ledgerly-icloud-imap -a <tu-cuenta>@icloud.com`) y las
+   líneas `ICLOUD_*`.
+
+Si Apple invalida la contraseña (cambio de contraseña de Apple o revocación), la tarjeta muestra el
+error: generar una nueva, actualizarla con `security add-generic-password -U -s ledgerly-icloud-imap
+-a <tu-cuenta>@icloud.com -w` y reiniciar.
+
 ## Importar desde Gmail (opcional)
 
 Ledgerly puede buscar en tu casilla los PDFs que te llegan por mail (resúmenes, cupones y recibos) y
 pasarlos por el mismo importador que la subida manual. Lee el mail con permiso de **solo lectura**.
-Sin las credenciales, la sección «Gmail» de Importar dice qué falta y el server no intenta conectarse.
+Sin las credenciales, la tarjeta «Gmail» de la sección «Mails» de Importar dice qué falta y el server no intenta conectarse.
 Diseño: `docs/superpowers/specs/2026-10-03-importacion-gmail-design.md`.
 
 1. [Google Cloud Console](https://console.cloud.google.com) → proyecto nuevo «Ledgerly».
@@ -112,3 +142,4 @@ No se commitea data financiera real.
 El refresh token de Gmail da lectura de todo el mail: vive solo en `.env` (gitignoreado), nunca se
 loguea ni se manda al cliente. Los PDFs de Gmail se procesan en memoria; no se guarda asunto,
 remitente ni cuerpo de ningún mail.
+La contraseña de app de iCloud vive solo en el Llavero de macOS: el server la lee en cada corrida, nunca la loguea ni la manda al cliente.

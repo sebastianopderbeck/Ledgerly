@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { gmailStatusDtoSchema, importResultUnionSchema, statementReviewDtoSchema } from "@ledgerly/shared";
+import { importResultUnionSchema, mailSourceStatusDtoSchema, statementReviewDtoSchema } from "@ledgerly/shared";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { emulateMobile } from "../testing/viewport.js";
 import { ImportPage } from "./ImportPage.js";
 
-const GMAIL_DISABLED = {
-  enabled: false,
-  missing: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"],
-  query: null,
-  intervalMinutes: null,
-  lastRun: null,
-};
+const MAIL_DISABLED = [
+  { source: "icloud", enabled: false, missing: ["ICLOUD_USER"], scope: null, intervalMinutes: null, lastRun: null },
+  {
+    source: "gmail", enabled: false, missing: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"],
+    scope: null, intervalMinutes: null, lastRun: null,
+  },
+];
 
 const statementDto = (id: string, transactionCount = 3) => ({
   id, issuer: "visa_signature", cardLabel: "Visa Signature ****1234", last4: "1234",
@@ -52,7 +52,7 @@ const REVIEW_URL = /\/statements\/([^/?]+)\/review/;
 
 const sharedDefaults = (url: string, init?: RequestInit): unknown => {
   if ((init?.method ?? "GET") !== "GET") return undefined;
-  if (url.includes("/gmail/status")) return GMAIL_DISABLED;
+  if (url.includes("/mail/status")) return MAIL_DISABLED;
   const review = REVIEW_URL.exec(url);
   if (review) return reviewOf(review[1]);
   if (url.endsWith("/statements")) return [];
@@ -83,16 +83,16 @@ describe("ImportPage", () => {
   });
 
   it("los datos de prueba compartidos cumplen los contratos de la API", () => {
-    expect(() => gmailStatusDtoSchema.parse(GMAIL_DISABLED)).not.toThrow();
+    expect(() => mailSourceStatusDtoSchema.array().parse(MAIL_DISABLED)).not.toThrow();
     expect(() => statementReviewDtoSchema.parse(reviewOf("s-nuevo"))).not.toThrow();
     expect(() => importResultUnionSchema.parse(statementResult("imported", 3))).not.toThrow();
   });
 
-  it("la sección Gmail va después del resultado de la subida y antes de «Archivos importados»", () => {
+  it("la sección Mails va después del resultado de la subida y antes de «Archivos importados»", () => {
     renderWithProviders(<ImportPage />);
     const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
-    expect(headings).toContain("Gmail");
-    expect(headings.indexOf("Gmail")).toBeLessThan(headings.indexOf("Archivos importados"));
+    expect(headings).toContain("Mails");
+    expect(headings.indexOf("Mails")).toBeLessThan(headings.indexOf("Archivos importados"));
   });
 
   it("lista los archivos importados de todos los tipos", async () => {

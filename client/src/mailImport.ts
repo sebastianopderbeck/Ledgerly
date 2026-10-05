@@ -1,4 +1,6 @@
-import type { MailSyncItemDTO, MailSyncOutcome, MailSyncRunDTO, MailSyncTrigger } from "@ledgerly/shared";
+import {
+  MAIL_SOURCE_LABELS, type MailSource, type MailSyncItemDTO, type MailSyncOutcome, type MailSyncRunDTO, type MailSyncTrigger,
+} from "@ledgerly/shared";
 import { formatLocalDate } from "./format.js";
 import { IMPORTED_FILE_KIND_LABELS } from "./importedFiles.js";
 
@@ -30,6 +32,10 @@ export const MAIL_OUTCOME_COLORS: Record<MailSyncOutcome, MailOutcomeColor> = {
 
 const TRIGGER_LABELS: Record<MailSyncTrigger, string> = { manual: "manual", job: "automática" };
 
+const SETUP_SECTIONS: Record<MailSource, string> = { gmail: "Importar desde Gmail", icloud: "Importar desde iCloud" };
+
+const SCOPE_PREFIXES: Record<MailSource, string> = { gmail: "Consulta", icloud: "Revisa" };
+
 const OUTCOME_COUNT_LABELS: Record<MailSyncOutcome, CountLabels> = {
   imported: { one: "importado", many: "importados" },
   duplicate: { one: "ya estaba", many: "ya estaban" },
@@ -47,20 +53,30 @@ export const joinWithY = (items: string[]): string =>
 
 export const formatDateTime = (iso: string): string => DATE_TIME_FORMAT.format(new Date(iso));
 
-export const gmailMissingVarsMessage = (missing: string[]): string => {
-  const single = missing.length === 1;
-  const verb = single ? "Falta" : "Faltan";
-  const pronoun = single ? "obtenerla" : "obtenerlas";
-  return `${verb} ${joinWithY(missing)} en el .env del server. Los pasos para ${pronoun} están en el README, sección «Importar desde Gmail»; después reiniciá el server.`;
+export const mailSearchLabel = (source: MailSource): string => `Buscar en ${MAIL_SOURCE_LABELS[source]}`;
+
+export const mailDisabledTitle = (source: MailSource): string =>
+  `Importación desde ${MAIL_SOURCE_LABELS[source]} deshabilitada`;
+
+export const mailMissingMessage = (source: MailSource, missing: string[]): string => {
+  const verb = missing.length === 1 ? "Falta" : "Faltan";
+  return `${verb} ${joinWithY(missing)}. Los pasos están en el README, sección «${SETUP_SECTIONS[source]}»; después reiniciá el server.`;
 };
+
+export const mailScopeLabel = (source: MailSource, scope: string | null): string => `${SCOPE_PREFIXES[source]}: ${scope ?? ""}`;
 
 export const mailIntervalLabel = (minutes: number | null): string => {
   if (minutes === null) return "apagada";
   return minutes % MINUTES_PER_HOUR === 0 ? `cada ${minutes / MINUTES_PER_HOUR} h` : `cada ${minutes} min`;
 };
 
-export const gmailLastRunLabel = (run: MailSyncRunDTO | null): string =>
-  (run ? `Última búsqueda: ${formatDateTime(run.startedAt)} (${TRIGGER_LABELS[run.trigger]})` : "Todavía no buscaste en Gmail.");
+export const mailLastRunLabel = (source: MailSource, run: MailSyncRunDTO | null): string =>
+  (run
+    ? `Última búsqueda: ${formatDateTime(run.startedAt)} (${TRIGGER_LABELS[run.trigger]})`
+    : `Todavía no buscaste en ${MAIL_SOURCE_LABELS[source]}.`);
+
+export const mailHasMoreMessage = (source: MailSource): string =>
+  `Quedan mails por revisar: tocá «${mailSearchLabel(source)}» otra vez.`;
 
 const countOf = (items: MailSyncItemDTO[], outcome: MailSyncOutcome): number =>
   items.filter((item) => item.outcome === outcome).length;

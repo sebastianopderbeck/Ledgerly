@@ -4,7 +4,7 @@ import type { SxProps, Theme } from "@mui/material/styles";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import type { MailSyncItemDTO, MailSyncRunDTO } from "@ledgerly/shared";
 import {
-  MAIL_OUTCOME_COLORS, MAIL_OUTCOME_LABELS, mailItemSecondary, mailRunSummary, splitMailItems,
+  MAIL_OUTCOME_COLORS, MAIL_OUTCOME_LABELS, mailHasMoreMessage, mailItemSecondary, mailRunSummary, splitMailItems,
 } from "../mailImport.js";
 import { MIN_TAP_SIZE } from "./tapTarget.js";
 
@@ -60,7 +60,7 @@ export const MailSyncResult = ({ run }: MailSyncResultProps) => {
       {hasError && <Alert severity="error" sx={{ mb: 1.5 }}>{run.error}</Alert>}
       {summary && <Typography variant="body2" sx={{ mb: 1 }}>{summary}</Typography>}
       {run.hasMore && (
-        <Alert severity="info" sx={{ mb: 1.5 }}>Quedan mails por revisar: tocá «Buscar en Gmail» otra vez.</Alert>
+        <Alert severity="info" sx={{ mb: 1.5 }}>{mailHasMoreMessage(run.source)}</Alert>
       )}
       {visible.length > 0 && <MailItemList items={visible} />}
       {skipped.length > 0 && (
