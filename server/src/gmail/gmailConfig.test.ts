@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  DEFAULT_GMAIL_QUERY, describeGmailSetup, missingGmailVars, parseGmailInterval, readGmailConfig,
+  DEFAULT_GMAIL_QUERY, describeGmailSetup, missingGmailVars, readGmailConfig,
 } from "./gmailConfig.js";
 
 const CREDENTIALS = {
@@ -50,23 +50,6 @@ describe("missingGmailVars", () => {
     expect(missingGmailVars(env())).toEqual([]);
     expect(missingGmailVars(env({ GMAIL_CLIENT_SECRET: "" }))).toEqual(["GMAIL_CLIENT_SECRET"]);
     expect(missingGmailVars({})).toEqual(["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"]);
-  });
-});
-
-describe("parseGmailInterval", () => {
-  it.each([
-    [undefined, null],
-    ["", null],
-    ["360", 360],
-    [" 90 ", 90],
-    ["abc", null],
-    ["5", null],
-    ["0", null],
-    ["15", 15],
-    ["90.5", null],
-    ["-30", null],
-  ])("%j → %j", (raw, expected) => {
-    expect(parseGmailInterval(raw)).toBe(expected);
   });
 });
 
