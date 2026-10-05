@@ -3,17 +3,17 @@ import type { MailSyncItemDTO, MailSyncRunDTO } from "@ledgerly/shared";
 
 vi.mock("./syncMail.js", () => ({ runMailSync: vi.fn(), findLastMailRun: vi.fn() }));
 import { findLastMailRun, runMailSync } from "./syncMail.js";
-import type { GmailConfig } from "../gmail/gmailConfig.js";
+import type { MailSourceSetup } from "./mailSourceSetup.js";
 import { formatMailRunLog, MAIL_STARTUP_DELAY_MS, nextMailRunDelayMs, startMailJob } from "./mailJob.js";
 
 const MINUTE = 60_000;
 const NOW = new Date("2026-10-03T12:00:00.000Z");
 const minutesBefore = (minutes: number) => new Date(NOW.getTime() - minutes * MINUTE);
 
-const config = (intervalMinutes: number | null): GmailConfig => ({
-  credentials: { clientId: "id-sintetico", clientSecret: "secreto-sintetico", refreshToken: "refresh-sintetico" },
-  query: "has:attachment",
-  intervalMinutes,
+const openClient = vi.fn();
+
+const setup = (intervalMinutes: number | null, overrides: Partial<MailSourceSetup> = {}): MailSourceSetup => ({
+  source: "gmail", missing: [], scope: "has:attachment", intervalMinutes, openClient, ...overrides,
 });
 
 const item = (id: string, outcome: MailSyncItemDTO["outcome"]): MailSyncItemDTO => ({
@@ -21,7 +21,7 @@ const item = (id: string, outcome: MailSyncItemDTO["outcome"]): MailSyncItemDTO 
 });
 
 const runOf = (overrides: Partial<MailSyncRunDTO> = {}): MailSyncRunDTO => ({
-  trigger: "job", startedAt: NOW.toISOString(), finishedAt: NOW.toISOString(), status: "ok", error: null,
+  source: "gmail", trigger: "job", startedAt: NOW.toISOString(), finishedAt: NOW.toISOString(), status: "ok", error: null,
   messagesChecked: 0, hasMore: false, items: [], ...overrides,
 });
 
@@ -46,6 +46,10 @@ describe("nextMailRunDelayMs", () => {
 });
 
 describe("formatMailRunLog", () => {
+  it("usa el nombre de la fuente", () => {
+    expect(formatMailRunLog(runOf({ source: "icloud", status: "error", error: "x" }))).toBe("iCloud (automática): error — x");
+  });
+
   it("resume una corrida automática ok", () => {
     const run = runOf({ messagesChecked: 2, items: [item("a", "imported"), item("b", "skipped")] });
     expect(formatMailRunLog(run)).toBe(
@@ -85,12 +89,12 @@ describe("startMailJob", () => {
   });
 
   it("corre al delay de arranque, loguea y encadena la siguiente al intervalo", async () => {
-    const stop = await startMailJob(config(360));
+    const stop = await startMailJob(setup(360));
     await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS - 1);
     expect(runMailSync).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(runMailSync).toHaveBeenCalledTimes(1);
-    expect(runMailSync).toHaveBeenCalledWith(config(360), "job");
+    expect(runMailSync).toHaveBeenCalledWith("gmail", openClient, "job");
     expect(console.log).toHaveBeenCalledWith(formatMailRunLog(runOf()));
     await vi.advanceTimersByTimeAsync(360 * MINUTE);
     expect(runMailSync).toHaveBeenCalledTimes(2);
@@ -99,7 +103,7 @@ describe("startMailJob", () => {
 
   it("respeta la última corrida registrada", async () => {
     vi.mocked(findLastMailRun).mockResolvedValue(runOf({ startedAt: minutesBefore(60).toISOString() }));
-    const stop = await startMailJob(config(360));
+    const stop = await startMailJob(setup(360));
     await vi.advanceTimersByTimeAsync(300 * MINUTE - 1);
     expect(runMailSync).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -109,7 +113,7 @@ describe("startMailJob", () => {
 
   it("loguea con console.error una corrida que terminó en error", async () => {
     vi.mocked(runMailSync).mockResolvedValue(runOf({ status: "error", error: "Gmail respondió 403." }));
-    const stop = await startMailJob(config(360));
+    const stop = await startMailJob(setup(360));
     await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS);
     expect(console.error).toHaveBeenCalledWith("Gmail (automática): error — Gmail respondió 403.");
     stop();
@@ -117,7 +121,7 @@ describe("startMailJob", () => {
 
   it("sigue programando aunque una corrida rechace", async () => {
     vi.mocked(runMailSync).mockRejectedValueOnce(new Error("Mongo caído"));
-    const stop = await startMailJob(config(360));
+    const stop = await startMailJob(setup(360));
     await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS);
     expect(console.error).toHaveBeenCalledWith("Gmail (automática): error — Mongo caído");
     await vi.advanceTimersByTimeAsync(360 * MINUTE);
@@ -127,23 +131,38 @@ describe("startMailJob", () => {
 
   it("si no puede leer la última corrida arranca con el delay de arranque", async () => {
     vi.mocked(findLastMailRun).mockRejectedValue(new Error("Mongo caído"));
-    const stop = await startMailJob(config(360));
+    const stop = await startMailJob(setup(360));
     await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS);
     expect(runMailSync).toHaveBeenCalledTimes(1);
     stop();
   });
 
   it("la función devuelta cancela la próxima corrida", async () => {
-    const stop = await startMailJob(config(360));
+    const stop = await startMailJob(setup(360));
     stop();
     await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS + 720 * MINUTE);
     expect(runMailSync).not.toHaveBeenCalled();
   });
 
   it("sin intervalo no programa nada", async () => {
-    await startMailJob(config(null));
+    await startMailJob(setup(null));
     await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS + 720 * MINUTE);
     expect(runMailSync).not.toHaveBeenCalled();
     expect(findLastMailRun).not.toHaveBeenCalled();
+  });
+
+  it("una fuente sin configurar no programa nada", async () => {
+    await startMailJob(setup(360, { openClient: null, missing: ["GMAIL_REFRESH_TOKEN"] }));
+    await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS + 720 * MINUTE);
+    expect(runMailSync).not.toHaveBeenCalled();
+    expect(findLastMailRun).not.toHaveBeenCalled();
+  });
+
+  it("mira la última corrida de su propia fuente y corre esa fuente", async () => {
+    const stop = await startMailJob(setup(360, { source: "icloud" }));
+    expect(findLastMailRun).toHaveBeenCalledWith("icloud");
+    await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS);
+    expect(runMailSync).toHaveBeenCalledWith("icloud", openClient, "job");
+    stop();
   });
 });

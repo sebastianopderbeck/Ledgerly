@@ -4,7 +4,8 @@ import { createApp } from "./http/app.js";
 import { serveClient } from "./http/serveClient.js";
 import { resolveListenOptions } from "./http/listenOptions.js";
 import { connectMongo } from "./db/connection.js";
-import { describeGmailSetup, readGmailConfig } from "./gmail/gmailConfig.js";
+import { describeGmailSetup } from "./gmail/gmailConfig.js";
+import { gmailSourceSetup } from "./gmail/gmailSource.js";
 import { startMailJob } from "./mail/mailJob.js";
 
 const { port, host } = resolveListenOptions(process.env);
@@ -26,5 +27,4 @@ if (host) {
 }
 
 console.log(describeGmailSetup(process.env));
-const gmailConfig = readGmailConfig(process.env);
-if (gmailConfig?.intervalMinutes) await startMailJob(gmailConfig);
+await startMailJob(gmailSourceSetup(process.env));

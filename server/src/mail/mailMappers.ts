@@ -19,6 +19,7 @@ export function toMailSyncRunDTO(
   items: HydratedDocument<MailAttachmentDoc>[],
 ): MailSyncRunDTO {
   return {
+    source: run.source as MailSyncRunDTO["source"],
     trigger: run.trigger as MailSyncRunDTO["trigger"],
     startedAt: run.startedAt.toISOString(),
     finishedAt: run.finishedAt.toISOString(),

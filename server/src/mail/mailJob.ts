@@ -1,5 +1,7 @@
-import type { MailSyncOutcome, MailSyncRunDTO, MailSyncTrigger } from "@ledgerly/shared";
-import type { GmailConfig } from "../gmail/gmailConfig.js";
+import {
+  MAIL_SOURCE_LABELS, type MailSource, type MailSyncOutcome, type MailSyncRunDTO, type MailSyncTrigger,
+} from "@ledgerly/shared";
+import type { MailSourceSetup } from "./mailSourceSetup.js";
 import { findLastMailRun, runMailSync } from "./syncMail.js";
 
 export const MAIL_STARTUP_DELAY_MS = 60_000;
@@ -19,10 +21,11 @@ const countOf = (run: MailSyncRunDTO, outcome: MailSyncOutcome): number =>
 
 const mailsLabel = (count: number): string => (count === 1 ? "1 mail nuevo" : `${count} mails nuevos`);
 
-const logPrefix = (trigger: MailSyncTrigger): string => `Gmail (${TRIGGER_LOG_LABELS[trigger]})`;
+const logPrefix = (source: MailSource, trigger: MailSyncTrigger): string =>
+  `${MAIL_SOURCE_LABELS[source]} (${TRIGGER_LOG_LABELS[trigger]})`;
 
 export function formatMailRunLog(run: MailSyncRunDTO): string {
-  const prefix = logPrefix(run.trigger);
+  const prefix = logPrefix(run.source, run.trigger);
   if (run.status === "error") return `${prefix}: error — ${run.error ?? UNEXPECTED_ERROR}`;
   const counts = [
     `importados ${countOf(run, "imported")}`,
@@ -39,27 +42,27 @@ const logRun = (run: MailSyncRunDTO): void => {
   else console.log(line);
 };
 
-const lastStartedAt = async (): Promise<Date | null> => {
+const lastStartedAt = async (source: MailSource): Promise<Date | null> => {
   try {
-    const run = await findLastMailRun();
+    const run = await findLastMailRun(source);
     return run ? new Date(run.startedAt) : null;
   } catch {
     return null;
   }
 };
 
-export async function startMailJob(config: GmailConfig): Promise<() => void> {
-  const { intervalMinutes } = config;
-  if (intervalMinutes === null) return () => {};
+export async function startMailJob(setup: MailSourceSetup): Promise<() => void> {
+  const { source, intervalMinutes, openClient } = setup;
+  if (intervalMinutes === null || openClient === null) return () => {};
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
 
   const runOnce = async (): Promise<void> => {
     try {
-      logRun(await runMailSync(config, "job"));
+      logRun(await runMailSync(source, openClient, "job"));
     } catch (err) {
-      console.error(`${logPrefix("job")}: error — ${err instanceof Error ? err.message : UNEXPECTED_ERROR}`);
+      console.error(`${logPrefix(source, "job")}: error — ${err instanceof Error ? err.message : UNEXPECTED_ERROR}`);
     }
     schedule(intervalMinutes * MINUTE_MS);
   };
@@ -72,7 +75,7 @@ export async function startMailJob(config: GmailConfig): Promise<() => void> {
     timer.unref();
   };
 
-  schedule(nextMailRunDelayMs(await lastStartedAt(), intervalMinutes, new Date()));
+  schedule(nextMailRunDelayMs(await lastStartedAt(source), intervalMinutes, new Date()));
 
   return () => {
     stopped = true;

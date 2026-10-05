@@ -15,7 +15,7 @@ const item = (id: string, outcome: MailSyncItemDTO["outcome"], overrides: Partia
 });
 
 const runOf = (overrides: Partial<MailSyncRunDTO> = {}): MailSyncRunDTO => ({
-  trigger: "manual", startedAt: "2026-10-03T17:05:00.000Z", finishedAt: "2026-10-03T17:05:09.000Z", status: "ok", error: null,
+  source: "gmail", trigger: "manual", startedAt: "2026-10-03T17:05:00.000Z", finishedAt: "2026-10-03T17:05:09.000Z", status: "ok", error: null,
   messagesChecked: 0, hasMore: false, items: [], ...overrides,
 });
 

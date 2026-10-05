@@ -1,12 +1,11 @@
 import { Types } from "mongoose";
-import type { MailSyncOutcome, MailSyncRunDTO, MailSyncTrigger, ImportedFileKind } from "@ledgerly/shared";
+import type { ImportedFileKind, MailSource, MailSyncOutcome, MailSyncRunDTO, MailSyncTrigger } from "@ledgerly/shared";
 import { MailAttachmentModel, MailSyncRunModel } from "../db/models.js";
 import { IngestionError } from "../ingestion/errors.js";
 import {
   importPdf as importPdfFile, MAX_PDF_BYTES, type ImportPdfInput, type ImportPdfOutcome,
 } from "../import/importPdf.js";
-import { createGmailClient, type GmailClient, type GmailMessage, type GmailPdfPart } from "../gmail/gmailClient.js";
-import type { GmailConfig } from "../gmail/gmailConfig.js";
+import type { MailClient, MailMessage, MailPdfPart, OpenMailClient } from "./mailClient.js";
 import { toMailSyncRunDTO } from "./mailMappers.js";
 
 export const MAIL_LIST_LIMIT = 500;
@@ -25,8 +24,8 @@ export interface MailLedgerEntry {
 }
 
 export interface SyncMailDeps {
-  client: GmailClient;
-  query: string;
+  source: MailSource;
+  openClient: OpenMailClient;
   trigger: MailSyncTrigger;
   importPdf?: (input: ImportPdfInput) => Promise<ImportPdfOutcome>;
   maxMessages?: number;
@@ -50,11 +49,15 @@ interface PartResult {
   detail: string;
 }
 
-interface RunContext {
+interface ScanContext {
+  source: MailSource;
   runId: Types.ObjectId;
-  client: GmailClient;
+  client: MailClient;
   importPdf: (input: ImportPdfInput) => Promise<ImportPdfOutcome>;
   now: () => Date;
+}
+
+interface RunContext extends ScanContext {
   settled: Set<string>;
 }
 
@@ -87,8 +90,10 @@ export function classifyImportError(err: unknown): ImportErrorOutcome {
   return { outcome: "failed", detail: errorMessage(err) };
 }
 
-const readLedger = async (ids: string[]): Promise<MailLedgerEntry[]> => {
-  const docs = await MailAttachmentModel.find({ messageId: { $in: ids } }, { messageId: 1, partId: 1, outcome: 1 }).lean();
+const readLedger = async (source: MailSource, ids: string[]): Promise<MailLedgerEntry[]> => {
+  const docs = await MailAttachmentModel.find(
+    { source, messageId: { $in: ids } }, { messageId: 1, partId: 1, outcome: 1 },
+  ).lean();
   return docs.map(({ messageId, partId, outcome }) => ({ messageId, partId, outcome: outcome as MailSyncOutcome }));
 };
 
@@ -96,10 +101,10 @@ const settledKeys = (ledger: MailLedgerEntry[]): Set<string> =>
   new Set(ledger.filter(({ outcome }) => outcome !== "failed").map(({ messageId, partId }) => ledgerKey(messageId, partId)));
 
 const recordPart = async (
-  ctx: RunContext, message: GmailMessage, partId: string, fileName: string, result: PartResult,
+  ctx: RunContext, message: MailMessage, partId: string, fileName: string, result: PartResult,
 ): Promise<void> => {
   await MailAttachmentModel.updateOne(
-    { messageId: message.id, partId },
+    { source: ctx.source, messageId: message.id, partId },
     { $set: { runId: ctx.runId, fileName, receivedAt: new Date(message.receivedAt), ...result, processedAt: ctx.now() } },
     { upsert: true },
   );
@@ -114,7 +119,7 @@ const importPart = async (ctx: RunContext, data: Uint8Array, fileName: string): 
   }
 };
 
-const downloadPart = async (ctx: RunContext, message: GmailMessage, part: GmailPdfPart): Promise<Uint8Array> => {
+const downloadPart = async (ctx: RunContext, message: MailMessage, part: MailPdfPart): Promise<Uint8Array> => {
   try {
     return await ctx.client.downloadPart(message.id, part);
   } catch (err) {
@@ -123,13 +128,13 @@ const downloadPart = async (ctx: RunContext, message: GmailMessage, part: GmailP
   }
 };
 
-const processPart = async (ctx: RunContext, message: GmailMessage, part: GmailPdfPart): Promise<PartResult> => {
+const processPart = async (ctx: RunContext, message: MailMessage, part: MailPdfPart): Promise<PartResult> => {
   if (part.size > MAX_PDF_BYTES) return { outcome: "skipped", detail: TOO_BIG_DETAIL, ...NO_DOCUMENT };
   const data = await downloadPart(ctx, message, part);
   return importPart(ctx, data, part.fileName);
 };
 
-const processMessage = async (ctx: RunContext, message: GmailMessage): Promise<void> => {
+const processMessage = async (ctx: RunContext, message: MailMessage): Promise<void> => {
   if (message.pdfParts.length === 0) {
     await recordPart(ctx, message, NO_PDF_PART_ID, NO_PDF_FILE_NAME, { outcome: "skipped", detail: NO_PDF_DETAIL, ...NO_DOCUMENT });
     return;
@@ -140,13 +145,11 @@ const processMessage = async (ctx: RunContext, message: GmailMessage): Promise<v
   }
 };
 
-const scanMailbox = async (
-  deps: Omit<RunContext, "settled">, query: string, maxMessages: number, progress: RunProgress,
-): Promise<void> => {
-  const ids = await deps.client.listMessageIds(query, MAIL_LIST_LIMIT);
-  const ledger = await readLedger(ids);
+const scanMailbox = async (scan: ScanContext, maxMessages: number, progress: RunProgress): Promise<void> => {
+  const ids = await scan.client.listMessageIds(MAIL_LIST_LIMIT);
+  const ledger = await readLedger(scan.source, ids);
   const { batch, hasMore } = selectPendingMessages(ids, ledger, maxMessages);
-  const ctx: RunContext = { ...deps, settled: settledKeys(ledger) };
+  const ctx: RunContext = { ...scan, settled: settledKeys(ledger) };
   progress.hasMore = hasMore;
   for (const messageId of batch) {
     const message = await ctx.client.getMessage(messageId);
@@ -155,21 +158,29 @@ const scanMailbox = async (
   }
 };
 
+const closeQuietly = async (client: MailClient | null): Promise<void> => {
+  await client?.close().catch(() => undefined);
+};
+
 const itemsOf = (runId: Types.ObjectId) => MailAttachmentModel.find({ runId }).sort({ processedAt: 1, _id: 1 });
 
 export async function syncMail({
-  client, query, trigger, importPdf = importPdfFile, maxMessages = MAIL_MAX_MESSAGES_PER_RUN, now = () => new Date(),
+  source, openClient, trigger, importPdf = importPdfFile, maxMessages = MAIL_MAX_MESSAGES_PER_RUN, now = () => new Date(),
 }: SyncMailDeps): Promise<MailSyncRunDTO> {
   const runId = new Types.ObjectId();
   const startedAt = now();
   const progress: RunProgress = { messagesChecked: 0, hasMore: false, error: null };
+  let client: MailClient | null = null;
   try {
-    await scanMailbox({ runId, client, importPdf, now }, query, maxMessages, progress);
+    client = await openClient();
+    await scanMailbox({ source, runId, client, importPdf, now }, maxMessages, progress);
   } catch (err) {
     progress.error = errorMessage(err);
   }
+  await closeQuietly(client);
   const run = await MailSyncRunModel.create({
     _id: runId,
+    source,
     trigger,
     startedAt,
     finishedAt: now(),
@@ -181,19 +192,19 @@ export async function syncMail({
   return toMailSyncRunDTO(run, await itemsOf(runId));
 }
 
-let inFlight: Promise<MailSyncRunDTO> | null = null;
+const inFlight = new Map<MailSource, Promise<MailSyncRunDTO>>();
 
-export function runMailSync(config: GmailConfig, trigger: MailSyncTrigger): Promise<MailSyncRunDTO> {
-  if (inFlight) return inFlight;
-  const run = syncMail({ client: createGmailClient(config.credentials), query: config.query, trigger });
-  const tracked = run.finally(() => {
-    inFlight = null;
+export function runMailSync(source: MailSource, openClient: OpenMailClient, trigger: MailSyncTrigger): Promise<MailSyncRunDTO> {
+  const current = inFlight.get(source);
+  if (current) return current;
+  const tracked = syncMail({ source, openClient, trigger }).finally(() => {
+    inFlight.delete(source);
   });
-  inFlight = tracked;
+  inFlight.set(source, tracked);
   return tracked;
 }
 
-export async function findLastMailRun(): Promise<MailSyncRunDTO | null> {
-  const run = await MailSyncRunModel.findOne().sort({ startedAt: -1 });
+export async function findLastMailRun(source: MailSource): Promise<MailSyncRunDTO | null> {
+  const run = await MailSyncRunModel.findOne({ source }).sort({ startedAt: -1 });
   return run ? toMailSyncRunDTO(run, await itemsOf(run._id)) : null;
 }

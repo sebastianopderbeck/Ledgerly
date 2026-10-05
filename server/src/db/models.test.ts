@@ -122,8 +122,8 @@ const emptyTotals = {
   saldoAnterior: { ars: 0, usd: 0 },
 };
 
-const gmailAttachment = (runId: Types.ObjectId, partId: string) => ({
-  messageId: "msg-1", partId, runId, fileName: "resumen-sintetico.pdf", receivedAt: new Date("2026-09-28T10:00:00Z"),
+const mailAttachment = (runId: Types.ObjectId, partId: string, source: string) => ({
+  source, messageId: "msg-1", partId, runId, fileName: "resumen-sintetico.pdf", receivedAt: new Date("2026-09-28T10:00:00Z"),
   outcome: "skipped", detail: "Formato de resumen no reconocido", processedAt: new Date("2026-10-03T12:00:00Z"),
 });
 
@@ -159,17 +159,27 @@ describe("modelos nuevos", () => {
     await expect(BudgetModel.create({ category: "Comida", topeArs: 2000, periodoBase: "2026-08" })).rejects.toThrow();
   });
 
-  it("cada adjunto de Gmail se registra una sola vez por mensaje y parte", async () => {
+  it("cada adjunto se registra una sola vez por fuente, mensaje y parte", async () => {
     await MailAttachmentModel.init();
     const run = await MailSyncRunModel.create({
-      trigger: "manual", startedAt: new Date("2026-10-03T12:00:00Z"), finishedAt: new Date("2026-10-03T12:00:05Z"),
-      status: "ok", messagesChecked: 1, hasMore: false,
+      source: "gmail", trigger: "manual", startedAt: new Date("2026-10-03T12:00:00Z"),
+      finishedAt: new Date("2026-10-03T12:00:05Z"), status: "ok", messagesChecked: 1, hasMore: false,
     });
     expect(run.error).toBeNull();
-    const attachment = await MailAttachmentModel.create(gmailAttachment(run._id, "1"));
+    const attachment = await MailAttachmentModel.create(mailAttachment(run._id, "1", "gmail"));
     expect(attachment.kind).toBeNull();
     expect(attachment.documentId).toBeNull();
-    await expect(MailAttachmentModel.create(gmailAttachment(run._id, "1"))).rejects.toThrow();
-    await expect(MailAttachmentModel.create(gmailAttachment(run._id, "2"))).resolves.toBeDefined();
+    await expect(MailAttachmentModel.create(mailAttachment(run._id, "1", "gmail"))).rejects.toThrow();
+    await expect(MailAttachmentModel.create(mailAttachment(run._id, "2", "gmail"))).resolves.toBeDefined();
+    await expect(MailAttachmentModel.create(mailAttachment(run._id, "1", "icloud"))).resolves.toBeDefined();
+  });
+
+  it("una corrida sin fuente o con una fuente desconocida se rechaza", async () => {
+    const base = {
+      trigger: "manual", startedAt: new Date("2026-10-03T12:00:00Z"), finishedAt: new Date("2026-10-03T12:00:05Z"),
+      status: "ok", messagesChecked: 0, hasMore: false,
+    };
+    await expect(MailSyncRunModel.create(base)).rejects.toThrow();
+    await expect(MailSyncRunModel.create({ ...base, source: "yahoo" })).rejects.toThrow();
   });
 });

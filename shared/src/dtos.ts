@@ -546,6 +546,9 @@ export const inboxRuleResultDtoSchema = z.object({
   categorized: z.number().int(),
 });
 
+export const mailSourceSchema = z.enum(["gmail", "icloud"]);
+export const MAIL_SOURCE_LABELS: Record<MailSource, string> = { gmail: "Gmail", icloud: "iCloud" };
+
 export const mailSyncOutcomeSchema = z.enum(["imported", "duplicate", "skipped", "failed"]);
 export const mailSyncTriggerSchema = z.enum(["manual", "job"]);
 
@@ -560,6 +563,7 @@ export const mailSyncItemDtoSchema = z.object({
 });
 
 export const mailSyncRunDtoSchema = z.object({
+  source: mailSourceSchema,
   trigger: mailSyncTriggerSchema,
   startedAt: z.string(),
   finishedAt: z.string(),
@@ -643,6 +647,7 @@ export type UncategorizedGroupDTO = z.infer<typeof uncategorizedGroupSchema>;
 export type UncategorizedInboxDTO = z.infer<typeof uncategorizedInboxDtoSchema>;
 export type InboxRuleResultDTO = z.infer<typeof inboxRuleResultDtoSchema>;
 export type MailSyncOutcome = z.infer<typeof mailSyncOutcomeSchema>;
+export type MailSource = z.infer<typeof mailSourceSchema>;
 export type MailSyncTrigger = z.infer<typeof mailSyncTriggerSchema>;
 export type MailSyncItemDTO = z.infer<typeof mailSyncItemDtoSchema>;
 export type MailSyncRunDTO = z.infer<typeof mailSyncRunDtoSchema>;

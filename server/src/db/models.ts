@@ -180,16 +180,19 @@ const budgetSchema = new Schema({
 });
 
 const mailSyncRunSchema = new Schema({
+  source: { type: String, required: true, enum: ["gmail", "icloud"] },
   trigger: { type: String, required: true, enum: ["manual", "job"] },
-  startedAt: { type: Date, required: true, index: true },
+  startedAt: { type: Date, required: true },
   finishedAt: { type: Date, required: true },
   status: { type: String, required: true, enum: ["ok", "error"] },
   error: { type: String, default: null },
   messagesChecked: { type: Number, required: true },
   hasMore: { type: Boolean, required: true },
 });
+mailSyncRunSchema.index({ source: 1, startedAt: -1 });
 
 const mailAttachmentSchema = new Schema({
+  source: { type: String, required: true, enum: ["gmail", "icloud"] },
   messageId: { type: String, required: true },
   partId: { type: String, required: true },
   runId: { type: Schema.Types.ObjectId, ref: "MailSyncRun", required: true, index: true },
@@ -201,7 +204,7 @@ const mailAttachmentSchema = new Schema({
   detail: { type: String, required: true },
   processedAt: { type: Date, required: true },
 });
-mailAttachmentSchema.index({ messageId: 1, partId: 1 }, { unique: true });
+mailAttachmentSchema.index({ source: 1, messageId: 1, partId: 1 }, { unique: true });
 
 export type StatementDoc = InferSchemaType<typeof statementSchema>;
 export type TransactionDoc = InferSchemaType<typeof transactionSchema>;

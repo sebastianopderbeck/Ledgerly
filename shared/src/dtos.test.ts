@@ -134,7 +134,7 @@ describe("macroRefreshDtoSchema", () => {
 
 import {
   budgetDtoSchema, budgetInputSchema, budgetPatchSchema, budgetSpendingDtoSchema, cashFlowDtoSchema,
-  gmailStatusDtoSchema, inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema,
+  gmailStatusDtoSchema, inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSyncRunDtoSchema,
   MANUAL_ASSET_TYPE_LABELS, manualAssetCreateSchema, manualAssetTypeSchema, manualAssetUpdateSchema, netWorthDtoSchema,
   statementReviewDtoSchema, statementReviewKeysDtoSchema, statementReviewPatchSchema, subscriptionsReportDtoSchema,
   uncategorizedInboxDtoSchema,
@@ -369,7 +369,7 @@ describe("gmailStatusDtoSchema", () => {
     const dto = {
       enabled: true, missing: [], query: "has:attachment filename:pdf newer_than:90d", intervalMinutes: 360,
       lastRun: {
-        trigger: "job", startedAt: "2026-10-03T14:05:00.000Z", finishedAt: "2026-10-03T14:05:09.000Z",
+        source: "gmail", trigger: "job", startedAt: "2026-10-03T14:05:00.000Z", finishedAt: "2026-10-03T14:05:09.000Z",
         status: "ok", error: null, messagesChecked: 2, hasMore: false,
         items: [
           { id: "g1", fileName: "resumen-sintetico.pdf", receivedAt: "2026-09-28T10:00:00.000Z", outcome: "imported",
@@ -388,5 +388,18 @@ describe("gmailStatusDtoSchema", () => {
       query: null, intervalMinutes: null, lastRun: null,
     };
     expect(gmailStatusDtoSchema.parse(dto)).toEqual(dto);
+  });
+});
+
+describe("mailSyncRunDtoSchema", () => {
+  const run = {
+    source: "icloud", trigger: "job", startedAt: "2026-10-05T12:00:00.000Z", finishedAt: "2026-10-05T12:00:09.000Z",
+    status: "ok", error: null, messagesChecked: 0, hasMore: false, items: [],
+  };
+
+  it("acepta las dos fuentes y rechaza otra", () => {
+    expect(mailSyncRunDtoSchema.parse(run).source).toBe("icloud");
+    expect(mailSyncRunDtoSchema.parse({ ...run, source: "gmail" }).source).toBe("gmail");
+    expect(() => mailSyncRunDtoSchema.parse({ ...run, source: "yahoo" })).toThrow();
   });
 });
