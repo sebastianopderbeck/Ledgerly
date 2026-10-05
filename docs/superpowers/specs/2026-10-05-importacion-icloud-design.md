@@ -35,6 +35,7 @@ Las colecciones `gmailsyncruns` y `gmailattachments` existen en la base comparti
 
 ## Decisiones tomadas
 
+- **2026-10-05 — Búsqueda automática diaria del 25 al 5.** Los resúmenes llegan dos veces por mes, así que el job corre una vez por día a una hora fija (`MAIL_SYNC_HOUR`, default 21) solo entre los días `MAIL_SYNC_DAYS` (`25-5`), con una única agenda para todas las fuentes. Reemplaza a los intervalos por fuente; si la Mac dormía a esa hora, la búsqueda pendiente corre al arrancar.
 - **Se apila sobre `feat/importacion-gmail`** en vez de arrancar desde `main`: reusar el motor, el
   registro y la UI es mucho menos código, y evita los conflictos de tener dos refactors de
   `import.ts`. La contra aceptada: esta rama se mergea después de esa.
@@ -185,12 +186,13 @@ Después de cada corrida **automática** (`trigger: "job"`), y solo en macOS:
 | `ICLOUD_USER` | Cuenta de iCloud (`<cuenta>@icloud.com`). Sin ella, iCloud está deshabilitado. |
 | `ICLOUD_SINCE` | Fecha `AAAA-MM-DD` desde la que se buscan mails. Ausente o inválida → 90 días hacia atrás. |
 | `ICLOUD_MAILBOXES` | Carpetas separadas por coma. Default `INBOX`. |
-| `ICLOUD_SYNC_INTERVAL_MINUTES` | Igual que `GMAIL_SYNC_INTERVAL_MINUTES`: entero ≥ 15; ausente o inválido → solo manual. |
+| `MAIL_SYNC_DAYS` | Rango de días del mes `DD-DD` (por ejemplo `25-5`, puede cruzar el fin de mes) en que corre la búsqueda automática, una vez por día. Compartida con Gmail. Ausente o inválida → solo manual. |
+| `MAIL_SYNC_HOUR` | Hora local de la búsqueda automática, entero de 0 a 23. Default `21`. |
 
 iCloud está **habilitado** cuando hay `ICLOUD_USER` **y** existe la contraseña en el Llavero. El
 status informa qué falta con textos legibles: `ICLOUD_USER` y/o «la contraseña de app en el
 Llavero (ledgerly-icloud-imap)». Ningún valor secreto viaja al cliente ni se loguea.
-Si falta la contraseña pero hay intervalo, el job igual arranca: cada corrida falla con el mensaje del Llavero (se avisa una vez) hasta que se cargue.
+Si falta la contraseña pero hay agenda, el job igual arranca: cada corrida falla con el mensaje del Llavero (se avisa una vez) hasta que se cargue.
 
 ### Colecciones — `server/src/db/models.ts`
 

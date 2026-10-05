@@ -579,7 +579,7 @@ export const mailSourceStatusDtoSchema = z.object({
   enabled: z.boolean(),
   missing: z.array(z.string()),
   scope: z.string().nullable(),
-  intervalMinutes: z.number().int().nullable(),
+  schedule: z.string().nullable(),
   lastRun: mailSyncRunDtoSchema.nullable(),
 });
 

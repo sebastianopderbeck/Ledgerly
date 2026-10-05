@@ -11,7 +11,7 @@ const CREDENTIALS = {
 const env = (extra: Record<string, string | undefined> = {}): NodeJS.ProcessEnv => ({ ...CREDENTIALS, ...extra });
 
 describe("readGmailConfig", () => {
-  it("con las tres credenciales devuelve la config con la consulta por defecto y sin intervalo", () => {
+  it("con las tres credenciales devuelve la config con la consulta por defecto", () => {
     expect(readGmailConfig(env())).toEqual({
       credentials: {
         clientId: CREDENTIALS.GMAIL_CLIENT_ID,
@@ -19,7 +19,6 @@ describe("readGmailConfig", () => {
         refreshToken: CREDENTIALS.GMAIL_REFRESH_TOKEN,
       },
       query: DEFAULT_GMAIL_QUERY,
-      intervalMinutes: null,
     });
   });
 
@@ -39,10 +38,6 @@ describe("readGmailConfig", () => {
     expect(readGmailConfig(env({ GMAIL_QUERY: "  from:banco has:attachment  " }))?.query).toBe("from:banco has:attachment");
     expect(readGmailConfig(env({ GMAIL_QUERY: "   " }))?.query).toBe(DEFAULT_GMAIL_QUERY);
   });
-
-  it("lee el intervalo de la búsqueda automática", () => {
-    expect(readGmailConfig(env({ GMAIL_SYNC_INTERVAL_MINUTES: "360" }))?.intervalMinutes).toBe(360);
-  });
 });
 
 describe("missingGmailVars", () => {
@@ -57,16 +52,12 @@ describe("describeGmailSetup", () => {
   const lines = [
     describeGmailSetup({}),
     describeGmailSetup(env()),
-    describeGmailSetup(env({ GMAIL_SYNC_INTERVAL_MINUTES: "5" })),
-    describeGmailSetup(env({ GMAIL_SYNC_INTERVAL_MINUTES: "360" })),
   ];
 
   it("arma la línea de arranque para cada caso", () => {
     expect(lines).toEqual([
       "Gmail: deshabilitado (faltan GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN)",
-      "Gmail: búsqueda manual; automática apagada",
-      "Gmail: búsqueda manual; GMAIL_SYNC_INTERVAL_MINUTES inválido (entero ≥ 15), automática apagada",
-      "Gmail: búsqueda automática cada 360 min",
+      "Gmail: habilitado",
     ]);
   });
 

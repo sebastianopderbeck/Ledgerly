@@ -367,7 +367,8 @@ describe("uncategorizedInboxDtoSchema", () => {
 describe("mailSourceStatusDtoSchema", () => {
   it("valida un status habilitado con la última corrida", () => {
     const dto = {
-      source: "icloud", enabled: true, missing: [], scope: "INBOX · desde el 01/09/2026", intervalMinutes: 360,
+      source: "icloud", enabled: true, missing: [], scope: "INBOX · desde el 01/09/2026",
+      schedule: "todos los días a las 21 h, del 25 al 5",
       lastRun: {
         source: "icloud", trigger: "job", startedAt: "2026-10-03T14:05:00.000Z", finishedAt: "2026-10-03T14:05:09.000Z",
         status: "ok", error: null, messagesChecked: 2, hasMore: false,
@@ -385,7 +386,7 @@ describe("mailSourceStatusDtoSchema", () => {
   it("valida un status deshabilitado", () => {
     const dto = {
       source: "gmail", enabled: false, missing: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"],
-      scope: null, intervalMinutes: null, lastRun: null,
+      scope: null, schedule: null, lastRun: null,
     };
     expect(mailSourceStatusDtoSchema.parse(dto)).toEqual(dto);
   });

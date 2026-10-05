@@ -32,13 +32,13 @@ const SYNC_RUN = runOf({
 });
 
 const disabled = (source: MailSource, missing: string[]): MailSourceStatusDTO =>
-  ({ source, enabled: false, missing, scope: null, intervalMinutes: null, lastRun: null });
+  ({ source, enabled: false, missing, scope: null, schedule: null, lastRun: null });
 
 const icloudEnabled = (lastRun: MailSyncRunDTO | null = null): MailSourceStatusDTO =>
-  ({ source: "icloud", enabled: true, missing: [], scope: ICLOUD_SCOPE, intervalMinutes: 360, lastRun });
+  ({ source: "icloud", enabled: true, missing: [], scope: ICLOUD_SCOPE, schedule: "todos los días a las 21 h, del 25 al 5", lastRun });
 
 const GMAIL_ENABLED: MailSourceStatusDTO =
-  { source: "gmail", enabled: true, missing: [], scope: QUERY, intervalMinutes: null, lastRun: null };
+  { source: "gmail", enabled: true, missing: [], scope: QUERY, schedule: null, lastRun: null };
 
 const respond = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -114,7 +114,7 @@ describe("MailImportSection", () => {
     renderWithProviders(<MailImportSection />);
     const icloud = await card("iCloud");
     expect(within(icloud).getByText("Todavía no buscaste en iCloud.")).toBeInTheDocument();
-    expect(within(icloud).getByText("Búsqueda automática: cada 6 h")).toBeInTheDocument();
+    expect(within(icloud).getByText("Búsqueda automática: todos los días a las 21 h, del 25 al 5")).toBeInTheDocument();
     expect(within(icloud).getByText(`Revisa: ${ICLOUD_SCOPE}`)).toBeInTheDocument();
     expect(await icloudButton()).toBeEnabled();
     const gmail = await card("Gmail");

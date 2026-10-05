@@ -30,7 +30,8 @@ const statementText = readFileSync(
   fileURLToPath(new URL("../../parsers/__fixtures__/icbc.sample.txt", import.meta.url)), "utf8",
 );
 const GMAIL_VARS = ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"];
-const ICLOUD_VARS = ["ICLOUD_USER", "ICLOUD_SINCE", "ICLOUD_MAILBOXES", "ICLOUD_SYNC_INTERVAL_MINUTES"];
+const ICLOUD_VARS = ["ICLOUD_USER", "ICLOUD_SINCE", "ICLOUD_MAILBOXES"];
+const SCHEDULE_VARS = ["MAIL_SYNC_DAYS", "MAIL_SYNC_HOUR"];
 const SECRETS = ["secreto-sintetico", "refresh-sintetico", "clave-app-sintetica"];
 const ICLOUD_USER = "usuario-sintetico@icloud.com";
 
@@ -51,7 +52,7 @@ const enableIcloud = (extra: Record<string, string> = {}) => {
 const statuses = async () => mailSourceStatusDtoSchema.array().parse((await request(app).get("/api/mail/status")).body);
 
 beforeEach(() => {
-  for (const key of [...GMAIL_VARS, "GMAIL_QUERY", "GMAIL_SYNC_INTERVAL_MINUTES", ...ICLOUD_VARS]) vi.stubEnv(key, "");
+  for (const key of [...GMAIL_VARS, "GMAIL_QUERY", ...SCHEDULE_VARS, ...ICLOUD_VARS]) vi.stubEnv(key, "");
   vi.mocked(createGmailClient).mockReset();
   vi.mocked(extractPdfText).mockReset();
   vi.mocked(hasIcloudPassword).mockReset();
@@ -68,8 +69,8 @@ describe("GET /api/mail/status", () => {
     const res = await request(app).get("/api/mail/status");
     expect(res.status).toBe(200);
     expect(mailSourceStatusDtoSchema.array().parse(res.body)).toEqual([
-      { source: "icloud", enabled: false, missing: ["ICLOUD_USER"], scope: null, intervalMinutes: null, lastRun: null },
-      { source: "gmail", enabled: false, missing: GMAIL_VARS, scope: null, intervalMinutes: null, lastRun: null },
+      { source: "icloud", enabled: false, missing: ["ICLOUD_USER"], scope: null, schedule: null, lastRun: null },
+      { source: "gmail", enabled: false, missing: GMAIL_VARS, scope: null, schedule: null, lastRun: null },
     ]);
     expect(hasIcloudPassword).not.toHaveBeenCalled();
   });
@@ -81,15 +82,18 @@ describe("GET /api/mail/status", () => {
     expect(hasIcloudPassword).toHaveBeenCalledWith(ICLOUD_USER);
   });
 
-  it("habilitadas informan alcance e intervalo sin leer ni exponer secretos", async () => {
-    enableIcloud({ ICLOUD_SINCE: "2026-09-01", ICLOUD_SYNC_INTERVAL_MINUTES: "360" });
+  it("habilitadas informan alcance y agenda sin leer ni exponer secretos", async () => {
+    enableIcloud({ ICLOUD_SINCE: "2026-09-01", MAIL_SYNC_DAYS: "25-5", MAIL_SYNC_HOUR: "9" });
     enableGmail({ GMAIL_QUERY: "from:banco has:attachment" });
     const res = await request(app).get("/api/mail/status");
     const [icloud, gmail] = mailSourceStatusDtoSchema.array().parse(res.body);
     expect(icloud).toEqual({
-      source: "icloud", enabled: true, missing: [], scope: "INBOX · desde el 01/09/2026", intervalMinutes: 360, lastRun: null,
+      source: "icloud", enabled: true, missing: [], scope: "INBOX · desde el 01/09/2026",
+      schedule: "todos los días a las 9 h, del 25 al 5", lastRun: null,
     });
-    expect(gmail).toMatchObject({ source: "gmail", enabled: true, scope: "from:banco has:attachment", intervalMinutes: null });
+    expect(gmail).toMatchObject({ source: "gmail", enabled: true, scope: "from:banco has:attachment",
+      schedule: "todos los días a las 9 h, del 25 al 5",
+    });
     expect(readIcloudPassword).not.toHaveBeenCalled();
     for (const secret of SECRETS) expect(JSON.stringify(res.body)).not.toContain(secret);
   });

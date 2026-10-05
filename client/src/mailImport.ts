@@ -44,7 +44,6 @@ const OUTCOME_COUNT_LABELS: Record<MailSyncOutcome, CountLabels> = {
 };
 
 const SUMMARY_ORDER: MailSyncOutcome[] = ["imported", "duplicate", "skipped", "failed"];
-const MINUTES_PER_HOUR = 60;
 const DATE_TIME_FORMAT = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" });
 
 export const joinWithY = (items: string[]): string =>
@@ -63,11 +62,6 @@ export const mailMissingMessage = (source: MailSource, missing: string[]): strin
 };
 
 export const mailScopeLabel = (source: MailSource, scope: string | null): string => `${SCOPE_PREFIXES[source]}: ${scope ?? ""}`;
-
-export const mailIntervalLabel = (minutes: number | null): string => {
-  if (minutes === null) return "apagada";
-  return minutes % MINUTES_PER_HOUR === 0 ? `cada ${minutes / MINUTES_PER_HOUR} h` : `cada ${minutes} min`;
-};
 
 export const mailLastRunLabel = (source: MailSource, run: MailSyncRunDTO | null): string =>
   (run

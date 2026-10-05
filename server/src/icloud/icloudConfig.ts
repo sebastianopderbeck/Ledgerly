@@ -1,5 +1,3 @@
-import { MIN_SYNC_INTERVAL_MINUTES, parseSyncInterval } from "../mail/syncInterval.js";
-
 export const ICLOUD_HOST = "imap.mail.me.com";
 export const ICLOUD_PORT = 993;
 export const ICLOUD_USER_VAR = "ICLOUD_USER";
@@ -15,8 +13,6 @@ export interface IcloudConfig {
   since: string | null;
   sinceInvalid: boolean;
   mailboxes: string[];
-  intervalMinutes: number | null;
-  intervalInvalid: boolean;
 }
 
 const valueOf = (env: NodeJS.ProcessEnv, key: string): string => env[key]?.trim() ?? "";
@@ -44,16 +40,12 @@ export function readIcloudConfig(env: NodeJS.ProcessEnv): IcloudConfig | null {
   const user = valueOf(env, ICLOUD_USER_VAR);
   if (!user) return null;
   const rawSince = valueOf(env, "ICLOUD_SINCE");
-  const rawInterval = valueOf(env, "ICLOUD_SYNC_INTERVAL_MINUTES");
   const since = rawSince ? parseIcloudSince(rawSince) : null;
-  const intervalMinutes = parseSyncInterval(rawInterval);
   return {
     user,
     since,
     sinceInvalid: rawSince !== "" && since === null,
     mailboxes: parseIcloudMailboxes(valueOf(env, "ICLOUD_MAILBOXES")),
-    intervalMinutes,
-    intervalInvalid: rawInterval !== "" && intervalMinutes === null,
   };
 }
 
@@ -68,22 +60,16 @@ export function icloudScopeLabel({ since, mailboxes }: Pick<IcloudConfig, "since
   return `${mailboxes.join(", ")} · ${window}`;
 }
 
-export function describeIcloudSetup(config: IcloudConfig | null, hasPassword: boolean): string {
+export function describeIcloudSetup(config: IcloudConfig | null, hasPassword: boolean, automatic: boolean): string {
   if (!config) return `iCloud: deshabilitado (falta ${ICLOUD_USER_VAR})`;
-  if (!hasPassword && config.intervalMinutes === null) return `iCloud: deshabilitado (falta ${ICLOUD_PASSWORD_MISSING})`;
-  const mode = config.intervalMinutes !== null
-    ? `búsqueda automática cada ${config.intervalMinutes} min`
-    : "búsqueda manual; automática apagada";
-  const notes = [
-    config.sinceInvalid ? `ICLOUD_SINCE inválido (AAAA-MM-DD), uso los últimos ${DEFAULT_ICLOUD_WINDOW_DAYS} días` : null,
-    config.intervalInvalid
-      ? `ICLOUD_SYNC_INTERVAL_MINUTES inválido (entero ≥ ${MIN_SYNC_INTERVAL_MINUTES}), automática apagada`
-      : null,
-  ].filter((note): note is string => note !== null);
+  if (!hasPassword && !automatic) return `iCloud: deshabilitado (falta ${ICLOUD_PASSWORD_MISSING})`;
+  const sinceNote = config.sinceInvalid
+    ? `ICLOUD_SINCE inválido (AAAA-MM-DD), uso los últimos ${DEFAULT_ICLOUD_WINDOW_DAYS} días`
+    : null;
   const passwordNote = hasPassword
     ? null
     : `falta ${ICLOUD_PASSWORD_MISSING}, las corridas van a fallar hasta que la cargues`;
-  return [`iCloud: ${mode} (${icloudScopeLabel(config)})`, passwordNote, ...notes]
+  return [`iCloud: habilitado (${icloudScopeLabel(config)})`, passwordNote, sinceNote]
     .filter((part): part is string => part !== null)
     .join("; ");
 }

@@ -12,24 +12,23 @@ describe("readIcloudConfig", () => {
     expect(readIcloudConfig({ ICLOUD_USER: "   " })).toBeNull();
   });
 
-  it("con solo la cuenta usa INBOX, la ventana por defecto y búsqueda manual", () => {
+  it("con solo la cuenta usa INBOX, la ventana por defecto", () => {
     expect(readIcloudConfig({ ICLOUD_USER: ` ${USER} ` })).toEqual({
-      user: USER, since: null, sinceInvalid: false, mailboxes: ["INBOX"], intervalMinutes: null, intervalInvalid: false,
+      user: USER, since: null, sinceInvalid: false, mailboxes: ["INBOX"],
     });
   });
 
-  it("lee fecha, carpetas e intervalo", () => {
+  it("lee fecha y carpetas", () => {
     expect(readIcloudConfig({
       ICLOUD_USER: USER, ICLOUD_SINCE: "2026-09-01", ICLOUD_MAILBOXES: " INBOX , Bancos,,Bancos ",
-      ICLOUD_SYNC_INTERVAL_MINUTES: "360",
     })).toEqual({
-      user: USER, since: "2026-09-01", sinceInvalid: false, mailboxes: ["INBOX", "Bancos"], intervalMinutes: 360, intervalInvalid: false,
+      user: USER, since: "2026-09-01", sinceInvalid: false, mailboxes: ["INBOX", "Bancos"],
     });
   });
 
-  it("marca la fecha y el intervalo inválidos", () => {
-    expect(readIcloudConfig({ ICLOUD_USER: USER, ICLOUD_SINCE: "01/09/2026", ICLOUD_SYNC_INTERVAL_MINUTES: "5" }))
-      .toMatchObject({ since: null, sinceInvalid: true, intervalMinutes: null, intervalInvalid: true });
+  it("marca la fecha inválida", () => {
+    expect(readIcloudConfig({ ICLOUD_USER: USER, ICLOUD_SINCE: "01/09/2026" }))
+      .toMatchObject({ since: null, sinceInvalid: true });
   });
 });
 
@@ -73,34 +72,31 @@ describe("icloudScopeLabel", () => {
 
 describe("describeIcloudSetup", () => {
   it("dice qué falta", () => {
-    expect(describeIcloudSetup(null, false)).toBe("iCloud: deshabilitado (falta ICLOUD_USER)");
-    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER }), false))
+    expect(describeIcloudSetup(null, false, true)).toBe("iCloud: deshabilitado (falta ICLOUD_USER)");
+    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER }), false, false))
       .toBe("iCloud: deshabilitado (falta la contraseña de app en el Llavero)");
   });
 
-  it("con intervalo y sin contraseña avisa que las corridas van a fallar", () => {
-    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER, ICLOUD_SYNC_INTERVAL_MINUTES: "360" }), false)).toBe(
-      "iCloud: búsqueda automática cada 360 min (INBOX · últimos 90 días); falta la contraseña de app en el Llavero, las corridas van a fallar hasta que la cargues",
+  it("con búsqueda automática y sin contraseña avisa que las corridas van a fallar", () => {
+    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER }), false, true)).toBe(
+      "iCloud: habilitado (INBOX · últimos 90 días); falta la contraseña de app en el Llavero, las corridas van a fallar hasta que la cargues",
     );
   });
 
-  it("describe la búsqueda automática o manual con su alcance", () => {
-    expect(describeIcloudSetup(readIcloudConfig({
-      ICLOUD_USER: USER, ICLOUD_SINCE: "2026-09-01", ICLOUD_SYNC_INTERVAL_MINUTES: "360",
-    }), true)).toBe("iCloud: búsqueda automática cada 360 min (INBOX · desde el 01/09/2026)");
-    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER }), true))
-      .toBe("iCloud: búsqueda manual; automática apagada (INBOX · últimos 90 días)");
+  it("describe el alcance cuando está habilitada", () => {
+    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER, ICLOUD_SINCE: "2026-09-01" }), true, true))
+      .toBe("iCloud: habilitado (INBOX · desde el 01/09/2026)");
+    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER }), true, false))
+      .toBe("iCloud: habilitado (INBOX · últimos 90 días)");
   });
 
-  it("avisa los valores inválidos", () => {
-    expect(describeIcloudSetup(readIcloudConfig({
-      ICLOUD_USER: USER, ICLOUD_SINCE: "ayer", ICLOUD_SYNC_INTERVAL_MINUTES: "5",
-    }), true)).toBe(
-      "iCloud: búsqueda manual; automática apagada (INBOX · últimos 90 días); ICLOUD_SINCE inválido (AAAA-MM-DD), uso los últimos 90 días; ICLOUD_SYNC_INTERVAL_MINUTES inválido (entero ≥ 15), automática apagada",
+  it("avisa la fecha inválida", () => {
+    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER, ICLOUD_SINCE: "ayer" }), true, false)).toBe(
+      "iCloud: habilitado (INBOX · últimos 90 días); ICLOUD_SINCE inválido (AAAA-MM-DD), uso los últimos 90 días",
     );
   });
 
   it("no incluye la cuenta", () => {
-    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER }), true)).not.toContain(USER);
+    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER }), true, true)).not.toContain(USER);
   });
 });

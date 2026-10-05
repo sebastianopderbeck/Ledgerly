@@ -87,9 +87,13 @@ Diseño: `docs/superpowers/specs/2026-10-05-importacion-icloud-design.md`.
    (desde cuándo buscar; sin ella, los últimos 90 días) e `ICLOUD_MAILBOXES=INBOX,Otra carpeta`.
 4. Reiniciar `bun run dev` → Importar → **Buscar en iCloud**.
 5. Versión publicada: copiar las líneas `ICLOUD_*` a `~/Services/ledgerly/.env`, sumar
-   `ICLOUD_SYNC_INTERVAL_MINUTES=360` y correr
+   `MAIL_SYNC_DAYS=25-5` (y, si querés otra hora, `MAIL_SYNC_HOUR=21`; va de 0 a 23) y correr
    `launchctl kickstart -k gui/$(id -u)/com.ledgerly.server`. En `server.log` aparece
-   `iCloud: búsqueda automática cada 360 min (…)`. Dejar la búsqueda automática **solo** en la
+   `Mails: búsqueda automática todos los días a las 21 h, del 25 al 5`. La búsqueda corre una vez
+   por día a esa hora, solo entre el 25 y el 5 (los resúmenes llegan dos veces por mes); el rango
+   puede cruzar el fin de mes. Si la Mac estaba dormida o apagada a esa hora, o el servicio se
+   reinició, la búsqueda que quedó pendiente corre a los 60 segundos de arrancar. Es una sola
+   agenda para iCloud y Gmail. Dejar la búsqueda automática **solo** en la
    publicada. Las corridas automáticas avisan con una notificación de macOS cuando importan algo o
    algo falla; la primera vez puede hacer falta habilitar las notificaciones de «Script Editor» en
    Ajustes → Notificaciones. Si al arrancar el servicio falta la contraseña en el Llavero, la
@@ -98,6 +102,13 @@ Diseño: `docs/superpowers/specs/2026-10-05-importacion-icloud-design.md`.
 6. Revocar: borrar la contraseña de app en account.apple.com, el ítem del Llavero
    (`security delete-generic-password -s ledgerly-icloud-imap -a <tu-cuenta>@icloud.com`) y las
    líneas `ICLOUD_*`.
+
+### Recibos de sueldo por reenvío
+
+Para que la búsqueda de iCloud también importe los recibos de sueldo, crear en la casilla laboral
+(Gmail) un filtro cuyo remitente sea el de liquidaciones de la empresa (`<remitente-de-recibos>`)
+con la acción «Reenviar a» `<tu-cuenta>@icloud.com` (Gmail pide confirmar la dirección de destino
+una sola vez). Los recibos llegan entonces a iCloud y entran por el mismo camino que los resúmenes.
 
 Si Apple invalida la contraseña (cambio de contraseña de Apple o revocación), la tarjeta muestra el
 error: generar una nueva y actualizarla con `security add-generic-password -U -s ledgerly-icloud-imap
@@ -127,9 +138,12 @@ Diseño: `docs/superpowers/specs/2026-10-03-importacion-gmail-design.md`.
 9. (Opcional) Acotar la búsqueda: probarla antes en el buscador de Gmail y cargarla entre comillas,
    p. ej. `GMAIL_QUERY="from:(resumenes@mibanco.com.ar OR recibos@miempresa.com) has:attachment filename:pdf newer_than:90d"`.
 10. Versión publicada: copiar las líneas `GMAIL_*` a `~/Services/ledgerly/.env`, sumar
-    `GMAIL_SYNC_INTERVAL_MINUTES=360` y correr
-    `launchctl kickstart -k gui/$(id -u)/com.ledgerly.server`. En `server.log` aparece
-    `Gmail: búsqueda automática cada 360 min`. Dejar la búsqueda automática **solo** en la publicada.
+    `MAIL_SYNC_DAYS=25-5` (y, opcional, `MAIL_SYNC_HOUR=21`) y correr
+    `launchctl kickstart -k gui/$(id -u)/com.ledgerly.server`. La agenda es la misma que la de
+    iCloud (una vez por día a esa hora, solo del 25 al 5); si la Mac dormía a esa hora, la búsqueda
+    pendiente corre al volver. En `server.log` aparece
+    `Mails: búsqueda automática todos los días a las 21 h, del 25 al 5`. Dejar la búsqueda
+    automática **solo** en la publicada.
 11. Revocar: [myaccount.google.com/connections](https://myaccount.google.com/connections) →
     Ledgerly → Borrar todas las conexiones, y borrar las líneas `GMAIL_*`. Si el secreto se filtró,
     borrar el cliente en «Clientes» y crear otro.

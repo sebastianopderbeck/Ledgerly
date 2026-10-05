@@ -1,21 +1,14 @@
 import {
   MAIL_SOURCE_LABELS, type MailSource, type MailSyncOutcome, type MailSyncRunDTO, type MailSyncTrigger,
 } from "@ledgerly/shared";
+import { MAX_TIMER_MS, nextMailRunDelayMs, nextScheduledRun } from "./mailSchedule.js";
 import type { MailSourceSetup } from "./mailSourceSetup.js";
 import { notifyRun } from "./notifyRun.js";
 import { findLastMailRun, runMailSync } from "./syncMail.js";
 
-export const MAIL_STARTUP_DELAY_MS = 60_000;
-const MINUTE_MS = 60_000;
 const UNEXPECTED_ERROR = "Error inesperado";
 
 const TRIGGER_LOG_LABELS: Record<MailSyncTrigger, string> = { manual: "manual", job: "automática" };
-
-export function nextMailRunDelayMs(lastStartedAt: Date | null, intervalMinutes: number, now: Date): number {
-  if (!lastStartedAt) return MAIL_STARTUP_DELAY_MS;
-  const dueInMs = lastStartedAt.getTime() + intervalMinutes * MINUTE_MS - now.getTime();
-  return Math.max(MAIL_STARTUP_DELAY_MS, dueInMs);
-}
 
 const countOf = (run: MailSyncRunDTO, outcome: MailSyncOutcome): number =>
   run.items.filter((item) => item.outcome === outcome).length;
@@ -52,14 +45,25 @@ const previousRun = async (source: MailSource): Promise<MailSyncRunDTO | null> =
 };
 
 export async function startMailJob(setup: MailSourceSetup): Promise<() => void> {
-  const { source, intervalMinutes, openClient } = setup;
-  if (intervalMinutes === null || openClient === null) return () => {};
+  const { source, schedule: mailSchedule, openClient } = setup;
+  if (mailSchedule === null || openClient === null) return () => {};
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
+  const jobStartedAt = new Date();
+  const last = await previousRun(source);
+  let lastStartedAt: Date | null = last ? new Date(last.startedAt) : null;
 
-  const runOnce = async (): Promise<void> => {
+  const arm = (delayMs: number): void => {
+    if (stopped) return;
+    timer = setTimeout(onTimer, Math.min(delayMs, MAX_TIMER_MS));
+    timer.unref();
+  };
+
+  const runOnce = async (slot: Date): Promise<void> => {
     const previous = await previousRun(source);
+    const startedAt = new Date();
+    lastStartedAt = startedAt.getTime() >= slot.getTime() ? startedAt : slot;
     let run: MailSyncRunDTO | null = null;
     try {
       run = await runMailSync(source, openClient, "job");
@@ -67,20 +71,18 @@ export async function startMailJob(setup: MailSourceSetup): Promise<() => void> 
     } catch (err) {
       console.error(`${logPrefix(source, "job")}: error — ${err instanceof Error ? err.message : UNEXPECTED_ERROR}`);
     }
-    schedule(intervalMinutes * MINUTE_MS);
+    arm(nextMailRunDelayMs(mailSchedule, lastStartedAt, new Date()));
     if (run) await notifyRun(run, previous);
   };
 
-  const schedule = (delayMs: number): void => {
-    if (stopped) return;
-    timer = setTimeout(() => {
-      void runOnce();
-    }, delayMs);
-    timer.unref();
+  const onTimer = (): void => {
+    const slot = nextScheduledRun(mailSchedule, lastStartedAt ?? jobStartedAt);
+    const remainingMs = slot.getTime() - Date.now();
+    if (remainingMs > 0) arm(remainingMs);
+    else void runOnce(slot);
   };
 
-  const last = await previousRun(source);
-  schedule(nextMailRunDelayMs(last ? new Date(last.startedAt) : null, intervalMinutes, new Date()));
+  arm(nextMailRunDelayMs(mailSchedule, lastStartedAt, new Date()));
 
   return () => {
     stopped = true;

@@ -6,6 +6,7 @@ import { resolveListenOptions } from "./http/listenOptions.js";
 import { connectMongo } from "./db/connection.js";
 import { describeGmailSetup } from "./gmail/gmailConfig.js";
 import { describeIcloudSource } from "./icloud/icloudSource.js";
+import { describeMailAutomation, parseMailSchedule } from "./mail/mailSchedule.js";
 import { startMailJob } from "./mail/mailJob.js";
 import { readMailSourceSetups } from "./mail/mailSources.js";
 
@@ -27,6 +28,8 @@ if (host) {
   app.listen(port, logListening);
 }
 
+const mailSchedule = parseMailSchedule(process.env);
+console.log(describeMailAutomation(mailSchedule));
 console.log(describeGmailSetup(process.env));
 console.log(await describeIcloudSource(process.env));
 for (const setup of await readMailSourceSetups(process.env)) await startMailJob(setup);
