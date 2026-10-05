@@ -3,8 +3,9 @@ import { Box, Chip, IconButton, Table, TableCell, TableContainer, TableHead, Tab
 import EditIcon from "@mui/icons-material/Edit";
 import type { PayslipDTO } from "@ledgerly/shared";
 import { usePatchPayslipRate } from "../api/hooks.js";
-import { byPeriodo, uniqueConceptLabels } from "../payslipConcepts.js";
+import { uniqueConceptLabels, type PeriodoOrden } from "../payslipConcepts.js";
 import { formatMoney } from "../format.js";
+import { PeriodoSortHeader } from "./PeriodoSortHeader.js";
 import { MotionTableBody, MotionTableRow } from "./motion/motion.js";
 import { fadeUpItem, staggerContainer } from "./motion/variants.js";
 
@@ -48,13 +49,16 @@ const RateCell = ({ payslip }: { payslip: PayslipDTO }) => {
   );
 };
 
-interface PayslipsTableProps { payslips: PayslipDTO[]; }
+interface PayslipsTableProps {
+  payslips: PayslipDTO[];
+  orden: PeriodoOrden;
+  onToggleOrden: () => void;
+}
 
-export const PayslipsTable = ({ payslips }: PayslipsTableProps) => {
+export const PayslipsTable = ({ payslips, orden, onToggleOrden }: PayslipsTableProps) => {
   if (payslips.length === 0) return null;
 
-  const rows = [...payslips].sort(byPeriodo);
-  const conceptLabels = uniqueConceptLabels(rows);
+  const conceptLabels = uniqueConceptLabels(payslips);
   const montoOf = (payslip: PayslipDTO, label: string): number | null =>
     payslip.conceptos.find((c) => c.label === label)?.monto ?? null;
 
@@ -63,7 +67,7 @@ export const PayslipsTable = ({ payslips }: PayslipsTableProps) => {
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Período</TableCell>
+            <PeriodoSortHeader orden={orden} onToggle={onToggleOrden} />
             <TableCell align="right">Bruto</TableCell>
             <TableCell align="right">Neto</TableCell>
             <TableCell align="right">Neto (USD)</TableCell>
@@ -75,7 +79,7 @@ export const PayslipsTable = ({ payslips }: PayslipsTableProps) => {
           </TableRow>
         </TableHead>
         <MotionTableBody variants={staggerContainer} initial="hidden" animate="visible">
-          {rows.map((p) => (
+          {payslips.map((p) => (
             <MotionTableRow key={p.id} variants={fadeUpItem}>
               <TableCell sx={{ whiteSpace: "nowrap" }}>
                 {p.periodo}

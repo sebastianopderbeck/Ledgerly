@@ -3,7 +3,7 @@ import { Box, Chip } from "@mui/material";
 import type { PayslipDTO } from "@ledgerly/shared";
 import { usePatchPayslipRate } from "../api/hooks.js";
 import { formatMoney, formatMoneyOrDash } from "../format.js";
-import { byPeriodo, uniqueConceptLabels } from "../payslipConcepts.js";
+import { uniqueConceptLabels } from "../payslipConcepts.js";
 import { RateSheet, RateValue } from "./RateSheet.js";
 import { RecordCard, recordListSx, type RecordField } from "./RecordCard.js";
 import { useSheetTarget } from "./useSheetTarget.js";
@@ -45,9 +45,8 @@ export const PayslipCards = ({ payslips }: PayslipCardsProps) => {
 
   if (payslips.length === 0) return null;
 
-  const sorted = [...payslips].sort(byPeriodo);
-  const conceptLabels = uniqueConceptLabels(sorted);
-  const cards = sorted.map((payslip) => (
+  const conceptLabels = uniqueConceptLabels(payslips);
+  const cards = payslips.map((payslip) => (
     <RecordCard
       key={payslip.id}
       title={payslip.periodo}
