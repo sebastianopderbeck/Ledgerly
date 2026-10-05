@@ -1,18 +1,15 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback } from "react";
 import { Box, Chip } from "@mui/material";
 import type { PayslipDTO } from "@ledgerly/shared";
 import { usePatchPayslipRate } from "../api/hooks.js";
-import { formatMoney, formatMoneyOrDash, formatPercent, formatPercentOrDash } from "../format.js";
-import { byPeriodo, uniqueConceptLabels } from "../payslipConcepts.js";
-import { ipcWindowLabel, raiseFor, type SalaryRaise } from "../salaryRaises.js";
+import { formatMoney, formatMoneyOrDash } from "../format.js";
+import { uniqueConceptLabels } from "../payslipConcepts.js";
 import { RateSheet, RateValue } from "./RateSheet.js";
 import { RecordCard, recordListSx, type RecordField } from "./RecordCard.js";
-import { SalaryRaiseChip } from "./SalaryRaiseChip.js";
 import { useSheetTarget } from "./useSheetTarget.js";
 
 interface PayslipCardsProps {
   payslips: PayslipDTO[];
-  raises: Map<string, SalaryRaise>;
 }
 
 const sacBadge = <Chip label="SAC" size="small" color="secondary" variant="outlined" />;
@@ -28,29 +25,8 @@ const highlightsOf = (payslip: PayslipDTO): RecordField[] => [
   { label: "Neto USD", value: formatMoneyOrDash(payslip.netoUsd, "USD") },
 ];
 
-const raiseFieldsOf = (raise: SalaryRaise | undefined): RecordField[] => {
-  if (!raise) return [];
-  return [
-    { label: "Aumento básico", value: formatPercent(raise.basicoPct) },
-    { label: "Aumento bruto", value: formatPercentOrDash(raise.brutoPct) },
-    { label: "IPC acumulado", value: formatPercentOrDash(raise.ipcPct) },
-    { label: "Meses IPC", value: ipcWindowLabel(raise) },
-  ];
-};
-
-const badgeOf = (payslip: PayslipDTO, raise: SalaryRaise | undefined): ReactNode => {
-  if (payslip.tipo === "sac") return sacBadge;
-  return raise ? <SalaryRaiseChip raise={raise} /> : undefined;
-};
-
-const detailsOf = (
-  payslip: PayslipDTO,
-  raise: SalaryRaise | undefined,
-  conceptLabels: string[],
-  onEditRate: () => void,
-): RecordField[] => [
+const detailsOf = (payslip: PayslipDTO, conceptLabels: string[], onEditRate: () => void): RecordField[] => [
   { label: "Bruto", value: formatMoney(payslip.brutoTotal, "ARS") },
-  ...raiseFieldsOf(raise),
   ...conceptLabels.map((label) => ({ label, value: formatMoneyOrDash(montoOf(payslip, label), "ARS") })),
   { label: "Descuentos", value: formatMoney(payslip.descuentos, "ARS") },
   {
@@ -59,7 +35,7 @@ const detailsOf = (
   },
 ];
 
-export const PayslipCards = ({ payslips, raises }: PayslipCardsProps) => {
+export const PayslipCards = ({ payslips }: PayslipCardsProps) => {
   const { mutate: patchRate } = usePatchPayslipRate();
   const { target, open, show, close } = useSheetTarget<PayslipDTO>();
 
@@ -69,21 +45,17 @@ export const PayslipCards = ({ payslips, raises }: PayslipCardsProps) => {
 
   if (payslips.length === 0) return null;
 
-  const sorted = [...payslips].sort(byPeriodo);
-  const conceptLabels = uniqueConceptLabels(sorted);
-  const cards = sorted.map((payslip) => {
-    const raise = raiseFor(raises, payslip);
-    return (
-      <RecordCard
-        key={payslip.id}
-        title={payslip.periodo}
-        label={payslipName(payslip)}
-        badge={badgeOf(payslip, raise)}
-        highlights={highlightsOf(payslip)}
-        details={detailsOf(payslip, raise, conceptLabels, () => show(payslip))}
-      />
-    );
-  });
+  const conceptLabels = uniqueConceptLabels(payslips);
+  const cards = payslips.map((payslip) => (
+    <RecordCard
+      key={payslip.id}
+      title={payslip.periodo}
+      label={payslipName(payslip)}
+      badge={payslip.tipo === "sac" ? sacBadge : undefined}
+      highlights={highlightsOf(payslip)}
+      details={detailsOf(payslip, conceptLabels, () => show(payslip))}
+    />
+  ));
   const sheetTitle = target ? `TC recibo ${payslipName(target)}` : "TC oficial";
 
   return (

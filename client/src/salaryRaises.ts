@@ -133,7 +133,3 @@ export function ipcWindowLabel({ ipcDesde, ipcHasta, ipcFaltantes }: SalaryRaise
   const window = ipcDesde === ipcHasta ? ipcDesde : `${ipcDesde} a ${ipcHasta}`;
   return ipcFaltantes.length > 0 ? `${window} · falta ${ipcFaltantes.join(", ")}` : window;
 }
-
-export function raiseFor(raises: Map<string, SalaryRaise>, payslip: PayslipDTO): SalaryRaise | undefined {
-  return payslip.tipo === "mensual" ? raises.get(payslip.periodo) : undefined;
-}
