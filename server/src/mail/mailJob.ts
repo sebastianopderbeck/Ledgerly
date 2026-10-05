@@ -1,7 +1,7 @@
 import {
   MAIL_SOURCE_LABELS, type MailSource, type MailSyncOutcome, type MailSyncRunDTO, type MailSyncTrigger,
 } from "@ledgerly/shared";
-import { nextMailRunDelayMs } from "./mailSchedule.js";
+import { MAX_TIMER_MS, nextMailRunDelayMs, nextScheduledRun } from "./mailSchedule.js";
 import type { MailSourceSetup } from "./mailSourceSetup.js";
 import { notifyRun } from "./notifyRun.js";
 import { findLastMailRun, runMailSync } from "./syncMail.js";
@@ -50,10 +50,20 @@ export async function startMailJob(setup: MailSourceSetup): Promise<() => void> 
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
+  const jobStartedAt = new Date();
+  const last = await previousRun(source);
+  let lastStartedAt: Date | null = last ? new Date(last.startedAt) : null;
 
-  const runOnce = async (): Promise<void> => {
+  const arm = (delayMs: number): void => {
+    if (stopped) return;
+    timer = setTimeout(onTimer, Math.min(delayMs, MAX_TIMER_MS));
+    timer.unref();
+  };
+
+  const runOnce = async (slot: Date): Promise<void> => {
     const previous = await previousRun(source);
     const startedAt = new Date();
+    lastStartedAt = startedAt.getTime() >= slot.getTime() ? startedAt : slot;
     let run: MailSyncRunDTO | null = null;
     try {
       run = await runMailSync(source, openClient, "job");
@@ -61,20 +71,18 @@ export async function startMailJob(setup: MailSourceSetup): Promise<() => void> 
     } catch (err) {
       console.error(`${logPrefix(source, "job")}: error — ${err instanceof Error ? err.message : UNEXPECTED_ERROR}`);
     }
-    schedule(nextMailRunDelayMs(mailSchedule, startedAt, new Date()));
+    arm(nextMailRunDelayMs(mailSchedule, lastStartedAt, new Date()));
     if (run) await notifyRun(run, previous);
   };
 
-  const schedule = (delayMs: number): void => {
-    if (stopped) return;
-    timer = setTimeout(() => {
-      void runOnce();
-    }, delayMs);
-    timer.unref();
+  const onTimer = (): void => {
+    const slot = nextScheduledRun(mailSchedule, lastStartedAt ?? jobStartedAt);
+    const remainingMs = slot.getTime() - Date.now();
+    if (remainingMs > 0) arm(remainingMs);
+    else void runOnce(slot);
   };
 
-  const last = await previousRun(source);
-  schedule(nextMailRunDelayMs(mailSchedule, last ? new Date(last.startedAt) : null, new Date()));
+  arm(nextMailRunDelayMs(mailSchedule, lastStartedAt, new Date()));
 
   return () => {
     stopped = true;

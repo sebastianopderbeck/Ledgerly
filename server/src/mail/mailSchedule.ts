@@ -11,6 +11,7 @@ export interface MailScheduleConfig {
 
 export const DEFAULT_MAIL_SYNC_HOUR = 21;
 export const MAIL_STARTUP_DELAY_MS = 60_000;
+export const MAX_TIMER_MS = 24 * 60 * 60 * 1000;
 
 const DAYS_PATTERN = /^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$/;
 const HOUR_PATTERN = /^\d{1,2}$/;

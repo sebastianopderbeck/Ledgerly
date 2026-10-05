@@ -7,7 +7,7 @@ vi.mock("./notifyRun.js", () => ({ notifyRun: vi.fn() }));
 import { notifyRun } from "./notifyRun.js";
 import type { MailSourceSetup } from "./mailSourceSetup.js";
 import { formatMailRunLog, startMailJob } from "./mailJob.js";
-import { MAIL_STARTUP_DELAY_MS, type MailSchedule } from "./mailSchedule.js";
+import { MAIL_STARTUP_DELAY_MS, MAX_TIMER_MS, type MailSchedule } from "./mailSchedule.js";
 
 const HOUR = 3_600_000;
 const SCHEDULE: MailSchedule = { fromDay: 25, toDay: 5, hour: 21 };
@@ -204,6 +204,43 @@ describe("startMailJob", () => {
     const stop = await startMailJob(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY);
     expect(notifyRun).toHaveBeenCalledWith(runOf(), null);
+    stop();
+  });
+
+  it("con una ventana de huecos largos no arma timers por encima del tope y corre una sola vez en el slot", async () => {
+    vi.setSystemTime(new Date(2026, 10, 3, 22));
+    const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const stop = await startMailJob(setup({ fromDay: 1, toDay: 3, hour: 21 }));
+    const slot = new Date(2026, 11, 1, 21);
+    await vi.advanceTimersByTimeAsync(slot.getTime() - Date.now() - 1);
+    expect(runMailSync).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(runMailSync).toHaveBeenCalledTimes(1);
+    expect(new Date(Date.now())).toEqual(slot);
+    const delays = timeoutSpy.mock.calls.map(([, delay]) => delay ?? 0);
+    expect(Math.max(...delays)).toBeLessThanOrEqual(MAX_TIMER_MS);
+    await vi.advanceTimersByTimeAsync(23 * HOUR);
+    expect(runMailSync).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("un timer que dispara unos ms antes del slot corre una sola vez", async () => {
+    const callbacks: Array<() => void> = [];
+    const realSetTimeout = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((callback: () => void, delay?: number) => {
+      callbacks.push(callback);
+      return realSetTimeout(callback, delay);
+    }) as typeof setTimeout);
+    const stop = await startMailJob(setup(SCHEDULE));
+    const slot = new Date(2026, 9, 27, 21);
+    vi.setSystemTime(new Date(slot.getTime() - 5));
+    callbacks[0]();
+    await vi.advanceTimersByTimeAsync(4);
+    expect(runMailSync).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(runMailSync).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(5 * MAIL_STARTUP_DELAY_MS);
+    expect(runMailSync).toHaveBeenCalledTimes(1);
     stop();
   });
 });
