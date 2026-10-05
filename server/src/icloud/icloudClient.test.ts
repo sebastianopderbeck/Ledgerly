@@ -14,11 +14,13 @@ const PASSWORD = "clave-app-sintetica";
 interface FakeMailbox {
   uidValidity: bigint;
   messages: FetchMessageObject[];
+  html?: Record<number, string>;
 }
 
 const pdfNode = (part: string, filename: string, size = 2048): MessageStructureObject => ({
   part, type: "application/pdf", disposition: "attachment", dispositionParameters: { filename }, size,
 });
+const htmlNode = (part: string): MessageStructureObject => ({ part, type: "text/html", size: 900 });
 const textNode = (part: string): MessageStructureObject => ({ part, type: "text/plain", size: 120 });
 const multipart = (...childNodes: MessageStructureObject[]): MessageStructureObject => ({ type: "multipart/mixed", childNodes });
 
@@ -43,12 +45,20 @@ const fakeSession = (mailboxes: Record<string, FakeMailbox>) => {
         },
       };
     }),
-    search: vi.fn(async (_query: { since: Date }, _options: { uid: true }): Promise<number[]> =>
-      state.open?.messages.map(({ uid }) => uid) ?? []),
+    search: vi.fn(async (query: { since: Date; body?: string }, _options: { uid: true }): Promise<number[]> => {
+      const { body } = query;
+      const box = state.open;
+      if (!box) return [];
+      const uids = box.messages.map(({ uid }) => uid);
+      return body === undefined ? uids : uids.filter((uid) => box.html?.[uid]?.includes(body));
+    }),
     fetchAll: vi.fn(async (range: number[]): Promise<FetchMessageObject[]> =>
       state.open?.messages.filter(({ uid }) => range.includes(uid)) ?? []),
-    download: vi.fn(async (range: string, part: string): Promise<{ content?: Readable }> =>
-      ({ content: Readable.from([Buffer.from(`pdf:${range}:${part}`)]) })),
+    download: vi.fn(async (range: string, part: string): Promise<{ content?: Readable }> => {
+      const html = state.open?.html?.[Number(range)];
+      const text = html !== undefined && part === "1" ? html : `pdf:${range}:${part}`;
+      return { content: Readable.from([Buffer.from(text)]) };
+    }),
     logout: vi.fn(async (): Promise<void> => undefined),
   } satisfies ImapSession;
 };
@@ -72,6 +82,15 @@ const RESUMEN = message(
   11, "2026-09-30T13:00:00.000Z", multipart(textNode("1"), pdfNode("2", "Resumen6oct2026.pdf")), "<resumen@banco.example>",
 );
 const NEWSLETTER = message(12, "2026-10-01T09:00:00.000Z", multipart(textNode("1")), "<news@tienda.example>");
+const COUPON_ID = "0a1b2c3d-1111-4222-8333-444455556666";
+const SECOND_COUPON_ID = "ffffffff-aaaa-4bbb-8ccc-000000000001";
+const COUPON_LINK_HTML = `<a href="https://go.certisend.com/AbC123/xYz789">x</a><a href="https://go.certisend.com/coupon/${COUPON_ID}">cupón</a>`;
+const PLAN_AUTO = message(
+  21, "2026-10-02T07:00:00.000Z", multipart(htmlNode("1")), "<plan-auto@banco.example>",
+);
+const PLAN_AUTO_CON_PDF = message(
+  22, "2026-10-03T07:00:00.000Z", multipart(htmlNode("1"), pdfNode("2", "adjunto.pdf")), "<plan-auto-pdf@banco.example>",
+);
 const CUPON = message(
   3, "2026-09-10T08:00:00.000Z", { type: "application/pdf", parameters: { name: "cupon.pdf" }, size: 2048 }, "<cupon@banco.example>",
 );
@@ -162,6 +181,56 @@ describe("openIcloudClient", () => {
     expect(session.mailbox).toBe(false);
   });
 
+  it("un mail con solo el link de un cupón de certisend se lista con una parte certisend", async () => {
+    const { session, client } = open({
+      INBOX: { uidValidity: 5n, messages: [NEWSLETTER] },
+      Auto: { uidValidity: 8n, messages: [PLAN_AUTO], html: { 21: COUPON_LINK_HTML } },
+    });
+    const mail = await client;
+    expect(await mail.listMessageIds(500)).toEqual(["plan-auto@banco.example"]);
+    expect(session.search).toHaveBeenCalledWith({ since: SINCE, body: "go.certisend.com/coupon/" }, { uid: true });
+    expect((await mail.getMessage("plan-auto@banco.example")).pdfParts).toEqual([{
+      kind: "certisend", couponId: COUPON_ID, partId: `certisend:${COUPON_ID}`, fileName: "certisend-0a1b2c3d.pdf", size: 0,
+    }]);
+    expect(session.mailbox).toBe(false);
+  });
+
+  it("un mail con adjunto y link devuelve las dos partes, y un link repetido cuenta una vez", async () => {
+    const { client } = open({
+      Auto: {
+        uidValidity: 8n,
+        messages: [PLAN_AUTO_CON_PDF],
+        html: { 22: `${COUPON_LINK_HTML}${COUPON_LINK_HTML}https://go.certisend.com/coupon/${SECOND_COUPON_ID}` },
+      },
+    });
+    const mail = await client;
+    await mail.listMessageIds(500);
+    const { pdfParts } = await mail.getMessage("plan-auto-pdf@banco.example");
+    expect(pdfParts.map((part) => part.kind)).toEqual(["attachment", "certisend", "certisend"]);
+    expect(pdfParts[0]).toEqual({ kind: "attachment", partId: "2", fileName: "adjunto.pdf", size: 2048, mailbox: "Auto", uid: 22 });
+  });
+
+  it("las partes certisend se descargan con el fetch inyectado y sin abrir la carpeta", async () => {
+    const pdf = new Uint8Array([37, 80, 68, 70]);
+    const pageHtml = `<a href="https://html2pdf.certisend.com/convert/?key=k&amp;url=https://go.certisend.com/coupon_print/${COUPON_ID}">PDF</a>`;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(pageHtml, { status: 200, headers: { "content-type": "text/html" } }))
+      .mockResolvedValueOnce(new Response(pdf, { status: 200, headers: { "content-type": "application/pdf" } }));
+    const session = fakeSession({ Auto: { uidValidity: 8n, messages: [PLAN_AUTO], html: { 21: COUPON_LINK_HTML } } });
+    const mail = await openIcloudClient({
+      user: USER, password: PASSWORD, mailboxes: ["Auto"], since: SINCE, createSession: () => session, certisend: { fetch: fetchMock },
+    });
+    await mail.listMessageIds(500);
+    const found = await mail.getMessage("plan-auto@banco.example");
+    session.getMailboxLock.mockClear();
+    session.download.mockClear();
+    const bytes = await mail.downloadPart(found.id, found.pdfParts[0]);
+    expect(Array.from(bytes)).toEqual(Array.from(pdf));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(session.getMailboxLock).not.toHaveBeenCalled();
+    expect(session.download).not.toHaveBeenCalled();
+  });
+
   it("el mismo mail en dos carpetas cuenta una sola vez", async () => {
     const { client } = open({
       INBOX: { uidValidity: 5n, messages: [RESUMEN] },
@@ -180,7 +249,7 @@ describe("openIcloudClient", () => {
     const found = await mail.getMessage("cupon@banco.example");
     expect(found).toEqual({
       id: "cupon@banco.example", receivedAt: "2026-09-10T08:00:00.000Z",
-      pdfParts: [{ partId: "1", fileName: "cupon.pdf", size: 2048, mailbox: "Bancos", uid: 3 }],
+      pdfParts: [{ kind: "attachment", partId: "1", fileName: "cupon.pdf", size: 2048, mailbox: "Bancos", uid: 3 }],
     });
     const bytes = await mail.downloadPart(found.id, found.pdfParts[0]);
     expect(new TextDecoder().decode(bytes)).toBe("pdf:3:1");
