@@ -145,3 +145,100 @@ describe("PayslipsPage en mobile", () => {
     expect(patches()).toEqual([]);
   });
 });
+
+const conBasico = (id: string, periodo: string, basico: number, bruto: number) => ({
+  ...payslip(id, periodo),
+  conceptos: [{ codigo: "0201", label: "SUELDO", tipo: "remunerativo", monto: basico }],
+  brutoTotal: bruto,
+});
+
+const ajustes = [
+  conBasico("a1", "2025-01", 1000, 1200),
+  conBasico("a2", "2025-02", 1000, 1200),
+  conBasico("a3", "2025-03", 1100, 1380),
+];
+
+const stubApi = (payslips: unknown[], inflation: [string, number][]) => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const body = url.includes("/payslips/summary") ? summary
+      : url.includes("/payslips") ? payslips
+      : url.includes("/inflation") ? inflation.map(([periodo, variacionMensual]) => ({ periodo, variacionMensual }))
+      : {};
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  }));
+};
+
+const rowOf = async (periodo: string) => {
+  const table = await screen.findByRole("table");
+  const row = within(table).getAllByRole("row").find((candidate) => within(candidate).queryByText(periodo));
+  if (!row) throw new Error(`sin fila para ${periodo}`);
+  return row;
+};
+
+describe("PayslipsPage ajustes por IPC", () => {
+  it("la tabla compara el aumento del básico y del bruto contra el IPC acumulado", async () => {
+    stubApi(ajustes, [["2025-01", 2], ["2025-02", 3]]);
+    renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=all" });
+    const table = await screen.findByRole("table");
+    for (const header of ["Aumento básico", "Aumento bruto", "IPC acumulado", "vs IPC"]) {
+      expect(within(table).getByRole("columnheader", { name: header })).toBeInTheDocument();
+    }
+    const ajuste = await rowOf("2025-03");
+    expect(within(ajuste).getByText("10,0%")).toBeInTheDocument();
+    expect(within(ajuste).getByText("15,0%")).toBeInTheDocument();
+    expect(within(ajuste).getByTitle("IPC de 2025-01 a 2025-02")).toHaveTextContent("5,1%");
+    expect(within(ajuste).getByText("Real +4,7%")).toBeInTheDocument();
+    const sinAjuste = await rowOf("2025-02");
+    expect(within(sinAjuste).queryByText(/Real|Solo IPC|Debajo|IPC parcial/)).not.toBeInTheDocument();
+  });
+
+  it("un ajuste por debajo del IPC se marca como Debajo", async () => {
+    stubApi(ajustes, [["2025-01", 10], ["2025-02", 1]]);
+    renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=all" });
+    expect(within(await rowOf("2025-03")).getByText("Debajo −1,0%")).toBeInTheDocument();
+  });
+
+  it("si falta el IPC de un mes avisa que es parcial y cuál falta", async () => {
+    stubApi(ajustes, [["2025-01", 2]]);
+    renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=all" });
+    const ajuste = await rowOf("2025-03");
+    expect(within(ajuste).getByText("IPC parcial")).toBeInTheDocument();
+    expect(within(ajuste).getByTitle("IPC de 2025-01 a 2025-02 · falta 2025-02")).toHaveTextContent("2,0%");
+  });
+
+  it("con un año filtrado compara contra el último ajuste del año anterior", async () => {
+    stubApi(
+      [conBasico("b1", "2025-09", 1000, 1000), conBasico("b2", "2026-01", 1100, 1100)],
+      [["2025-09", 1], ["2025-10", 1], ["2025-11", 1], ["2025-12", 1]],
+    );
+    renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=2026" });
+    const ajuste = await rowOf("2026-01");
+    expect(within(ajuste).getByTitle("IPC de 2025-09 a 2025-12")).toHaveTextContent("4,1%");
+    expect(within(ajuste).getByText("Real +5,7%")).toBeInTheDocument();
+  });
+});
+
+describe("PayslipsPage ajustes por IPC en mobile", () => {
+  beforeEach(() => emulateMobile());
+
+  it("la tarjeta del ajuste muestra el veredicto y el detalle del IPC", async () => {
+    stubApi(ajustes, [["2025-01", 2], ["2025-02", 3]]);
+    renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=all" });
+    const card = await screen.findByRole("article", { name: "2025-03" });
+    expect(within(card).getByText("Real +4,7%")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Ver detalle" }));
+    expect(within(card).getByText("Aumento básico").nextSibling).toHaveTextContent("10,0%");
+    expect(within(card).getByText("Aumento bruto").nextSibling).toHaveTextContent("15,0%");
+    expect(within(card).getByText("IPC acumulado").nextSibling).toHaveTextContent("5,1%");
+    expect(within(card).getByText("Meses IPC").nextSibling).toHaveTextContent("2025-01 a 2025-02");
+  });
+
+  it("la tarjeta de un mes sin ajuste no agrega los campos del IPC", async () => {
+    stubApi(ajustes, [["2025-01", 2], ["2025-02", 3]]);
+    renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=all" });
+    const card = await screen.findByRole("article", { name: "2025-02" });
+    await userEvent.click(within(card).getByRole("button", { name: "Ver detalle" }));
+    expect(within(card).getByText("Bruto")).toBeInTheDocument();
+    expect(within(card).queryByText("Aumento básico")).not.toBeInTheDocument();
+  });
+});
