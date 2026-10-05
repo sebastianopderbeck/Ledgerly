@@ -70,7 +70,7 @@ export function icloudScopeLabel({ since, mailboxes }: Pick<IcloudConfig, "since
 
 export function describeIcloudSetup(config: IcloudConfig | null, hasPassword: boolean): string {
   if (!config) return `iCloud: deshabilitado (falta ${ICLOUD_USER_VAR})`;
-  if (!hasPassword) return `iCloud: deshabilitado (falta ${ICLOUD_PASSWORD_MISSING})`;
+  if (!hasPassword && config.intervalMinutes === null) return `iCloud: deshabilitado (falta ${ICLOUD_PASSWORD_MISSING})`;
   const mode = config.intervalMinutes !== null
     ? `búsqueda automática cada ${config.intervalMinutes} min`
     : "búsqueda manual; automática apagada";
@@ -80,5 +80,10 @@ export function describeIcloudSetup(config: IcloudConfig | null, hasPassword: bo
       ? `ICLOUD_SYNC_INTERVAL_MINUTES inválido (entero ≥ ${MIN_SYNC_INTERVAL_MINUTES}), automática apagada`
       : null,
   ].filter((note): note is string => note !== null);
-  return [`iCloud: ${mode} (${icloudScopeLabel(config)})`, ...notes].join("; ");
+  const passwordNote = hasPassword
+    ? null
+    : `falta ${ICLOUD_PASSWORD_MISSING}, las corridas van a fallar hasta que la cargues`;
+  return [`iCloud: ${mode} (${icloudScopeLabel(config)})`, passwordNote, ...notes]
+    .filter((part): part is string => part !== null)
+    .join("; ");
 }

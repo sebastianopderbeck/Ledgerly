@@ -3,7 +3,7 @@ import type { MailSyncItemDTO, MailSyncRunDTO } from "@ledgerly/shared";
 
 vi.mock("node:child_process", () => ({
   execFile: vi.fn((
-    _file: string, _args: string[], callback: (err: Error | null, result: { stdout: string; stderr: string }) => void,
+    _file: string, _args: string[], _options: object, callback: (err: Error | null, result: { stdout: string; stderr: string }) => void,
   ) => {
     callback(null, { stdout: "", stderr: "" });
   }),
@@ -47,6 +47,14 @@ describe("runNotifications", () => {
       "No pude importar roto.pdf: Mongo se cayó",
       "Resumen6oct2026.pdf parece un resumen pero no lo pude leer: No se encontraron movimientos en el resumen",
     ]);
+  });
+
+  it("un fallido que vuelve a fallar igual en la corrida siguiente no se vuelve a avisar", () => {
+    const run = runOf({ items: [item("roto.pdf", "failed", { detail: "Mongo se cayó" })] });
+    const same = runOf({ items: [item("roto.pdf", "failed", { detail: "Mongo se cayó" })] });
+    const otherDetail = runOf({ items: [item("roto.pdf", "failed", { detail: "Otro motivo" })] });
+    expect(runNotifications(run, same)).toEqual([]);
+    expect(runNotifications(run, otherDetail)).toEqual(["No pude importar roto.pdf: Mongo se cayó"]);
   });
 
   it("una corrida con error avisa solo si la anterior de la fuente no había fallado", () => {
@@ -101,6 +109,7 @@ describe("osascriptNotify", () => {
         "-e", "on run argv", "-e", "display notification (item 2 of argv) with title (item 1 of argv)", "-e", "end run",
         "Ledgerly · Gmail", 'Importé "raro" & cía.pdf: x',
       ],
+      { timeout: 10_000 },
       expect.any(Function),
     );
   });

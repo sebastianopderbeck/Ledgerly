@@ -1,9 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
-import { hasIcloudPassword, readIcloudPassword } from "./keychain.js";
-import { IcloudAuthError, ICLOUD_MISSING_PASSWORD_MESSAGE } from "./icloudErrors.js";
+
+vi.mock("node:child_process", () => ({
+  execFile: vi.fn((
+    _file: string, _args: string[], _options: object,
+    callback: (err: Error | null, result: { stdout: string; stderr: string }) => void,
+  ) => {
+    callback(null, { stdout: "clave-app-sintetica\n", stderr: "" });
+  }),
+}));
+import { execFile } from "node:child_process";
+import { hasIcloudPassword, KEYCHAIN_TIMEOUT_MS, readIcloudPassword } from "./keychain.js";
+import { IcloudAuthError, ICLOUD_KEYCHAIN_TIMEOUT_MESSAGE, ICLOUD_MISSING_PASSWORD_MESSAGE } from "./icloudErrors.js";
 
 const USER = "usuario-sintetico@icloud.com";
 const LOOKUP = ["find-generic-password", "-s", "ledgerly-icloud-imap", "-a", USER];
+
+const timedOut = (): Error => Object.assign(new Error("Command failed"), { killed: true, signal: "SIGTERM" });
 
 describe("hasIcloudPassword", () => {
   it("busca el ítem por servicio y cuenta, sin pedir la contraseña", async () => {
@@ -15,6 +27,13 @@ describe("hasIcloudPassword", () => {
   it("si security falla, no hay contraseña", async () => {
     const run = vi.fn(async (): Promise<string> => {
       throw new Error("The specified item could not be found in the keychain.");
+    });
+    expect(await hasIcloudPassword(USER, { run, platform: "darwin" })).toBe(false);
+  });
+
+  it("si security no responde a tiempo, no hay contraseña", async () => {
+    const run = vi.fn(async (): Promise<string> => {
+      throw timedOut();
     });
     expect(await hasIcloudPassword(USER, { run, platform: "darwin" })).toBe(false);
   });
@@ -43,6 +62,15 @@ describe("readIcloudPassword", () => {
     expect((error as Error).message).not.toContain("dato-filtrado-sintetico");
   });
 
+  it("si security no responde a tiempo tira IcloudAuthError con el aviso del Llavero bloqueado", async () => {
+    const run = vi.fn(async (): Promise<string> => {
+      throw timedOut();
+    });
+    const error = await readIcloudPassword(USER, { run, platform: "darwin" }).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(IcloudAuthError);
+    expect((error as Error).message).toBe(ICLOUD_KEYCHAIN_TIMEOUT_MESSAGE);
+  });
+
   it("una contraseña vacía cuenta como faltante", async () => {
     const run = vi.fn(async () => "  \n");
     await expect(readIcloudPassword(USER, { run, platform: "darwin" })).rejects.toThrow(ICLOUD_MISSING_PASSWORD_MESSAGE);
@@ -52,5 +80,15 @@ describe("readIcloudPassword", () => {
     const run = vi.fn(async () => "abcd-efgh-ijkl-mnop");
     await expect(readIcloudPassword(USER, { run, platform: "linux" })).rejects.toBeInstanceOf(IcloudAuthError);
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe("corredor por defecto", () => {
+  it("le pone un timeout de 10 s a security", async () => {
+    expect(KEYCHAIN_TIMEOUT_MS).toBe(10_000);
+    expect(await readIcloudPassword(USER, { platform: "darwin" })).toBe("clave-app-sintetica");
+    expect(execFile).toHaveBeenCalledWith(
+      "/usr/bin/security", [...LOOKUP, "-w"], { timeout: 10_000 }, expect.any(Function),
+    );
   });
 });

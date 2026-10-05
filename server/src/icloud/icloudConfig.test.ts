@@ -78,6 +78,12 @@ describe("describeIcloudSetup", () => {
       .toBe("iCloud: deshabilitado (falta la contraseña de app en el Llavero)");
   });
 
+  it("con intervalo y sin contraseña avisa que las corridas van a fallar", () => {
+    expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER, ICLOUD_SYNC_INTERVAL_MINUTES: "360" }), false)).toBe(
+      "iCloud: búsqueda automática cada 360 min (INBOX · últimos 90 días); falta la contraseña de app en el Llavero, las corridas van a fallar hasta que la cargues",
+    );
+  });
+
   it("describe la búsqueda automática o manual con su alcance", () => {
     expect(describeIcloudSetup(readIcloudConfig({
       ICLOUD_USER: USER, ICLOUD_SINCE: "2026-09-01", ICLOUD_SYNC_INTERVAL_MINUTES: "360",

@@ -133,6 +133,16 @@ describe("startMailJob", () => {
     stop();
   });
 
+  it("una notificación colgada no frena la próxima corrida", async () => {
+    vi.mocked(notifyRun).mockReturnValue(new Promise<void>(() => {}));
+    const stop = await startMailJob(setup(360));
+    await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS);
+    expect(runMailSync).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(360 * MINUTE);
+    expect(runMailSync).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
   it("si no puede leer la última corrida arranca con el delay de arranque", async () => {
     vi.mocked(findLastMailRun).mockRejectedValue(new Error("Mongo caído"));
     const stop = await startMailJob(setup(360));

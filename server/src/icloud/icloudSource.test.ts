@@ -21,12 +21,16 @@ describe("icloudSourceSetup", () => {
     expect(d.hasPassword).not.toHaveBeenCalled();
   });
 
-  it("sin la contraseña en el Llavero queda deshabilitada", async () => {
+  it("sin la contraseña en el Llavero informa qué falta pero igual puede abrir el cliente, leyéndola en cada corrida", async () => {
     const d = deps(false);
-    expect(await icloudSourceSetup({ ICLOUD_USER: USER }, d)).toMatchObject({
-      source: "icloud", missing: ["la contraseña de app en el Llavero"], openClient: null,
+    const setup = await icloudSourceSetup({ ICLOUD_USER: USER, ICLOUD_SYNC_INTERVAL_MINUTES: "360" }, d);
+    expect(setup).toMatchObject({
+      source: "icloud", missing: ["la contraseña de app en el Llavero"], scope: "INBOX · últimos 90 días", intervalMinutes: 360,
     });
+    expect(setup.openClient).not.toBeNull();
     expect(d.hasPassword).toHaveBeenCalledWith(USER);
+    await setup.openClient?.();
+    expect(d.readPassword).toHaveBeenCalledWith(USER);
   });
 
   it("habilitada informa alcance e intervalo, y lee la contraseña recién al abrir", async () => {

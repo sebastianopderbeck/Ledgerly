@@ -60,14 +60,15 @@ export async function startMailJob(setup: MailSourceSetup): Promise<() => void> 
 
   const runOnce = async (): Promise<void> => {
     const previous = await previousRun(source);
+    let run: MailSyncRunDTO | null = null;
     try {
-      const run = await runMailSync(source, openClient, "job");
+      run = await runMailSync(source, openClient, "job");
       logRun(run);
-      await notifyRun(run, previous);
     } catch (err) {
       console.error(`${logPrefix(source, "job")}: error — ${err instanceof Error ? err.message : UNEXPECTED_ERROR}`);
     }
     schedule(intervalMinutes * MINUTE_MS);
+    if (run) await notifyRun(run, previous);
   };
 
   const schedule = (delayMs: number): void => {

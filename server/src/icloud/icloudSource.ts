@@ -21,10 +21,10 @@ export async function icloudSourceSetup(env: NodeJS.ProcessEnv, {
 }: IcloudSourceDeps = {}): Promise<MailSourceSetup> {
   const config = readIcloudConfig(env);
   if (!config) return disabled([ICLOUD_USER_VAR]);
-  if (!(await hasPassword(config.user))) return disabled([ICLOUD_PASSWORD_MISSING]);
+  const missing = (await hasPassword(config.user)) ? [] : [ICLOUD_PASSWORD_MISSING];
   return {
     source: "icloud",
-    missing: [],
+    missing,
     scope: icloudScopeLabel(config),
     intervalMinutes: config.intervalMinutes,
     openClient: async () => open({

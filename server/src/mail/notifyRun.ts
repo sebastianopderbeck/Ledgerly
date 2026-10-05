@@ -9,6 +9,8 @@ export interface NotifyDeps {
   platform?: NodeJS.Platform;
 }
 
+export const NOTIFY_TIMEOUT_MS = 10_000;
+
 const execFileAsync = promisify(execFile);
 
 const APPLESCRIPT = ["-e", "on run argv", "-e", "display notification (item 2 of argv) with title (item 1 of argv)", "-e", "end run"];
@@ -22,7 +24,7 @@ const KIND_PHRASES: Record<ImportedFileKind, string> = {
 };
 
 export const osascriptNotify: Notify = async (title, message) => {
-  await execFileAsync("osascript", [...APPLESCRIPT, title, message]);
+  await execFileAsync("osascript", [...APPLESCRIPT, title, message], { timeout: NOTIFY_TIMEOUT_MS });
 };
 
 const joinWithY = (items: string[]): string =>
@@ -37,8 +39,11 @@ const importedMessages = (items: MailSyncItemDTO[]): string[] => {
   return [`Importé ${items.length} documentos: ${joinWithY(items.map(({ fileName }) => fileName))}`];
 };
 
-const failedMessages = (items: MailSyncItemDTO[]): string[] =>
-  items.map(({ fileName, detail }) => `No pude importar ${fileName}: ${detail}`);
+const isRepeatedFailure = (fileName: string, detail: string, previous: MailSyncRunDTO | null): boolean =>
+  previous !== null && itemsWith(previous, "failed").some((item) => item.fileName === fileName && item.detail === detail);
+
+const failedMessages = (items: MailSyncItemDTO[], previous: MailSyncRunDTO | null): string[] =>
+  items.filter(({ fileName, detail }) => !isRepeatedFailure(fileName, detail, previous)).map(({ fileName, detail }) => `No pude importar ${fileName}: ${detail}`);
 
 const unreadableMessages = (items: MailSyncItemDTO[]): string[] =>
   items.flatMap(({ fileName, detail, kind }) => (kind ? [`${fileName} parece ${KIND_PHRASES[kind]} pero no lo pude leer: ${detail}`] : []));
@@ -50,7 +55,7 @@ export function runNotifications(run: MailSyncRunDTO, previous: MailSyncRunDTO |
   if (run.trigger !== "job") return [];
   return [
     ...importedMessages(itemsWith(run, "imported")),
-    ...failedMessages(itemsWith(run, "failed")),
+    ...failedMessages(itemsWith(run, "failed"), previous),
     ...unreadableMessages(itemsWith(run, "skipped")),
     ...runErrorMessages(run, previous),
   ];

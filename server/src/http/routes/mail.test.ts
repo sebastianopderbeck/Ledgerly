@@ -116,6 +116,14 @@ describe("POST /api/mail/:source/sync", () => {
     expect(openIcloudClient).not.toHaveBeenCalled();
   });
 
+  it("iCloud con cuenta y sin contraseña responde 409 sin abrir el cliente", async () => {
+    vi.stubEnv("ICLOUD_USER", ICLOUD_USER);
+    const res = await request(app).post("/api/mail/icloud/sync");
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("iCloud no está configurado: falta la contraseña de app en el Llavero");
+    expect(openIcloudClient).not.toHaveBeenCalled();
+  });
+
   it("iCloud importa el resumen de un mail con la contraseña del Llavero y queda en su status", async () => {
     enableIcloud({ ICLOUD_SINCE: "2026-09-01", ICLOUD_MAILBOXES: "INBOX, Bancos" });
     vi.mocked(extractPdfText).mockResolvedValue({ text: statementText, meta });

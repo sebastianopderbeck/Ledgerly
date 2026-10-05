@@ -159,6 +159,7 @@ Después de cada corrida **automática** (`trigger: "job"`), y solo en macOS:
 | Un adjunto `skipped` por un documento **reconocido** que no se pudo leer (sin movimientos, cupón inválido, recibo inválido) | «Resumen6oct2026.pdf parece un resumen pero no lo pude leer: \<detalle\>». |
 | La corrida terminó en `error` **y la anterior de esa fuente no** | «iCloud: \<error\>». Si la contraseña vence, avisa una vez, no cada 6 h. |
 
+- Un adjunto `failed` que vuelve a fallar igual en la corrida siguiente no se vuelve a avisar.
 - No notifican: `duplicate`, ni los `skipped` por formato desconocido o PDF sin texto (facturas,
   pasajes, PDFs ajenos), ni la vuelta de `error` a `ok`.
 - Para distinguir el `skipped` «ajeno» del «reconocido pero roto», `classifyImportError` le pone
@@ -189,6 +190,7 @@ Después de cada corrida **automática** (`trigger: "job"`), y solo en macOS:
 iCloud está **habilitado** cuando hay `ICLOUD_USER` **y** existe la contraseña en el Llavero. El
 status informa qué falta con textos legibles: `ICLOUD_USER` y/o «la contraseña de app en el
 Llavero (ledgerly-icloud-imap)». Ningún valor secreto viaja al cliente ni se loguea.
+Si falta la contraseña pero hay intervalo, el job igual arranca: cada corrida falla con el mensaje del Llavero (se avisa una vez) hasta que se cargue.
 
 ### Colecciones — `server/src/db/models.ts`
 
@@ -243,7 +245,7 @@ por ejemplo `iCloud: búsqueda automática cada 360 min (INBOX desde 2026-09-01)
 La sección de Importar pasa a llamarse **«Mails»** y muestra **una tarjeta por fuente**, iCloud
 primero:
 
-- Encabezado de tarjeta con el nombre de la fuente y la cuenta.
+- Encabezado de tarjeta con el nombre de la fuente (la cuenta no viaja al cliente).
 - Lo mismo que hoy muestra la tarjeta de Gmail: última búsqueda, búsqueda automática, alcance
   (`scope`), botón **«Buscar en iCloud»** / **«Buscar en Gmail»** y el resultado con los omitidos
   colapsados.
@@ -262,7 +264,8 @@ primero:
 | Falta la contraseña en el Llavero al correr | Corrida `error`: «Falta la contraseña de app de iCloud en el Llavero (ledgerly-icloud-imap). Pasos en el README, «Importar desde iCloud».» |
 | iCloud rechaza el login (`authenticationFailed`) | `error`: «iCloud rechazó el usuario o la contraseña de app. Generá una nueva en account.apple.com y actualizala en el Llavero.» |
 | Red caída, DNS, timeout | `error`: «No se pudo conectar con iCloud: \<motivo\>». La próxima corrida reintenta. |
-| No existe una carpeta de `ICLOUD_MAILBOXES` | `error`: «No existe la carpeta \<nombre\> en iCloud.» |
+| No existe una carpeta de `ICLOUD_MAILBOXES` | `error`: «No pude abrir la carpeta «\<nombre\>» de iCloud: \<motivo\>». |
+| El Llavero no responde (bloqueado) | `error`: «El Llavero no respondió a tiempo (¿está bloqueado?)…». Nada se cuelga: las llamadas a `security` y `osascript` tienen un timeout de 10 s. |
 | Falla la descarga de una parte | Igual que en Gmail: queda `failed`, la corrida corta con `error` y el mail se reintenta en la próxima. |
 | PDF con contraseña o sin texto | `skipped` con el motivo (comportamiento actual de `importPdf`). |
 | Se reinicia el server a mitad de corrida | Igual que en Gmail: idempotente; lo no registrado se retoma. |

@@ -92,14 +92,16 @@ Diseño: `docs/superpowers/specs/2026-10-05-importacion-icloud-design.md`.
    `iCloud: búsqueda automática cada 360 min (…)`. Dejar la búsqueda automática **solo** en la
    publicada. Las corridas automáticas avisan con una notificación de macOS cuando importan algo o
    algo falla; la primera vez puede hacer falta habilitar las notificaciones de «Script Editor» en
-   Ajustes → Notificaciones.
+   Ajustes → Notificaciones. Si al arrancar el servicio falta la contraseña en el Llavero, la
+   búsqueda automática corre igual: la tarjeta y la notificación te dicen qué falta, y empieza a
+   funcionar apenas la cargues.
 6. Revocar: borrar la contraseña de app en account.apple.com, el ítem del Llavero
    (`security delete-generic-password -s ledgerly-icloud-imap -a <tu-cuenta>@icloud.com`) y las
    líneas `ICLOUD_*`.
 
 Si Apple invalida la contraseña (cambio de contraseña de Apple o revocación), la tarjeta muestra el
-error: generar una nueva, actualizarla con `security add-generic-password -U -s ledgerly-icloud-imap
--a <tu-cuenta>@icloud.com -w` y reiniciar.
+error: generar una nueva y actualizarla con `security add-generic-password -U -s ledgerly-icloud-imap
+-a <tu-cuenta>@icloud.com -w`. No hace falta reiniciar: cada corrida lee la contraseña del Llavero.
 
 ## Importar desde Gmail (opcional)
 

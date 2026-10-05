@@ -8,7 +8,7 @@ import { findLastMailRun, runMailSync } from "../../mail/syncMail.js";
 export const mailRouter = Router();
 
 const toStatus = async ({ source, missing, scope, intervalMinutes, openClient }: MailSourceSetup): Promise<MailSourceStatusDTO> => ({
-  source, enabled: openClient !== null, missing, scope, intervalMinutes, lastRun: await findLastMailRun(source),
+  source, enabled: missing.length === 0 && openClient !== null, missing, scope, intervalMinutes, lastRun: await findLastMailRun(source),
 });
 
 const missingText = (missing: string[]): string => `${missing.length === 1 ? "falta" : "faltan"} ${missing.join(", ")}`;
@@ -23,7 +23,7 @@ mailRouter.post("/:source/sync", asyncHandler(async (req, res) => {
   if (!parsed.success) throw new HttpError(400, `Fuente de mails desconocida: ${req.params.source}`);
   const source = parsed.data;
   const setup = await readMailSourceSetup(source, process.env);
-  if (!setup.openClient) {
+  if (setup.missing.length > 0 || !setup.openClient) {
     throw new HttpError(409, `${MAIL_SOURCE_LABELS[source]} no está configurado: ${missingText(setup.missing)}`);
   }
   res.json(await runMailSync(source, setup.openClient, "manual"));
