@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { detectParser } from "./registry.js";
+import { icbcEresumenParser } from "./icbcEresumen.js";
+import { icbcParser } from "./icbc.js";
 import type { PdfMeta } from "@ledgerly/shared";
 
 const read = (f: string) =>
@@ -14,6 +16,10 @@ describe("detectParser", () => {
   });
   it("elige ICBC", () => {
     expect(detectParser(read("icbc.sample.txt"), meta)?.issuer).toBe("icbc");
+  });
+  it("elige el parser del e-resumen de ICBC", () => {
+    expect(detectParser(read("icbc-eresumen.sample.txt"), meta)).toBe(icbcEresumenParser);
+    expect(detectParser(read("icbc.sample.txt"), meta)).toBe(icbcParser);
   });
   it("devuelve null si no reconoce", () => {
     expect(detectParser("texto de un banco desconocido", meta)).toBeNull();

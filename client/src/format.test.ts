@@ -1,6 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { formatLocalDate, formatMoney, formatMoneyOrDash, formatPercentOrDash, formatSignedPercent, formatUva } from "./format.js";
 
+describe("formatSignedPercent", () => {
+  it("antepone + a las subas, redondeando a un decimal", () => {
+    expect(formatSignedPercent(4.24)).toBe("+4,2%");
+    expect(formatSignedPercent(41.93)).toBe("+41,9%");
+    expect(formatSignedPercent(4.72)).toBe("+4,7%");
+  });
+
+  it("antepone el signo menos tipográfico a las bajas", () => {
+    expect(formatSignedPercent(-3.1)).toBe("−3,1%");
+    expect(formatSignedPercent(-0.99)).toBe("−1,0%");
+  });
+
+  it("cero, o lo que redondea a cero, va sin signo", () => {
+    expect(formatSignedPercent(0)).toBe("0,0%");
+    expect(formatSignedPercent(-0.04)).toBe("0,0%");
+    expect(formatSignedPercent(0.04)).toBe("0,0%");
+  });
+});
 describe("formatUva", () => {
   it("usa separadores es-AR y sufijo UVA", () => {
     expect(formatUva(76960.84)).toBe("76.960,84 UVA");
@@ -31,15 +49,5 @@ describe("formatPercentOrDash", () => {
 
   it("devuelve un guion si no hay valor", () => {
     expect(formatPercentOrDash(null)).toBe("—");
-  });
-});
-
-describe("formatSignedPercent", () => {
-  it("antepone + a los positivos", () => {
-    expect(formatSignedPercent(4.72)).toBe("+4,7%");
-  });
-
-  it("usa el signo menos tipográfico en los negativos", () => {
-    expect(formatSignedPercent(-0.99)).toBe("−1,0%");
   });
 });

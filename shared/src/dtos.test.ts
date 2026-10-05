@@ -131,3 +131,275 @@ describe("macroRefreshDtoSchema", () => {
     expect(macroRefreshDtoSchema.safeParse(dto).success).toBe(false);
   });
 });
+
+import {
+  budgetDtoSchema, budgetInputSchema, budgetPatchSchema, budgetSpendingDtoSchema, cashFlowDtoSchema,
+  inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSourceStatusDtoSchema, mailSyncRunDtoSchema,
+  MANUAL_ASSET_TYPE_LABELS, manualAssetCreateSchema, manualAssetTypeSchema, manualAssetUpdateSchema, netWorthDtoSchema,
+  statementReviewDtoSchema, statementReviewKeysDtoSchema, statementReviewPatchSchema, subscriptionsReportDtoSchema,
+  uncategorizedInboxDtoSchema,
+} from "./dtos.js";
+
+const cashFlowMonth = {
+  mes: "2026-09", estado: "completo", ingreso: 1100000, conSac: false, tarjetas: 578000,
+  hipoteca: 300000, auto: 150000, egresos: 1028000, margen: 72000, tasaAhorro: 0.0655,
+  faltantes: [], estimados: [],
+};
+
+describe("cashFlowDtoSchema", () => {
+  it("valida un mes completo y uno proyectado", () => {
+    const dto = {
+      mesActual: "2026-10",
+      meses: [
+        cashFlowMonth,
+        { ...cashFlowMonth, mes: "2026-11", estado: "proyectado", tarjetas: 60000, egresos: 510000,
+          margen: 590000, tasaAhorro: 0.536, estimados: ["Sueldo (último neto)", "ICBC (solo cuotas)"] },
+      ],
+    };
+    expect(cashFlowDtoSchema.parse(dto)).toEqual(dto);
+  });
+
+  it("acepta un mes incompleto sin ingreso ni margen", () => {
+    const dto = { mesActual: "2026-10", meses: [{ ...cashFlowMonth, estado: "incompleto", ingreso: null,
+      margen: null, tasaAhorro: null, faltantes: ["Recibo de sueldo"] }] };
+    expect(cashFlowDtoSchema.parse(dto).meses[0].ingreso).toBeNull();
+  });
+
+  it("rechaza un estado desconocido", () => {
+    const dto = { mesActual: "2026-10", meses: [{ ...cashFlowMonth, estado: "cerrado" }] };
+    expect(cashFlowDtoSchema.safeParse(dto).success).toBe(false);
+  });
+});
+
+const subscription = {
+  key: "MUSICAPP", nombre: "MUSICAPP", busqueda: "MUSICAPP", categoria: "Suscripciones", cardLabel: "ICBC",
+  moneda: "ARS", montoActual: 5490, montoMensualArs: 5490,
+  primerCobro: "2026-03-12", ultimoCobro: "2026-08-12", proximoCobro: "2026-09-12",
+  cobros: 6, estado: "activa", oculta: false,
+  aumento: { variacion: 0.1002, desde: "2026-03", montoAnterior: 4990 }, monedaAnterior: null,
+};
+
+describe("subscriptionsReportDtoSchema", () => {
+  it("valida un reporte con una suscripción activa con aumento y una cortada", () => {
+    const dto = {
+      cotizacionOficial: 1465, totalMensualArs: 5490, totalMensualUsd: 0, totalAnualArs: 65880,
+      items: [
+        subscription,
+        { ...subscription, key: "STREAMFLIX COM", nombre: "STREAMFLIX.COM", busqueda: "STREAMFLIX", moneda: "USD",
+          montoActual: 12.99, montoMensualArs: null, estado: "cortada", aumento: null, monedaAnterior: "ARS" },
+      ],
+    };
+    expect(subscriptionsReportDtoSchema.parse(dto)).toEqual(dto);
+  });
+
+  it("rechaza una suscripción sin cobros", () => {
+    const dto = { cotizacionOficial: null, totalMensualArs: 0, totalMensualUsd: 0, totalAnualArs: 0,
+      items: [{ ...subscription, cobros: 0 }] };
+    expect(subscriptionsReportDtoSchema.safeParse(dto).success).toBe(false);
+  });
+});
+
+const reviewStatement = {
+  id: "s3", issuer: "visa_signature", cardLabel: "Visa Signature ****1234", last4: "1234",
+  closingDate: "2026-09-25", dueDate: "2026-10-06",
+  totals: {
+    totalConsumos: { ars: 1000, usd: 0 }, saldoActual: { ars: 1000, usd: 45 },
+    pagoMinimo: { ars: 100, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 },
+  },
+  sourceFileName: "visa.pdf", needsReview: false, reconciliation: { ok: true, entries: [] },
+  transactionCount: 2, uploadedAt: "2026-09-26T12:00:00.000Z",
+};
+
+const reviewTransaction = {
+  id: "t31", statementId: "s3", issuer: "visa_signature", cardLabel: "Visa Signature ****1234",
+  date: "2026-09-12", descriptionRaw: "COMERCIO UNO", merchant: "COMERCIO UNO", category: "Comida",
+  categorySource: "rule", amount: 2500, currency: "ARS", direction: "debit", type: "purchase",
+  isInstallment: false, installmentCurrent: null, installmentTotal: null, comprobante: null,
+};
+
+describe("statementReviewDtoSchema", () => {
+  it("valida una revisión con un hallazgo de movimiento y uno de categoría", () => {
+    const dto = {
+      statement: reviewStatement, previousStatements: 9, historyStatements: 6, skippedChecks: [],
+      findings: [
+        { kind: "transaction", key: "tx:t31", transaction: reviewTransaction, reasons: ["duplicado"],
+          duplicateOf: { transactionId: "t30", date: "2026-09-11", sameStatement: true }, usualUsd: null },
+        { kind: "category", key: "cat:Supermercado", category: "Supermercado", total: 450000, average: 250000, ratio: 1.8 },
+      ],
+      reviewedKeys: ["tx:t31"],
+    };
+    expect(statementReviewDtoSchema.parse(dto)).toEqual(dto);
+  });
+
+  it("rechaza un hallazgo de movimiento sin motivos", () => {
+    const dto = {
+      statement: reviewStatement, previousStatements: 0, historyStatements: 0, skippedChecks: ["usd", "nuevo", "categoria"],
+      findings: [{ kind: "transaction", key: "tx:t31", transaction: reviewTransaction, reasons: [], duplicateOf: null, usualUsd: null }],
+      reviewedKeys: [],
+    };
+    expect(statementReviewDtoSchema.safeParse(dto).success).toBe(false);
+  });
+});
+
+describe("statementReviewPatchSchema", () => {
+  it("acepta tildar varias claves", () => {
+    expect(statementReviewPatchSchema.parse({ keys: ["tx:a", "cat:Comida"], reviewed: true }).keys).toHaveLength(2);
+  });
+
+  it("rechaza keys vacío y claves vacías", () => {
+    expect(statementReviewPatchSchema.safeParse({ keys: [], reviewed: true }).success).toBe(false);
+    expect(statementReviewPatchSchema.safeParse({ keys: [""], reviewed: false }).success).toBe(false);
+    expect(statementReviewPatchSchema.safeParse({ keys: ["tx:a"] }).success).toBe(false);
+  });
+
+  it("la respuesta lleva las claves tildadas", () => {
+    expect(statementReviewKeysDtoSchema.parse({ reviewedKeys: ["tx:a"] })).toEqual({ reviewedKeys: ["tx:a"] });
+  });
+});
+
+describe("installmentPurchaseDtoSchema", () => {
+  it("valida una compra en 4 cuotas", () => {
+    const dto = {
+      id: "ICBC|2026-05-04|MERCADOLIBRE|4|1", cardLabel: "ICBC", merchant: "MERCADOLIBRE", category: "Compras",
+      purchaseDate: "2026-05-04", installmentTotal: 4,
+      installments: [
+        { number: 1, amount: 1500, paymentDate: "2026-06-14" },
+        { number: 2, amount: 1500, paymentDate: "2026-07-14" },
+        { number: 3, amount: 1500, paymentDate: "2026-08-14" },
+        { number: 4, amount: 1500, paymentDate: "2026-09-14" },
+      ],
+    };
+    expect(installmentPurchaseDtoSchema.parse(dto)).toEqual(dto);
+  });
+});
+
+describe("isoDateSchema", () => {
+  it("acepta fechas de calendario y rechaza las inexistentes o mal formadas", () => {
+    expect(isoDateSchema.safeParse("2028-02-29").success).toBe(true);
+    expect(isoDateSchema.safeParse("2026-02-30").success).toBe(false);
+    expect(isoDateSchema.safeParse("2026-1-5").success).toBe(false);
+  });
+});
+
+describe("manualAssetCreateSchema", () => {
+  const valid = { nombre: "  Ahorros  ", tipo: "ahorro", moneda: "USD", valuacion: { fecha: "2026-10-01", monto: 5000 } };
+
+  it("acepta un activo válido y recorta el nombre", () => {
+    expect(manualAssetCreateSchema.parse(valid).nombre).toBe("Ahorros");
+  });
+
+  it("rechaza fecha inválida, monto negativo y claves extra", () => {
+    expect(manualAssetCreateSchema.safeParse({ ...valid, valuacion: { fecha: "2026-02-30", monto: 1 } }).success).toBe(false);
+    expect(manualAssetCreateSchema.safeParse({ ...valid, valuacion: { fecha: "2026-10-01", monto: -1 } }).success).toBe(false);
+    expect(manualAssetCreateSchema.safeParse({ ...valid, extra: true }).success).toBe(false);
+    expect(manualAssetCreateSchema.safeParse({ ...valid, nombre: "   " }).success).toBe(false);
+  });
+
+  it("tiene una etiqueta por cada tipo de activo", () => {
+    expect(Object.keys(MANUAL_ASSET_TYPE_LABELS).sort()).toEqual([...manualAssetTypeSchema.options].sort());
+    expect(MANUAL_ASSET_TYPE_LABELS.plazo_fijo).toBe("Plazo fijo");
+  });
+});
+
+describe("manualAssetUpdateSchema", () => {
+  it("acepta cambios parciales y rechaza la moneda", () => {
+    expect(manualAssetUpdateSchema.parse({ nombre: "Cuenta sueldo" })).toEqual({ nombre: "Cuenta sueldo" });
+    expect(manualAssetUpdateSchema.parse({})).toEqual({});
+    expect(manualAssetUpdateSchema.safeParse({ moneda: "USD" }).success).toBe(false);
+  });
+});
+
+describe("netWorthDtoSchema", () => {
+  it("valida la foto con su evolución", () => {
+    const totales = { activosArs: 17500000, pasivosArs: 10068000, netoArs: 7432000, activosUsd: 17500, pasivosUsd: 10068, netoUsd: 7432 };
+    const dto = {
+      fecha: "2026-10-03", usdOficial: 1000, usdOficialFecha: "2026-10-02", uva: 2000, uvaFecha: "2026-10-03",
+      totales,
+      items: [
+        { id: "auto", lado: "activo", fuente: "auto", label: "Auto", detalle: "MODELO X · valor móvil de la cuota 30",
+          fecha: "2026-09-18", moneda: "ARS", montoOriginal: 12000000, ars: 12000000, usd: 12000, assetId: null },
+        { id: "a1", lado: "activo", fuente: "manual", label: "Ahorros", detalle: "Ahorros",
+          fecha: "2026-10-01", moneda: "USD", montoOriginal: 5000, ars: 5000000, usd: 5000, assetId: "a1" },
+      ],
+      evolucion: [{ periodo: "2026-10", ...totales }],
+      activosManuales: [{ id: "a1", nombre: "Ahorros", tipo: "ahorro", moneda: "USD", valuaciones: [{ fecha: "2026-10-01", monto: 5000 }] }],
+    };
+    expect(netWorthDtoSchema.parse(dto)).toEqual(dto);
+  });
+});
+
+describe("budget schemas", () => {
+  it("validan un tope, su alta y el gasto por mes y categoría", () => {
+    const budget = { id: "b1", category: "Comida", topeArs: 300000, ajustaInflacion: true, periodoBase: "2026-08" };
+    expect(budgetDtoSchema.parse(budget)).toEqual(budget);
+    expect(budgetInputSchema.parse({ category: " Comida ", topeArs: 300000 })).toEqual({
+      category: "Comida", topeArs: 300000, ajustaInflacion: false,
+    });
+    const spending = { ultimoMesCerrado: "2026-09", gastos: [{ month: "2026-09", category: "Comida", total: 250000, count: 12 }] };
+    expect(budgetSpendingDtoSchema.parse(spending)).toEqual(spending);
+  });
+
+  it("rechazan un tope no positivo y un patch vacío", () => {
+    expect(budgetInputSchema.safeParse({ category: "Comida", topeArs: 0 }).success).toBe(false);
+    expect(budgetInputSchema.safeParse({ category: "  ", topeArs: 10 }).success).toBe(false);
+    expect(budgetPatchSchema.safeParse({}).success).toBe(false);
+    expect(budgetPatchSchema.safeParse({ topeArs: -1 }).success).toBe(false);
+    expect(budgetPatchSchema.safeParse({ ajustaInflacion: true }).success).toBe(true);
+  });
+});
+
+describe("uncategorizedInboxDtoSchema", () => {
+  it("valida la bandeja y el resultado de crear una regla", () => {
+    const inbox = {
+      pendingCount: 8, usdRate: 1415,
+      groups: [{ pattern: "STEAMGAMES.COM", merchants: ["STEAMGAMES.COM 4259522985"], count: 2, totalArs: 0,
+        totalUsd: 19.98, equivalentArs: 28271.7, lastDate: "2026-09-14" }],
+    };
+    expect(uncategorizedInboxDtoSchema.parse(inbox)).toEqual(inbox);
+    const result = {
+      rule: { id: "r1", priority: 100, matchType: "contains", pattern: "PANADERIA", category: "Comida", source: "user", enabled: true },
+      categorized: 6,
+    };
+    expect(inboxRuleResultDtoSchema.parse(result)).toEqual(result);
+  });
+});
+
+describe("mailSourceStatusDtoSchema", () => {
+  it("valida un status habilitado con la última corrida", () => {
+    const dto = {
+      source: "icloud", enabled: true, missing: [], scope: "INBOX · desde el 01/09/2026", intervalMinutes: 360,
+      lastRun: {
+        source: "icloud", trigger: "job", startedAt: "2026-10-03T14:05:00.000Z", finishedAt: "2026-10-03T14:05:09.000Z",
+        status: "ok", error: null, messagesChecked: 2, hasMore: false,
+        items: [
+          { id: "g1", fileName: "resumen-sintetico.pdf", receivedAt: "2026-09-28T10:00:00.000Z", outcome: "imported",
+            kind: "statement", documentId: "s1", detail: "Visa Signature ****1234 · 42 movimientos" },
+          { id: "g2", fileName: "factura.pdf", receivedAt: "2026-09-27T10:00:00.000Z", outcome: "skipped",
+            kind: null, documentId: null, detail: "Formato de resumen no reconocido" },
+        ],
+      },
+    };
+    expect(mailSourceStatusDtoSchema.parse(dto)).toEqual(dto);
+  });
+
+  it("valida un status deshabilitado", () => {
+    const dto = {
+      source: "gmail", enabled: false, missing: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"],
+      scope: null, intervalMinutes: null, lastRun: null,
+    };
+    expect(mailSourceStatusDtoSchema.parse(dto)).toEqual(dto);
+  });
+});
+
+describe("mailSyncRunDtoSchema", () => {
+  const run = {
+    source: "icloud", trigger: "job", startedAt: "2026-10-05T12:00:00.000Z", finishedAt: "2026-10-05T12:00:09.000Z",
+    status: "ok", error: null, messagesChecked: 0, hasMore: false, items: [],
+  };
+
+  it("acepta las dos fuentes y rechaza otra", () => {
+    expect(mailSyncRunDtoSchema.parse(run).source).toBe("icloud");
+    expect(mailSyncRunDtoSchema.parse({ ...run, source: "gmail" }).source).toBe("gmail");
+    expect(() => mailSyncRunDtoSchema.parse({ ...run, source: "yahoo" })).toThrow();
+  });
+});

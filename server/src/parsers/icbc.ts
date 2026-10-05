@@ -7,6 +7,7 @@ import {
   parseInstallment,
   shortDate,
 } from "./normalize.js";
+import { isIcbcEresumen } from "./icbcEresumen.js";
 
 const PAGE_HEADER = /CUIT[\s\S]*?FINANCIACION \$\s*[\d.]+,\d{2}/g;
 const SALDO_ANTERIOR = /SALDO ANTERIOR\s+[\d.]+,\d{2}\s+[\d.]+,\d{2}/;
@@ -18,7 +19,7 @@ export const icbcParser: StatementParser = {
   issuer: "icbc",
 
   detect(text) {
-    return text.includes("ICBC");
+    return text.includes("ICBC") && text.includes("SALDO ANTERIOR") && !isIcbcEresumen(text);
   },
 
   parse(text, _meta: PdfMeta): ParsedStatement {
@@ -81,13 +82,16 @@ export const icbcParser: StatementParser = {
         ? parseArAmount(totalsFooter[2]).amount
         : 0;
 
+    const closingDate = shortDate(flat, "CIERRE");
+    const dueDate = shortDate(flat, "VENCIMIENTO");
+
     return {
       header: {
         issuer: "icbc",
         cardLabel: "ICBC",
         last4: null,
-        closingDate: shortDate(flat, "CIERRE"),
-        dueDate: shortDate(flat, "VENCIMIENTO"),
+        closingDate,
+        dueDate,
         totals: {
           totalConsumos: {
             ars: totalConsumos ? parseArAmount(totalConsumos[1]).amount : 0,

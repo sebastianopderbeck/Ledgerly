@@ -8,6 +8,14 @@ const text = readFileSync(
   fileURLToPath(new URL("./__fixtures__/icbc.sample.txt", import.meta.url)),
   "utf8",
 );
+const eresumenText = readFileSync(
+  fileURLToPath(new URL("./__fixtures__/icbc-eresumen.sample.txt", import.meta.url)),
+  "utf8",
+);
+const cotoVoucherText = readFileSync(
+  fileURLToPath(new URL("./__fixtures__/coto-voucher.sample.txt", import.meta.url)),
+  "utf8",
+);
 const realPath = fileURLToPath(new URL("../../../examples/icbc-real.txt", import.meta.url));
 const hasReal = existsSync(realPath);
 const meta: PdfMeta = { producer: "iText 5.0.6", creator: null, pageCount: 10, encrypted: true };
@@ -16,6 +24,14 @@ describe("icbcParser.detect", () => {
   it("detecta por el marker ICBC", () => {
     expect(icbcParser.detect(text, meta)).toBe(true);
     expect(icbcParser.detect("otro banco", meta)).toBe(false);
+  });
+
+  it("no detecta el e-resumen de ICBC, que tiene su propio parser", () => {
+    expect(icbcParser.detect(eresumenText, meta)).toBe(false);
+  });
+
+  it("no detecta un voucher de supermercado que menciona ICBC", () => {
+    expect(icbcParser.detect(cotoVoucherText, meta)).toBe(false);
   });
 });
 

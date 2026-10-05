@@ -1,0 +1,7 @@
+Voucher -Documento no valido como factura-
+Pedido 000001 SUPERMERCADO EJEMPLO
+Pagaste con tarjeta ICBC VISA
+ARROZ LARGO FINO 1KG 1 x 1.500,00 1.500,00
+LECHE ENTERA 1L 2 x 900,00 1.800,00
+PAN LACTAL 1 x 2.200,00 2.200,00
+Total del pedido 5.500,00

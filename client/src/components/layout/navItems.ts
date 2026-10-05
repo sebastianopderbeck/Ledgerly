@@ -8,6 +8,11 @@ import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import RuleOutlinedIcon from "@mui/icons-material/RuleOutlined";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
+import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
+import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
+import TrackChangesOutlinedIcon from "@mui/icons-material/TrackChangesOutlined";
+import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
 
 export type NavPlacement = "bar" | "more";
 
@@ -24,9 +29,14 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/installments", label: "Cuotas", icon: CalendarMonthOutlinedIcon, placement: "bar" },
   { to: "/credits", label: "Créditos", icon: AccountBalanceOutlinedIcon, placement: "more" },
   { to: "/auto", label: "Auto", icon: DirectionsCarOutlinedIcon, placement: "more" },
+  { to: "/patrimonio", label: "Patrimonio", icon: AccountBalanceWalletOutlinedIcon, placement: "more" },
   { to: "/sueldo", label: "Sueldo", icon: PaymentsOutlinedIcon, placement: "more" },
+  { to: "/vencimientos", label: "Vencimientos", icon: EventNoteOutlinedIcon, placement: "more" },
   { to: "/contexto", label: "Contexto", icon: InsightsOutlinedIcon, placement: "more" },
+  { to: "/flujo", label: "Flujo", icon: SavingsOutlinedIcon, placement: "more" },
+  { to: "/presupuestos", label: "Presupuestos", icon: TrackChangesOutlinedIcon, placement: "more" },
   { to: "/transactions", label: "Movimientos", icon: ReceiptLongOutlinedIcon, placement: "bar" },
+  { to: "/suscripciones", label: "Suscripciones", icon: AutorenewOutlinedIcon, placement: "more" },
   { to: "/rules", label: "Reglas", icon: RuleOutlinedIcon, placement: "more" },
   { to: "/import", label: "Importar", icon: UploadFileOutlinedIcon, placement: "bar" },
 ];

@@ -130,3 +130,12 @@ describe("POST /api/import (eficiencia)", () => {
     expect(mocked).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("POST /api/import (PDF con contraseña)", () => {
+  it("responde 422 con un mensaje claro", async () => {
+    mocked.mockRejectedValue(Object.assign(new Error("No password given"), { name: "PasswordException" }));
+    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "protegido.pdf");
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("El PDF está protegido con contraseña");
+  });
+});

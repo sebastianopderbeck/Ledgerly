@@ -12,6 +12,8 @@ export const txTypeSchema = z.enum([
   "adjustment",
 ]);
 
+export const UNCATEGORIZED_CATEGORY = "Sin categoría";
+
 const moneyPairSchema = z.object({ ars: z.number(), usd: z.number() });
 
 export const parsedRowSchema = z.object({

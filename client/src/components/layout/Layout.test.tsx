@@ -6,7 +6,10 @@ import { emulateDesktop, emulateMobile } from "../../testing/viewport.js";
 import { Layout } from "./Layout.js";
 import { NAV_ITEMS } from "./navItems.js";
 
-const SECTIONS = [/dashboard/i, /cuotas/i, /créditos/i, /auto/i, /sueldo/i, /contexto/i, /movimientos/i, /reglas/i, /importar/i];
+const SECTIONS = [
+  /dashboard/i, /cuotas/i, /créditos/i, /auto/i, /patrimonio/i, /sueldo/i, /vencimientos/i, /contexto/i, /flujo/i,
+  /presupuestos/i, /movimientos/i, /suscripciones/i, /reglas/i, /importar/i,
+];
 
 const renderLayout = (route = "/") => renderWithProviders(<Layout><div>contenido</div></Layout>, { route });
 

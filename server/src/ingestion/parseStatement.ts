@@ -2,7 +2,8 @@ import type { ParsedStatement, ExtractedPdf, PdfMeta, ReconciliationResult } fro
 import { extractPdfText } from "../pdf/extract.js";
 import { detectParser } from "../parsers/registry.js";
 import { reconcile } from "../parsers/reconcile.js";
-import { NoTextError, NoTransactionsError, UnsupportedFormatError } from "./errors.js";
+import { InvalidStatementDatesError, NoTextError, NoTransactionsError, UnsupportedFormatError } from "./errors.js";
+import { hasSaneRowDates } from "./statementSanity.js";
 
 export async function parseStatement(data: Uint8Array, extracted?: ExtractedPdf): Promise<{
   statement: ParsedStatement;
@@ -17,6 +18,7 @@ export async function parseStatement(data: Uint8Array, extracted?: ExtractedPdf)
 
   const statement = parser.parse(text, meta);
   if (statement.rows.length === 0) throw new NoTransactionsError();
+  if (!hasSaneRowDates(statement)) throw new InvalidStatementDatesError();
 
   return { statement, reconciliation: reconcile(statement), meta };
 }

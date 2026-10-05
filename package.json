@@ -24,7 +24,8 @@
     "seed:sueldo": "tsx --env-file=.env server/src/import/seedPayslips.ts",
     "seed:inflation": "tsx --env-file=.env server/src/import/backfillInflation.ts",
     "seed:macro": "tsx --env-file=.env server/src/import/backfillMacro.ts",
-    "seed:fingerprints": "tsx --env-file=.env server/src/import/backfillFingerprints.ts"
+    "seed:fingerprints": "tsx --env-file=.env server/src/import/backfillFingerprints.ts",
+    "gmail:auth": "tsx --env-file=.env server/src/gmail/authorizeGmail.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

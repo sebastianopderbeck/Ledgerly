@@ -1,4 +1,5 @@
-import type { ExtractedPdf } from "@ledgerly/shared";
+import type { ExtractedPdf, ParsedStatement } from "@ledgerly/shared";
+import { Types } from "mongoose";
 import { createHash } from "node:crypto";
 import { parseStatement } from "../ingestion/parseStatement.js";
 import { CategoryRuleModel, StatementModel, TransactionModel } from "../db/models.js";
@@ -15,31 +16,57 @@ export function fingerprintOf(
     .digest("hex");
 }
 
+interface ImportStatementResult {
+  status: "imported" | "duplicate";
+  statementId: string;
+  transactionCount: number;
+}
+
+const duplicateOf = async (statementId: Types.ObjectId): Promise<ImportStatementResult> => ({
+  status: "duplicate",
+  statementId: statementId.toString(),
+  transactionCount: await TransactionModel.countDocuments({ statementId }),
+});
+
+const removeStatement = async (statementId: Types.ObjectId): Promise<void> => {
+  await TransactionModel.deleteMany({ statementId });
+  await StatementModel.deleteOne({ _id: statementId });
+};
+
+const findSameStatement = async (header: ParsedStatement["header"]) => {
+  if (!header.closingDate) return null;
+  return StatementModel.findOne({
+    issuer: header.issuer,
+    cardLabel: header.cardLabel,
+    closingDate: new Date(header.closingDate),
+  });
+};
+
+const assertValid = (doc: object, model: typeof StatementModel | typeof TransactionModel): void => {
+  const error = new model(doc).validateSync();
+  if (error) throw error;
+};
+
 export async function importStatement(input: {
   data: Uint8Array;
   fileName: string;
   replace?: boolean;
   extracted?: ExtractedPdf;
-}): Promise<{ status: "imported" | "duplicate"; statementId: string; transactionCount: number }> {
+}): Promise<ImportStatementResult> {
   const sourceHash = createHash("sha256").update(input.data).digest("hex");
 
-  const existing = await StatementModel.findOne({ sourceHash });
-  if (existing && !input.replace) {
-    return {
-      status: "duplicate",
-      statementId: existing._id.toString(),
-      transactionCount: await TransactionModel.countDocuments({ statementId: existing._id }),
-    };
-  }
-  if (existing && input.replace) {
-    await TransactionModel.deleteMany({ statementId: existing._id });
-    await StatementModel.deleteOne({ _id: existing._id });
-  }
+  const sameFile = await StatementModel.findOne({ sourceHash });
+  if (sameFile && !input.replace) return duplicateOf(sameFile._id);
 
   const { statement, reconciliation, meta } = await parseStatement(input.data, input.extracted);
-  const rules = (await CategoryRuleModel.find({ enabled: true }).lean()) as unknown as RuleInput[];
+  const sameStatement = await findSameStatement(statement.header);
+  if (sameStatement && !input.replace) return duplicateOf(sameStatement._id);
 
-  const created = await StatementModel.create({
+  const rules = (await CategoryRuleModel.find({ enabled: true }).lean()) as unknown as RuleInput[];
+  const statementId = new Types.ObjectId();
+
+  const statementDoc = {
+    _id: statementId,
     issuer: statement.header.issuer,
     cardLabel: statement.header.cardLabel,
     last4: statement.header.last4,
@@ -52,12 +79,12 @@ export async function importStatement(input: {
     parserVersion: PARSER_VERSION,
     needsReview: !reconciliation.ok,
     reconciliation,
-  });
+  };
 
   const docs = statement.rows.map((row) => {
     const { category, source } = categorize(row.descriptionRaw, row.merchant, rules);
     return {
-      statementId: created._id,
+      statementId,
       issuer: statement.header.issuer,
       cardLabel: statement.header.cardLabel,
       date: new Date(row.date),
@@ -80,16 +107,29 @@ export async function importStatement(input: {
     };
   });
 
-  const existingFingerprints = new Set(
-    (await TransactionModel.find({ fingerprint: { $in: docs.map((d) => d.fingerprint) } }).distinct("fingerprint")) as string[],
-  );
-  const seen = new Set<string>();
-  const toInsert = docs.filter((doc) => {
-    if (existingFingerprints.has(doc.fingerprint) || seen.has(doc.fingerprint)) return false;
-    seen.add(doc.fingerprint);
-    return true;
-  });
-  if (toInsert.length > 0) await TransactionModel.insertMany(toInsert);
+  assertValid(statementDoc, StatementModel);
+  docs.forEach((doc) => assertValid(doc, TransactionModel));
 
-  return { status: "imported", statementId: created._id.toString(), transactionCount: toInsert.length };
+  if (sameFile) await removeStatement(sameFile._id);
+  if (sameStatement && !sameStatement._id.equals(sameFile?._id)) await removeStatement(sameStatement._id);
+
+  try {
+    await StatementModel.create(statementDoc);
+
+    const existingFingerprints = new Set(
+      (await TransactionModel.find({ fingerprint: { $in: docs.map((d) => d.fingerprint) } }).distinct("fingerprint")) as string[],
+    );
+    const seen = new Set<string>();
+    const toInsert = docs.filter((doc) => {
+      if (existingFingerprints.has(doc.fingerprint) || seen.has(doc.fingerprint)) return false;
+      seen.add(doc.fingerprint);
+      return true;
+    });
+    if (toInsert.length > 0) await TransactionModel.insertMany(toInsert);
+
+    return { status: "imported", statementId: statementId.toString(), transactionCount: toInsert.length };
+  } catch (error) {
+    await removeStatement(statementId);
+    throw error;
+  }
 }

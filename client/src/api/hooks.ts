@@ -1,8 +1,13 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  AutoCouponDTO, AutoSummaryDTO, CategoryRuleDTO, CategoryStat, CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth,
-  ImportResultUnionDTO, ImportedFileDTO, InflationRateDTO, MacroRefreshDTO, MacroSeriesDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, SummaryStat, TransactionDTO,
+  AutoCouponDTO, AutoSummaryDTO, BudgetDTO, BudgetInput, BudgetPatch, BudgetSpendingDTO, CashFlowDTO, CategoryRuleDTO, CategoryStat,
+  CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth, MailSource, MailSourceStatusDTO, MailSyncRunDTO, ImportResultUnionDTO,
+  ImportedFileDTO, InboxRuleResultDTO, InflationRateDTO, InstallmentPurchaseDTO, MacroRefreshDTO, MacroSeriesDTO,
+  ManualAssetCreateDTO, ManualAssetDTO, ManualAssetUpdateDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO,
+  NetWorthDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, StatementReviewDTO, StatementReviewKeysDTO,
+  SubscriptionsReportDTO, SummaryStat, TransactionDTO, UncategorizedInboxDTO,
 } from "@ledgerly/shared";
+import { applyReviewedDelta } from "../statementReview.js";
 import { apiFetch } from "./client.js";
 
 export interface StatFilters { currency: "ARS" | "USD"; from?: string; to?: string; cardLabel?: string; year?: string[]; }
@@ -216,6 +221,173 @@ export function usePatchPayslipRate() {
   return useMutation({
     mutationFn: ({ id, tipoCambioUsd }: { id: string; tipoCambioUsd: number }) =>
       apiFetch<PayslipDTO>(`/payslips/${id}`, { method: "PATCH", body: JSON.stringify({ tipoCambioUsd }) }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useCashFlow() {
+  return useQuery({ queryKey: ["cash-flow"], queryFn: () => apiFetch<CashFlowDTO>("/cash-flow") });
+}
+
+export function useSubscriptions() {
+  return useQuery({
+    queryKey: ["subscriptions"],
+    queryFn: () => apiFetch<SubscriptionsReportDTO>("/subscriptions"),
+    staleTime: 1000 * 60 * 60,
+  });
+}
+
+export function useSetSubscriptionHidden() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, hidden }: { key: string; hidden: boolean }) =>
+      apiFetch<void>(`/subscriptions/hidden/${encodeURIComponent(key)}`, { method: hidden ? "PUT" : "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
+  });
+}
+
+export const statementReviewKey = (id: string | null) => ["statement-review", id] as const;
+
+const fetchStatementReview = (id: string) => apiFetch<StatementReviewDTO>(`/statements/${id}/review`);
+
+export function useStatementReview(id: string | null) {
+  return useQuery({
+    queryKey: statementReviewKey(id),
+    queryFn: () => fetchStatementReview(id ?? ""),
+    enabled: Boolean(id),
+  });
+}
+
+export function useStatementReviews(ids: string[]) {
+  return useQueries({
+    queries: ids.map((id) => ({ queryKey: statementReviewKey(id), queryFn: () => fetchStatementReview(id) })),
+  });
+}
+
+export interface MarkFindingsReviewedInput { statementId: string; keys: string[]; reviewed: boolean; }
+
+export function useMarkFindingsReviewed() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ statementId, keys, reviewed }: MarkFindingsReviewedInput) =>
+      apiFetch<StatementReviewKeysDTO>(`/statements/${statementId}/review`, {
+        method: "PATCH",
+        body: JSON.stringify({ keys, reviewed }),
+      }),
+    onMutate: ({ statementId, keys, reviewed }: MarkFindingsReviewedInput) => {
+      qc.setQueryData<StatementReviewDTO>(statementReviewKey(statementId), (previous) =>
+        previous && { ...previous, reviewedKeys: applyReviewedDelta(previous.reviewedKeys, keys, reviewed) });
+    },
+    onError: (_error, { statementId }) => qc.invalidateQueries({ queryKey: statementReviewKey(statementId) }),
+  });
+}
+
+export function useInstallmentPurchases(f: Pick<StatFilters, "cardLabel" | "year">) {
+  return useQuery({
+    queryKey: ["installment-purchases", f],
+    queryFn: () => apiFetch<InstallmentPurchaseDTO[]>(`/stats/installment-purchases${qs(f)}`),
+  });
+}
+
+export function useNetWorth() {
+  return useQuery({
+    queryKey: ["net-worth"],
+    queryFn: async () => (await apiFetch<NetWorthDTO | undefined>("/net-worth")) ?? null,
+  });
+}
+
+export function useCreateManualAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ManualAssetCreateDTO) =>
+      apiFetch<ManualAssetDTO>("/net-worth/assets", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["net-worth"] }),
+  });
+}
+
+export function useUpdateManualAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ManualAssetUpdateDTO }) =>
+      apiFetch<ManualAssetDTO>(`/net-worth/assets/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["net-worth"] }),
+  });
+}
+
+export function useDeleteManualAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/net-worth/assets/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["net-worth"] }),
+  });
+}
+
+export function useDeleteAssetValuation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fecha }: { id: string; fecha: string }) =>
+      apiFetch<ManualAssetDTO>(`/net-worth/assets/${id}/valuations/${fecha}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["net-worth"] }),
+  });
+}
+
+export function useBudgets() {
+  return useQuery({ queryKey: ["budgets"], queryFn: () => apiFetch<BudgetDTO[]>("/budgets") });
+}
+
+export function useBudgetSpending(years: string[] | undefined) {
+  return useQuery({
+    queryKey: ["budget-spending", years],
+    queryFn: () => apiFetch<BudgetSpendingDTO>(`/budgets/spending${qs({ year: years })}`),
+  });
+}
+
+export function useCreateBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BudgetInput) => apiFetch<BudgetDTO>("/budgets", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }),
+  });
+}
+
+export function useUpdateBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: BudgetPatch }) =>
+      apiFetch<BudgetDTO>(`/budgets/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }),
+  });
+}
+
+export function useDeleteBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/budgets/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }),
+  });
+}
+
+export function useUncategorizedInbox() {
+  return useQuery({ queryKey: ["rules-inbox"], queryFn: () => apiFetch<UncategorizedInboxDTO>("/category-rules/inbox") });
+}
+
+export function useCreateInboxRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { pattern: string; category: string }) =>
+      apiFetch<InboxRuleResultDTO>("/category-rules/inbox/rules", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useMailStatus() {
+  return useQuery({ queryKey: ["mail-status"], queryFn: () => apiFetch<MailSourceStatusDTO[]>("/mail/status") });
+}
+
+export function useMailSync(source: MailSource) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<MailSyncRunDTO>(`/mail/${source}/sync`, { method: "POST" }),
     onSuccess: () => qc.invalidateQueries(),
   });
 }

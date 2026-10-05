@@ -14,6 +14,7 @@ import { MonthlyTrendChart } from "../components/charts/MonthlyTrendChart.js";
 import { FutureInstallmentsChart } from "../components/charts/FutureInstallmentsChart.js";
 import { TopMerchantsChart } from "../components/charts/TopMerchantsChart.js";
 import { MonthlyUsdChart } from "../components/charts/MonthlyUsdChart.js";
+import { RealSpendingPanel } from "../components/RealSpendingPanel.js";
 
 const DASHBOARD_FIELDS: FilterField[] = ["year", "currency", "card", "month"];
 
@@ -37,6 +38,7 @@ export const DashboardPage = () => {
         <ChartCard title="Gasto por categoría"><CategoryBreakdownChart {...filters} /></ChartCard>
         <ChartCard title="Gasto por categoría (último resumen)"><LastStatementCategoryChart {...filters} /></ChartCard>
         <ChartCard title="Evolución mensual"><MonthlyTrendChart {...filters} /></ChartCard>
+        <ChartCard title="Gasto real (pesos de hoy)"><RealSpendingPanel {...filters} /></ChartCard>
         <ChartCard title="Cuotas a vencer"><FutureInstallmentsChart {...filters} /></ChartCard>
         <ChartCard title="Top comercios"><TopMerchantsChart {...filters} /></ChartCard>
         <ChartCard title="A pagar por mes en USD (al oficial)"><MonthlyUsdChart {...filters} /></ChartCard>

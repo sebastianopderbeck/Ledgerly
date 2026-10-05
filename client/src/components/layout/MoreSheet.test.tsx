@@ -15,10 +15,12 @@ describe("MoreSheet", () => {
     expect(screen.getByRole("dialog", { name: "Más secciones" })).toBeInTheDocument();
   });
 
-  it("lista Créditos, Auto, Sueldo, Contexto y Reglas", () => {
+  it("lista Créditos, Auto, Patrimonio, Sueldo, Vencimientos, Contexto, Flujo, Presupuestos, Suscripciones y Reglas", () => {
     renderWithProviders(<MoreSheet open onClose={noop} />);
     const names = within(sheetNav()).getAllByRole("link").map((link) => link.textContent);
-    expect(names).toEqual(["Créditos", "Auto", "Sueldo", "Contexto", "Reglas"]);
+    expect(names).toEqual([
+      "Créditos", "Auto", "Patrimonio", "Sueldo", "Vencimientos", "Contexto", "Flujo", "Presupuestos", "Suscripciones", "Reglas",
+    ]);
   });
 
   it("los links conservan los filtros globales y descartan los de Movimientos", () => {

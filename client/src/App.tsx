@@ -15,6 +15,11 @@ import { CreditsPage } from "./pages/CreditsPage.js";
 import { AutoPage } from "./pages/AutoPage.js";
 import { PayslipsPage } from "./pages/PayslipsPage.js";
 import { MacroPage } from "./pages/MacroPage.js";
+import { CashFlowPage } from "./pages/CashFlowPage.js";
+import { BudgetsPage } from "./pages/BudgetsPage.js";
+import { SubscriptionsPage } from "./pages/SubscriptionsPage.js";
+import { NetWorthPage } from "./pages/NetWorthPage.js";
+import { VencimientosPage } from "./pages/VencimientosPage.js";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -29,8 +34,13 @@ const AnimatedRoutes = () => {
         <Route path="/credits" element={<PageTransition><CreditsPage /></PageTransition>} />
         <Route path="/auto" element={<PageTransition><AutoPage /></PageTransition>} />
         <Route path="/sueldo" element={<PageTransition><PayslipsPage /></PageTransition>} />
+        <Route path="/patrimonio" element={<PageTransition><NetWorthPage /></PageTransition>} />
+        <Route path="/vencimientos" element={<PageTransition><VencimientosPage /></PageTransition>} />
         <Route path="/contexto" element={<PageTransition><MacroPage /></PageTransition>} />
+        <Route path="/flujo" element={<PageTransition><CashFlowPage /></PageTransition>} />
+        <Route path="/presupuestos" element={<PageTransition><BudgetsPage /></PageTransition>} />
         <Route path="/transactions" element={<PageTransition><TransactionsPage /></PageTransition>} />
+        <Route path="/suscripciones" element={<PageTransition><SubscriptionsPage /></PageTransition>} />
         <Route path="/installments" element={<PageTransition><InstallmentsPage /></PageTransition>} />
       </Routes>
     </AnimatePresence>

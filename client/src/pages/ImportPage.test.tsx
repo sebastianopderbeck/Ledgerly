@@ -1,13 +1,69 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { importResultUnionSchema, mailSourceStatusDtoSchema, statementReviewDtoSchema } from "@ledgerly/shared";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { emulateMobile } from "../testing/viewport.js";
 import { ImportPage } from "./ImportPage.js";
 
+const MAIL_DISABLED = [
+  { source: "icloud", enabled: false, missing: ["ICLOUD_USER"], scope: null, intervalMinutes: null, lastRun: null },
+  {
+    source: "gmail", enabled: false, missing: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"],
+    scope: null, intervalMinutes: null, lastRun: null,
+  },
+];
+
+const statementDto = (id: string, transactionCount = 3) => ({
+  id, issuer: "visa_signature", cardLabel: "Visa Signature ****1234", last4: "1234",
+  closingDate: "2026-09-25", dueDate: "2026-10-06",
+  totals: {
+    totalConsumos: { ars: 3000, usd: 0 },
+    saldoActual: { ars: 3000, usd: 0 },
+    pagoMinimo: { ars: 300, usd: 0 },
+    saldoAnterior: { ars: 0, usd: 0 },
+  },
+  sourceFileName: "r.pdf", needsReview: false, reconciliation: { ok: true, entries: [] },
+  transactionCount, uploadedAt: "2026-09-26T12:00:00.000Z",
+});
+
+const statementResult = (status: "imported" | "duplicate", transactionCount: number, id = "s-nuevo") => ({
+  kind: "statement", status, transactionCount, statement: statementDto(id, transactionCount),
+});
+
+const reviewOf = (id: string) => ({
+  statement: statementDto(id),
+  previousStatements: 0,
+  historyStatements: 0,
+  skippedChecks: ["usd", "nuevo", "categoria"],
+  findings: [{
+    kind: "transaction", key: "tx:t1", reasons: ["sin-categoria"], duplicateOf: null, usualUsd: null,
+    transaction: {
+      id: "t1", statementId: id, issuer: "visa_signature", cardLabel: "Visa Signature ****1234", date: "2026-09-12",
+      descriptionRaw: "COMERCIO UNO", merchant: "COMERCIO UNO", category: "Sin categoría", categorySource: "rule",
+      amount: 2500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
+      installmentCurrent: null, installmentTotal: null, comprobante: null,
+    },
+  }],
+  reviewedKeys: [],
+});
+
+const REVIEW_URL = /\/statements\/([^/?]+)\/review/;
+
+const sharedDefaults = (url: string, init?: RequestInit): unknown => {
+  if ((init?.method ?? "GET") !== "GET") return undefined;
+  if (url.includes("/mail/status")) return MAIL_DISABLED;
+  const review = REVIEW_URL.exec(url);
+  if (review) return reviewOf(review[1]);
+  if (url.endsWith("/statements")) return [];
+  return undefined;
+};
+
 function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
-  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) =>
-    new Response(JSON.stringify(handler(url, init)), { status: 200, headers: { "Content-Type": "application/json" } })));
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    const body = sharedDefaults(url, init) ?? handler(url, init);
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  }));
 }
 
 beforeEach(() => {
@@ -24,6 +80,19 @@ describe("ImportPage", () => {
     renderWithProviders(<ImportPage />);
     expect(screen.getByText(/importar resumen/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /elegir archivo/i })).toBeInTheDocument();
+  });
+
+  it("los datos de prueba compartidos cumplen los contratos de la API", () => {
+    expect(() => mailSourceStatusDtoSchema.array().parse(MAIL_DISABLED)).not.toThrow();
+    expect(() => statementReviewDtoSchema.parse(reviewOf("s-nuevo"))).not.toThrow();
+    expect(() => importResultUnionSchema.parse(statementResult("imported", 3))).not.toThrow();
+  });
+
+  it("la sección Mails va después del resultado de la subida y antes de «Archivos importados»", () => {
+    renderWithProviders(<ImportPage />);
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
+    expect(headings).toContain("Mails");
+    expect(headings.indexOf("Mails")).toBeLessThan(headings.indexOf("Archivos importados"));
   });
 
   it("lista los archivos importados de todos los tipos", async () => {
@@ -44,8 +113,7 @@ describe("ImportPage", () => {
   it("sube un archivo y muestra el resultado", async () => {
     mockFetch((url, init) => {
       if (url.includes("/import") && init?.method === "POST") {
-        return { kind: "statement", status: "imported", transactionCount: 3,
-          statement: { reconciliation: { ok: true, entries: [] } } };
+        return statementResult("imported", 3);
       }
       return [];
     });
@@ -61,11 +129,9 @@ describe("ImportPage", () => {
       if (url.includes("/import") && init?.method === "POST") {
         if (url.includes("replace=true")) {
           replaceCalled = true;
-          return { kind: "statement", status: "imported", transactionCount: 5,
-            statement: { reconciliation: { ok: true, entries: [] } } };
+          return statementResult("imported", 5);
         }
-        return { kind: "statement", status: "duplicate", transactionCount: 0,
-          statement: { reconciliation: { ok: true, entries: [] } } };
+        return statementResult("duplicate", 0);
       }
       return [];
     });
@@ -159,8 +225,7 @@ describe("ImportPage en mobile", () => {
   it("importa el PDF elegido y muestra el resultado", async () => {
     mockFetch((url, init) => {
       if (url.includes("/import") && init?.method === "POST") {
-        return { kind: "statement", status: "imported", transactionCount: 3,
-          statement: { reconciliation: { ok: true, entries: [] } } };
+        return statementResult("imported", 3);
       }
       return url.includes("/imports") ? imported : {};
     });
