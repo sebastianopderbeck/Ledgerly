@@ -3,7 +3,7 @@ import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material"
 import type { ImportResultUnionDTO } from "@ledgerly/shared";
 import { useImportFile } from "../api/hooks.js";
 import { FileDropzone } from "../components/FileDropzone.js";
-import { GmailImportSection } from "../components/GmailImportSection.js";
+import { MailImportSection } from "../components/MailImportSection.js";
 import { ImportedFilesSection } from "../components/ImportedFilesSection.js";
 import { ReconciliationBanner } from "../components/ReconciliationBanner.js";
 import { StatementReviewSection } from "../components/StatementReviewSection.js";
@@ -87,7 +87,7 @@ export const ImportPage = () => {
         </Alert>
       )}
 
-      <GmailImportSection />
+      <MailImportSection />
       <StatementReviewSection key={focusStatement?.id ?? "latest"} focusStatement={focusStatement} />
 
       <Typography variant="h6" component="h2" sx={{ mt: 4, mb: 2 }}>Archivos importados</Typography>

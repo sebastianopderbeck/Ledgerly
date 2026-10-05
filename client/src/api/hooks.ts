@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, BudgetDTO, BudgetInput, BudgetPatch, BudgetSpendingDTO, CashFlowDTO, CategoryRuleDTO, CategoryStat,
-  CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth, GmailStatusDTO, GmailSyncRunDTO, ImportResultUnionDTO,
+  CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth, GmailStatusDTO, MailSyncRunDTO, ImportResultUnionDTO,
   ImportedFileDTO, InboxRuleResultDTO, InflationRateDTO, InstallmentPurchaseDTO, MacroRefreshDTO, MacroSeriesDTO,
   ManualAssetCreateDTO, ManualAssetDTO, ManualAssetUpdateDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO,
   NetWorthDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, StatementReviewDTO, StatementReviewKeysDTO,
@@ -387,7 +387,7 @@ export function useGmailStatus() {
 export function useGmailSync() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => apiFetch<GmailSyncRunDTO>("/gmail/sync", { method: "POST" }),
+    mutationFn: () => apiFetch<MailSyncRunDTO>("/gmail/sync", { method: "POST" }),
     onSuccess: () => qc.invalidateQueries(),
   });
 }

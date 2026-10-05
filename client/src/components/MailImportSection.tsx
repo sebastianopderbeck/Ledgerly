@@ -3,9 +3,9 @@ import type { SxProps, Theme } from "@mui/material/styles";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import type { GmailStatusDTO } from "@ledgerly/shared";
 import { useGmailStatus, useGmailSync } from "../api/hooks.js";
-import { gmailIntervalLabel, gmailLastRunLabel, gmailMissingVarsMessage } from "../gmailImport.js";
+import { mailIntervalLabel, gmailLastRunLabel, gmailMissingVarsMessage } from "../mailImport.js";
 import { useIsMobile } from "../useIsMobile.js";
-import { GmailSyncResult } from "./GmailSyncResult.js";
+import { MailSyncResult } from "./MailSyncResult.js";
 import { tapTargetSx } from "./tapTarget.js";
 
 interface GmailDisabledNoticeProps {
@@ -36,7 +36,7 @@ const GmailSyncCard = ({ status }: GmailSyncCardProps) => {
   const handleSync = () => sync.mutate();
   const buttonLabel = sync.isPending ? "Buscando…" : "Buscar en Gmail";
   const buttonIcon = sync.isPending ? <CircularProgress size={16} color="inherit" /> : <MailOutlineIcon />;
-  const intervalText = `Búsqueda automática: ${gmailIntervalLabel(status.intervalMinutes)}`;
+  const intervalText = `Búsqueda automática: ${mailIntervalLabel(status.intervalMinutes)}`;
   const queryText = `Consulta: ${status.query ?? ""}`;
 
   return (
@@ -62,7 +62,7 @@ const GmailSyncCard = ({ status }: GmailSyncCardProps) => {
           </Button>
         </Box>
         {sync.isError && <Alert severity="error" sx={{ mt: 2 }}>{sync.error.message}</Alert>}
-        {run && <GmailSyncResult run={run} />}
+        {run && <MailSyncResult run={run} />}
       </CardContent>
     </Card>
   );
@@ -78,7 +78,7 @@ const GmailImportPanel = () => {
   return <GmailSyncCard status={status} />;
 };
 
-export const GmailImportSection = () => (
+export const MailImportSection = () => (
   <>
     <Typography variant="h6" component="h2" sx={{ mt: 4, mb: 2 }}>Gmail</Typography>
     <GmailImportPanel />

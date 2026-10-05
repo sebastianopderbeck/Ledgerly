@@ -179,7 +179,7 @@ const budgetSchema = new Schema({
   periodoBase: { type: String, required: true },
 });
 
-const gmailSyncRunSchema = new Schema({
+const mailSyncRunSchema = new Schema({
   trigger: { type: String, required: true, enum: ["manual", "job"] },
   startedAt: { type: Date, required: true, index: true },
   finishedAt: { type: Date, required: true },
@@ -189,10 +189,10 @@ const gmailSyncRunSchema = new Schema({
   hasMore: { type: Boolean, required: true },
 });
 
-const gmailAttachmentSchema = new Schema({
+const mailAttachmentSchema = new Schema({
   messageId: { type: String, required: true },
   partId: { type: String, required: true },
-  runId: { type: Schema.Types.ObjectId, ref: "GmailSyncRun", required: true, index: true },
+  runId: { type: Schema.Types.ObjectId, ref: "MailSyncRun", required: true, index: true },
   fileName: { type: String, required: true },
   receivedAt: { type: Date, required: true },
   outcome: { type: String, required: true, enum: ["imported", "duplicate", "skipped", "failed"] },
@@ -201,7 +201,7 @@ const gmailAttachmentSchema = new Schema({
   detail: { type: String, required: true },
   processedAt: { type: Date, required: true },
 });
-gmailAttachmentSchema.index({ messageId: 1, partId: 1 }, { unique: true });
+mailAttachmentSchema.index({ messageId: 1, partId: 1 }, { unique: true });
 
 export type StatementDoc = InferSchemaType<typeof statementSchema>;
 export type TransactionDoc = InferSchemaType<typeof transactionSchema>;
@@ -214,8 +214,8 @@ export type MacroSeriesDoc = InferSchemaType<typeof macroSeriesSchema>;
 export type HiddenSubscriptionDoc = InferSchemaType<typeof hiddenSubscriptionSchema>;
 export type ManualAssetDoc = InferSchemaType<typeof manualAssetSchema>;
 export type BudgetDoc = InferSchemaType<typeof budgetSchema>;
-export type GmailSyncRunDoc = InferSchemaType<typeof gmailSyncRunSchema>;
-export type GmailAttachmentDoc = InferSchemaType<typeof gmailAttachmentSchema>;
+export type MailSyncRunDoc = InferSchemaType<typeof mailSyncRunSchema>;
+export type MailAttachmentDoc = InferSchemaType<typeof mailAttachmentSchema>;
 
 export const StatementModel: Model<StatementDoc> =
   mongoose.models.Statement ?? mongoose.model("Statement", statementSchema);
@@ -239,7 +239,7 @@ export const ManualAssetModel: Model<ManualAssetDoc> =
   mongoose.models.ManualAsset ?? mongoose.model("ManualAsset", manualAssetSchema);
 export const BudgetModel: Model<BudgetDoc> =
   mongoose.models.Budget ?? mongoose.model("Budget", budgetSchema);
-export const GmailSyncRunModel: Model<GmailSyncRunDoc> =
-  mongoose.models.GmailSyncRun ?? mongoose.model("GmailSyncRun", gmailSyncRunSchema);
-export const GmailAttachmentModel: Model<GmailAttachmentDoc> =
-  mongoose.models.GmailAttachment ?? mongoose.model("GmailAttachment", gmailAttachmentSchema);
+export const MailSyncRunModel: Model<MailSyncRunDoc> =
+  mongoose.models.MailSyncRun ?? mongoose.model("MailSyncRun", mailSyncRunSchema);
+export const MailAttachmentModel: Model<MailAttachmentDoc> =
+  mongoose.models.MailAttachment ?? mongoose.model("MailAttachment", mailAttachmentSchema);

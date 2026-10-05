@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import request from "supertest";
-import { gmailStatusDtoSchema, gmailSyncRunDtoSchema } from "@ledgerly/shared";
+import { gmailStatusDtoSchema, mailSyncRunDtoSchema } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
-import { fakeGmailClient, pdfPart } from "../../testing/gmailFixtures.js";
+import { fakeGmailClient, pdfPart } from "../../testing/mailFixtures.js";
 
 vi.mock("../../pdf/extract.js", () => ({ extractPdfText: vi.fn() }));
 vi.mock("../../gmail/gmailClient.js", async (importOriginal) => ({
@@ -81,7 +81,7 @@ describe("POST /api/gmail/sync", () => {
     );
     const res = await request(app).post("/api/gmail/sync");
     expect(res.status).toBe(200);
-    const run = gmailSyncRunDtoSchema.parse(res.body);
+    const run = mailSyncRunDtoSchema.parse(res.body);
     expect(run).toMatchObject({ trigger: "manual", status: "ok", messagesChecked: 1 });
     expect(run.items).toMatchObject([{ fileName: "resumen-sintetico.pdf", outcome: "imported", kind: "statement" }]);
     expect(await StatementModel.countDocuments()).toBe(1);

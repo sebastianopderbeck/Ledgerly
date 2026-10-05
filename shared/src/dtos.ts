@@ -546,28 +546,28 @@ export const inboxRuleResultDtoSchema = z.object({
   categorized: z.number().int(),
 });
 
-export const gmailSyncOutcomeSchema = z.enum(["imported", "duplicate", "skipped", "failed"]);
-export const gmailSyncTriggerSchema = z.enum(["manual", "job"]);
+export const mailSyncOutcomeSchema = z.enum(["imported", "duplicate", "skipped", "failed"]);
+export const mailSyncTriggerSchema = z.enum(["manual", "job"]);
 
-export const gmailSyncItemDtoSchema = z.object({
+export const mailSyncItemDtoSchema = z.object({
   id: z.string(),
   fileName: z.string(),
   receivedAt: z.string(),
-  outcome: gmailSyncOutcomeSchema,
+  outcome: mailSyncOutcomeSchema,
   kind: importedFileKindSchema.nullable(),
   documentId: z.string().nullable(),
   detail: z.string(),
 });
 
-export const gmailSyncRunDtoSchema = z.object({
-  trigger: gmailSyncTriggerSchema,
+export const mailSyncRunDtoSchema = z.object({
+  trigger: mailSyncTriggerSchema,
   startedAt: z.string(),
   finishedAt: z.string(),
   status: z.enum(["ok", "error"]),
   error: z.string().nullable(),
   messagesChecked: z.number().int(),
   hasMore: z.boolean(),
-  items: z.array(gmailSyncItemDtoSchema),
+  items: z.array(mailSyncItemDtoSchema),
 });
 
 export const gmailStatusDtoSchema = z.object({
@@ -575,7 +575,7 @@ export const gmailStatusDtoSchema = z.object({
   missing: z.array(z.string()),
   query: z.string().nullable(),
   intervalMinutes: z.number().int().nullable(),
-  lastRun: gmailSyncRunDtoSchema.nullable(),
+  lastRun: mailSyncRunDtoSchema.nullable(),
 });
 
 export type TransactionDTO = z.infer<typeof transactionDtoSchema>;
@@ -642,8 +642,8 @@ export type BudgetSpendingDTO = z.infer<typeof budgetSpendingDtoSchema>;
 export type UncategorizedGroupDTO = z.infer<typeof uncategorizedGroupSchema>;
 export type UncategorizedInboxDTO = z.infer<typeof uncategorizedInboxDtoSchema>;
 export type InboxRuleResultDTO = z.infer<typeof inboxRuleResultDtoSchema>;
-export type GmailSyncOutcome = z.infer<typeof gmailSyncOutcomeSchema>;
-export type GmailSyncTrigger = z.infer<typeof gmailSyncTriggerSchema>;
-export type GmailSyncItemDTO = z.infer<typeof gmailSyncItemDtoSchema>;
-export type GmailSyncRunDTO = z.infer<typeof gmailSyncRunDtoSchema>;
+export type MailSyncOutcome = z.infer<typeof mailSyncOutcomeSchema>;
+export type MailSyncTrigger = z.infer<typeof mailSyncTriggerSchema>;
+export type MailSyncItemDTO = z.infer<typeof mailSyncItemDtoSchema>;
+export type MailSyncRunDTO = z.infer<typeof mailSyncRunDtoSchema>;
 export type GmailStatusDTO = z.infer<typeof gmailStatusDtoSchema>;

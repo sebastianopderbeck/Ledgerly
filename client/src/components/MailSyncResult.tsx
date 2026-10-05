@@ -2,22 +2,22 @@ import { useCallback, useMemo, useState } from "react";
 import { Alert, Box, Button, Chip, Collapse, List, ListItem, Typography } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import type { GmailSyncItemDTO, GmailSyncRunDTO } from "@ledgerly/shared";
+import type { MailSyncItemDTO, MailSyncRunDTO } from "@ledgerly/shared";
 import {
-  GMAIL_OUTCOME_COLORS, GMAIL_OUTCOME_LABELS, gmailItemSecondary, gmailRunSummary, splitGmailItems,
-} from "../gmailImport.js";
+  MAIL_OUTCOME_COLORS, MAIL_OUTCOME_LABELS, mailItemSecondary, mailRunSummary, splitMailItems,
+} from "../mailImport.js";
 import { MIN_TAP_SIZE } from "./tapTarget.js";
 
-interface GmailSyncResultProps {
-  run: GmailSyncRunDTO;
+interface MailSyncResultProps {
+  run: MailSyncRunDTO;
 }
 
-interface GmailItemListProps {
-  items: GmailSyncItemDTO[];
+interface MailItemListProps {
+  items: MailSyncItemDTO[];
 }
 
-interface GmailItemRowProps {
-  item: GmailSyncItemDTO;
+interface MailItemRowProps {
+  item: MailSyncItemDTO;
 }
 
 const itemHeaderSx: SxProps<Theme> = { display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 1, rowGap: 0.5 };
@@ -28,30 +28,30 @@ const chevronSx = (expanded: boolean): SxProps<Theme> => ({
   transition: "transform 200ms ease",
 });
 
-const GmailItemRow = ({ item }: GmailItemRowProps) => (
+const MailItemRow = ({ item }: MailItemRowProps) => (
   <ListItem disableGutters sx={{ display: "block", py: 0.75 }}>
     <Box sx={itemHeaderSx}>
       <Typography variant="subtitle2" component="span" sx={{ overflowWrap: "anywhere", minWidth: 0 }}>
         {item.fileName}
       </Typography>
-      <Chip size="small" label={GMAIL_OUTCOME_LABELS[item.outcome]} color={GMAIL_OUTCOME_COLORS[item.outcome]} />
+      <Chip size="small" label={MAIL_OUTCOME_LABELS[item.outcome]} color={MAIL_OUTCOME_COLORS[item.outcome]} />
     </Box>
     <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
-      {gmailItemSecondary(item)}
+      {mailItemSecondary(item)}
     </Typography>
   </ListItem>
 );
 
-const GmailItemList = ({ items }: GmailItemListProps) => {
-  const rows = items.map((item) => <GmailItemRow key={item.id} item={item} />);
+const MailItemList = ({ items }: MailItemListProps) => {
+  const rows = items.map((item) => <MailItemRow key={item.id} item={item} />);
   return <List disablePadding>{rows}</List>;
 };
 
-export const GmailSyncResult = ({ run }: GmailSyncResultProps) => {
+export const MailSyncResult = ({ run }: MailSyncResultProps) => {
   const [showSkipped, setShowSkipped] = useState(false);
-  const { visible, skipped } = useMemo(() => splitGmailItems(run.items), [run.items]);
+  const { visible, skipped } = useMemo(() => splitMailItems(run.items), [run.items]);
   const toggleSkipped = useCallback(() => setShowSkipped((current) => !current), []);
-  const summary = gmailRunSummary(run);
+  const summary = mailRunSummary(run);
   const hasError = run.status === "error";
   const toggleLabel = showSkipped ? "Ocultar omitidos" : `Ver omitidos (${skipped.length})`;
 
@@ -62,7 +62,7 @@ export const GmailSyncResult = ({ run }: GmailSyncResultProps) => {
       {run.hasMore && (
         <Alert severity="info" sx={{ mb: 1.5 }}>Quedan mails por revisar: tocá «Buscar en Gmail» otra vez.</Alert>
       )}
-      {visible.length > 0 && <GmailItemList items={visible} />}
+      {visible.length > 0 && <MailItemList items={visible} />}
       {skipped.length > 0 && (
         <>
           <Button
@@ -75,7 +75,7 @@ export const GmailSyncResult = ({ run }: GmailSyncResultProps) => {
             {toggleLabel}
           </Button>
           <Collapse in={showSkipped} unmountOnExit>
-            <GmailItemList items={skipped} />
+            <MailItemList items={skipped} />
           </Collapse>
         </>
       )}

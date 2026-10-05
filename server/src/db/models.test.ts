@@ -4,8 +4,8 @@ import { withDb } from "../testing/withDb.js";
 import {
   AutoCouponModel,
   BudgetModel,
-  GmailAttachmentModel,
-  GmailSyncRunModel,
+  MailAttachmentModel,
+  MailSyncRunModel,
   HiddenSubscriptionModel,
   ManualAssetModel,
   MortgageCouponModel,
@@ -160,16 +160,16 @@ describe("modelos nuevos", () => {
   });
 
   it("cada adjunto de Gmail se registra una sola vez por mensaje y parte", async () => {
-    await GmailAttachmentModel.init();
-    const run = await GmailSyncRunModel.create({
+    await MailAttachmentModel.init();
+    const run = await MailSyncRunModel.create({
       trigger: "manual", startedAt: new Date("2026-10-03T12:00:00Z"), finishedAt: new Date("2026-10-03T12:00:05Z"),
       status: "ok", messagesChecked: 1, hasMore: false,
     });
     expect(run.error).toBeNull();
-    const attachment = await GmailAttachmentModel.create(gmailAttachment(run._id, "1"));
+    const attachment = await MailAttachmentModel.create(gmailAttachment(run._id, "1"));
     expect(attachment.kind).toBeNull();
     expect(attachment.documentId).toBeNull();
-    await expect(GmailAttachmentModel.create(gmailAttachment(run._id, "1"))).rejects.toThrow();
-    await expect(GmailAttachmentModel.create(gmailAttachment(run._id, "2"))).resolves.toBeDefined();
+    await expect(MailAttachmentModel.create(gmailAttachment(run._id, "1"))).rejects.toThrow();
+    await expect(MailAttachmentModel.create(gmailAttachment(run._id, "2"))).resolves.toBeDefined();
   });
 });
