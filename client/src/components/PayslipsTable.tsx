@@ -1,10 +1,12 @@
 import { useRef, useState } from "react";
-import { Box, Chip, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Box, Chip, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import type { PayslipDTO } from "@ledgerly/shared";
 import { usePatchPayslipRate } from "../api/hooks.js";
 import { byPeriodo, uniqueConceptLabels } from "../payslipConcepts.js";
-import { formatMoney } from "../format.js";
+import { formatMoney, formatPercent, formatPercentOrDash } from "../format.js";
+import { ipcWindowLabel, raiseFor, type SalaryRaise } from "../salaryRaises.js";
+import { SalaryRaiseChip } from "./SalaryRaiseChip.js";
 import { MotionTableBody, MotionTableRow } from "./motion/motion.js";
 import { fadeUpItem, staggerContainer } from "./motion/variants.js";
 
@@ -48,9 +50,41 @@ const RateCell = ({ payslip }: { payslip: PayslipDTO }) => {
   );
 };
 
-interface PayslipsTableProps { payslips: PayslipDTO[]; }
+interface RaiseCellsProps {
+  raise: SalaryRaise | undefined;
+}
 
-export const PayslipsTable = ({ payslips }: PayslipsTableProps) => {
+const RaiseCells = ({ raise }: RaiseCellsProps) => {
+  if (!raise) {
+    return (
+      <>
+        <TableCell align="right">{dash}</TableCell>
+        <TableCell align="right">{dash}</TableCell>
+        <TableCell align="right">{dash}</TableCell>
+        <TableCell align="right">{dash}</TableCell>
+      </>
+    );
+  }
+  return (
+    <>
+      <TableCell align="right">{formatPercent(raise.basicoPct)}</TableCell>
+      <TableCell align="right">{formatPercentOrDash(raise.brutoPct)}</TableCell>
+      <TableCell align="right">
+        <Tooltip title={`IPC de ${ipcWindowLabel(raise)}`} describeChild>
+          <span>{formatPercentOrDash(raise.ipcPct)}</span>
+        </Tooltip>
+      </TableCell>
+      <TableCell align="right"><SalaryRaiseChip raise={raise} /></TableCell>
+    </>
+  );
+};
+
+interface PayslipsTableProps {
+  payslips: PayslipDTO[];
+  raises: Map<string, SalaryRaise>;
+}
+
+export const PayslipsTable = ({ payslips, raises }: PayslipsTableProps) => {
   if (payslips.length === 0) return null;
 
   const rows = [...payslips].sort(byPeriodo);
@@ -65,6 +99,10 @@ export const PayslipsTable = ({ payslips }: PayslipsTableProps) => {
           <TableRow>
             <TableCell>Período</TableCell>
             <TableCell align="right">Bruto</TableCell>
+            <TableCell align="right">Aumento básico</TableCell>
+            <TableCell align="right">Aumento bruto</TableCell>
+            <TableCell align="right">IPC acumulado</TableCell>
+            <TableCell align="right">vs IPC</TableCell>
             <TableCell align="right">Neto</TableCell>
             <TableCell align="right">Neto (USD)</TableCell>
               {conceptLabels.map((label) => (
@@ -82,6 +120,7 @@ export const PayslipsTable = ({ payslips }: PayslipsTableProps) => {
                 {p.tipo === "sac" && <Chip label="SAC" size="small" color="secondary" variant="outlined" sx={{ ml: 1 }} />}
               </TableCell>
               <TableCell align="right">{formatMoney(p.brutoTotal, "ARS")}</TableCell>
+              <RaiseCells raise={raiseFor(raises, p)} />
               <TableCell align="right">{formatMoney(p.neto, "ARS")}</TableCell>
               <TableCell align="right">{p.netoUsd != null ? formatMoney(p.netoUsd, "USD") : dash}</TableCell>
                 {conceptLabels.map((label) => {

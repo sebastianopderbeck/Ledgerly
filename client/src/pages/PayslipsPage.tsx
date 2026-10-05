@@ -16,6 +16,7 @@ import { InflationAccumulatedChart } from "../components/charts/InflationAccumul
 import { PayslipCompositionChart } from "../components/charts/PayslipCompositionChart.js";
 import { PayslipGrossNetChart } from "../components/charts/PayslipGrossNetChart.js";
 import { payslipYears } from "../payslipConcepts.js";
+import { salaryRaises } from "../salaryRaises.js";
 import { matchesYears } from "../filters/globalFilters.js";
 import { useGlobalFilters } from "../filters/useGlobalFilters.js";
 import { useIsMobile } from "../useIsMobile.js";
@@ -28,8 +29,9 @@ export const PayslipsPage = () => {
   const { data: inflationData } = useInflation();
   const { yearSelection } = useGlobalFilters();
   const isMobile = useIsMobile();
-  const inflation = inflationData ?? [];
+  const inflation = useMemo(() => inflationData ?? [], [inflationData]);
   const payslips = useMemo(() => data ?? [], [data]);
+  const raises = useMemo(() => salaryRaises(payslips, inflation), [payslips, inflation]);
   const years = useMemo(() => payslipYears(payslips), [payslips]);
   const inYears = useMemo(
     () => payslips.filter((payslip) => matchesYears(payslip.periodo, yearSelection)),
@@ -62,7 +64,9 @@ export const PayslipsPage = () => {
     );
   }
 
-  const payslipDetail = isMobile ? <PayslipCards payslips={inYears} /> : <PayslipsTable payslips={inYears} />;
+  const payslipDetail = isMobile
+    ? <PayslipCards payslips={inYears} raises={raises} />
+    : <PayslipsTable payslips={inYears} raises={raises} />;
 
   return (
     <>

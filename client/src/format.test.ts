@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatLocalDate, formatMoney, formatMoneyOrDash, formatUva } from "./format.js";
+import { formatLocalDate, formatMoney, formatMoneyOrDash, formatPercentOrDash, formatSignedPercent, formatUva } from "./format.js";
 
 describe("formatUva", () => {
   it("usa separadores es-AR y sufijo UVA", () => {
@@ -21,5 +21,25 @@ describe("formatMoneyOrDash", () => {
 
   it("sin monto muestra un guion", () => {
     expect(formatMoneyOrDash(null, "ARS")).toBe("—");
+  });
+});
+
+describe("formatPercentOrDash", () => {
+  it("formatea el porcentaje con un decimal", () => {
+    expect(formatPercentOrDash(15)).toBe("15,0%");
+  });
+
+  it("devuelve un guion si no hay valor", () => {
+    expect(formatPercentOrDash(null)).toBe("—");
+  });
+});
+
+describe("formatSignedPercent", () => {
+  it("antepone + a los positivos", () => {
+    expect(formatSignedPercent(4.72)).toBe("+4,7%");
+  });
+
+  it("usa el signo menos tipográfico en los negativos", () => {
+    expect(formatSignedPercent(-0.99)).toBe("−1,0%");
   });
 });

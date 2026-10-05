@@ -35,3 +35,11 @@ export function formatLocalDate(iso: string): string {
 export function formatMoneyOrDash(amount: number | null, currency: "ARS" | "USD"): string {
   return amount === null ? "—" : formatMoney(amount, currency);
 }
+
+export function formatPercentOrDash(value: number | null): string {
+  return value === null ? "—" : formatPercent(value);
+}
+
+export function formatSignedPercent(value: number): string {
+  return `${value >= 0 ? "+" : "−"}${formatPercent(Math.abs(value))}`;
+}
