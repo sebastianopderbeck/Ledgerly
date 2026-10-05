@@ -5,7 +5,7 @@ import { FAKE_RECEIVED_AT, fakeMailClient, fakePdfBytes, pdfPart } from "../test
 import { GmailApiError, GmailAuthError } from "../gmail/gmailClient.js";
 import { MailAttachmentModel, MailSyncRunModel } from "../db/models.js";
 import {
-  EncryptedPdfError, InvalidAutoCouponError, InvalidCouponError, InvalidPayslipError, NoTransactionsError, UnsupportedFormatError,
+  EncryptedPdfError, InvalidAutoCouponError, InvalidCouponError, InvalidPayslipError, InvalidStatementDatesError, NoTransactionsError, UnsupportedFormatError,
 } from "../ingestion/errors.js";
 import { MAX_PDF_BYTES, type ImportPdfInput, type ImportPdfOutcome } from "../import/importPdf.js";
 import type { MailClient } from "./mailClient.js";
@@ -87,6 +87,7 @@ describe("classifyImportError", () => {
 
   it("un documento reconocido que no se pudo leer guarda su tipo", () => {
     expect(classifyImportError(new NoTransactionsError())).toMatchObject({ outcome: "skipped", kind: "statement" });
+    expect(classifyImportError(new InvalidStatementDatesError())).toMatchObject({ outcome: "skipped", kind: "statement" });
     expect(classifyImportError(new InvalidCouponError())).toMatchObject({ outcome: "skipped", kind: "coupon" });
     expect(classifyImportError(new InvalidAutoCouponError())).toMatchObject({ outcome: "skipped", kind: "auto" });
     expect(classifyImportError(new InvalidPayslipError())).toMatchObject({ outcome: "skipped", kind: "payslip" });

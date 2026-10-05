@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import type { ImportedFileKind, MailSource, MailSyncOutcome, MailSyncRunDTO, MailSyncTrigger } from "@ledgerly/shared";
 import { MailAttachmentModel, MailSyncRunModel } from "../db/models.js";
 import {
-  IngestionError, InvalidAutoCouponError, InvalidCouponError, InvalidPayslipError, NoTransactionsError,
+  IngestionError, InvalidAutoCouponError, InvalidCouponError, InvalidPayslipError, InvalidStatementDatesError, NoTransactionsError,
 } from "../ingestion/errors.js";
 import {
   importPdf as importPdfFile, MAX_PDF_BYTES, type ImportPdfInput, type ImportPdfOutcome,
@@ -89,7 +89,7 @@ export function selectPendingMessages(ids: string[], ledger: MailLedgerEntry[], 
 }
 
 const recognizedKindOf = (err: IngestionError): ImportedFileKind | null => {
-  if (err instanceof NoTransactionsError) return "statement";
+  if (err instanceof NoTransactionsError || err instanceof InvalidStatementDatesError) return "statement";
   if (err instanceof InvalidCouponError) return "coupon";
   if (err instanceof InvalidAutoCouponError) return "auto";
   if (err instanceof InvalidPayslipError) return "payslip";

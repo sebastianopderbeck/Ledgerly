@@ -26,6 +26,13 @@ export class NoTransactionsError extends IngestionError {
   }
 }
 
+export class InvalidStatementDatesError extends IngestionError {
+  constructor() {
+    super("El resumen tiene movimientos con fechas inválidas o fuera de su período");
+    this.name = "InvalidStatementDatesError";
+  }
+}
+
 export class InvalidCouponError extends IngestionError {
   constructor() {
     super("El cupón tiene un formato inesperado");
