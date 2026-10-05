@@ -64,6 +64,31 @@ describe("visaSignatureParser.parse", () => {
   });
 });
 
+describe("visaSignatureParser.parse con compras en otra moneda", () => {
+  const foreign = [
+    "VISA SIGNATURE",
+    "SALDO ANTERIOR 0,00 0,00",
+    "31.08.26 639391 RUMBO EUR 569,99 671,32",
+    "29.09.26 525899* Plus Ultra LBTNFVG EUR 596,84 686,78",
+    "10.09.26 111111* CAFE DEL SOL 1.500,00",
+    "Tarjeta 8883 Total Consumos de TITULAR EJEMPLO 1.500,00 1.358,10 _",
+  ].join("\n");
+  const result = visaSignatureParser.parse(foreign, meta);
+
+  it("una compra en euros se registra por su monto en dólares", () => {
+    expect(result.rows.find((r) => r.comprobante === "639391")).toMatchObject({ amount: 671.32, currency: "USD" });
+    expect(result.rows.find((r) => r.comprobante === "525899")).toMatchObject({ amount: 686.78, currency: "USD" });
+  });
+
+  it("un comercio que termina en tres mayúsculas sigue siendo en pesos", () => {
+    expect(result.rows.find((r) => r.comprobante === "111111")).toMatchObject({ amount: 1500, currency: "ARS" });
+  });
+
+  it("la reconciliación cuadra en pesos y en dólares", () => {
+    expect(reconcile(result).ok).toBe(true);
+  });
+});
+
 const realPath = fileURLToPath(new URL("../../../examples/visa-real.txt", import.meta.url));
 const hasReal = existsSync(realPath);
 const realMeta: PdfMeta = { producer: "Adobe LiveCycle", creator: null, pageCount: 2, encrypted: false };

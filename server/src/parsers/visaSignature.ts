@@ -11,6 +11,7 @@ import {
 
 const ROW = /^\s*(\d{2}\.\d{2}\.\d{2})\s+(?:(\d{4,6})[*FK]?\s+)?(.*)$/;
 const SKIP = /SALDO ANTERIOR|Total Consumos|SALDO ACTUAL|PAGO MINIMO|DEBITAREMOS/;
+const BILLED_IN_USD = /USD|U\$S|\b[A-Z]{3}\s+\d[\d.]*,\d{2}\s+\d[\d.]*,\d{2}/;
 
 export const visaSignatureParser: StatementParser = {
   issuer: "visa_signature",
@@ -46,7 +47,7 @@ export const visaSignatureParser: StatementParser = {
         descriptionRaw: rest.replace(/\s+/g, " ").trim(),
         merchant: normalizeMerchant(rest),
         amount,
-        currency: /USD|U\$S/.test(rest) ? "USD" : "ARS",
+        currency: BILLED_IN_USD.test(rest) ? "USD" : "ARS",
         direction,
         type: classifyType(rest),
         isInstallment: installment.isInstallment,
