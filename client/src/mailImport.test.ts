@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { MailSyncItemDTO, MailSyncRunDTO } from "@ledgerly/shared";
 import { formatLocalDate } from "./format.js";
 import {
-  formatDateTime, joinWithY, mailDisabledTitle, mailHasMoreMessage, mailIntervalLabel, mailItemSecondary, mailLastRunLabel,
+  formatDateTime, joinWithY, mailDisabledTitle, mailHasMoreMessage, mailItemSecondary, mailLastRunLabel,
   mailMissingMessage, mailRunSummary, mailScopeLabel, mailSearchLabel, splitMailItems,
 } from "./mailImport.js";
 
@@ -39,15 +39,6 @@ describe("mailMissingMessage", () => {
     expect(mailMissingMessage("icloud", ["la contraseña de app en el Llavero"])).toBe(
       "Falta la contraseña de app en el Llavero. Los pasos están en el README, sección «Importar desde iCloud»; después reiniciá el server.",
     );
-  });
-});
-
-describe("mailIntervalLabel", () => {
-  it("apagada, en horas si es múltiplo de 60, si no en minutos", () => {
-    expect(mailIntervalLabel(null)).toBe("apagada");
-    expect(mailIntervalLabel(360)).toBe("cada 6 h");
-    expect(mailIntervalLabel(60)).toBe("cada 1 h");
-    expect(mailIntervalLabel(90)).toBe("cada 90 min");
   });
 });
 

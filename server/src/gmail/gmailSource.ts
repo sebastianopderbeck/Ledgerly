@@ -1,6 +1,7 @@
 import type { MailClient } from "../mail/mailClient.js";
 import type { MailSourceSetup } from "../mail/mailSourceSetup.js";
 import { createGmailClient, type GmailClient, type GmailPdfPart } from "./gmailClient.js";
+import { parseMailSchedule } from "../mail/mailSchedule.js";
 import { missingGmailVars, readGmailConfig } from "./gmailConfig.js";
 
 export function gmailMailClient(client: GmailClient, query: string): MailClient<GmailPdfPart> {
@@ -15,14 +16,14 @@ export function gmailMailClient(client: GmailClient, query: string): MailClient<
 export function gmailSourceSetup(env: NodeJS.ProcessEnv): MailSourceSetup {
   const config = readGmailConfig(env);
   if (!config) {
-    return { source: "gmail", missing: missingGmailVars(env), scope: null, intervalMinutes: null, openClient: null };
+    return { source: "gmail", missing: missingGmailVars(env), scope: null, schedule: null, openClient: null };
   }
-  const { credentials, query, intervalMinutes } = config;
+  const { credentials, query } = config;
   return {
     source: "gmail",
     missing: [],
     scope: query,
-    intervalMinutes,
+    schedule: parseMailSchedule(env).schedule,
     openClient: async () => gmailMailClient(createGmailClient(credentials), query),
   };
 }

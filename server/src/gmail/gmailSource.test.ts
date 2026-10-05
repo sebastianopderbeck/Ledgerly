@@ -33,17 +33,19 @@ describe("gmailSourceSetup", () => {
   it("sin credenciales queda deshabilitada, con lo que falta y sin cliente", () => {
     expect(gmailSourceSetup({})).toEqual({
       source: "gmail", missing: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"],
-      scope: null, intervalMinutes: null, openClient: null,
+      scope: null, schedule: null, openClient: null,
     });
   });
 
-  it("con credenciales informa consulta e intervalo, y crea el cliente recién al abrir", async () => {
+  it("con credenciales informa consulta y agenda, y crea el cliente recién al abrir", async () => {
     const raw = fakeGmailClient([]);
     vi.mocked(createGmailClient).mockReturnValue(raw);
     const setup = gmailSourceSetup({
-      ...CREDENTIALS, GMAIL_QUERY: "from:banco has:attachment", GMAIL_SYNC_INTERVAL_MINUTES: "360",
+      ...CREDENTIALS, GMAIL_QUERY: "from:banco has:attachment", MAIL_SYNC_DAYS: "25-5", MAIL_SYNC_HOUR: "9",
     });
-    expect(setup).toMatchObject({ source: "gmail", missing: [], scope: "from:banco has:attachment", intervalMinutes: 360 });
+    expect(setup).toMatchObject({ source: "gmail", missing: [], scope: "from:banco has:attachment",
+      schedule: { fromDay: 25, toDay: 5, hour: 9 },
+    });
     expect(createGmailClient).not.toHaveBeenCalled();
     const client = await setup.openClient?.();
     await client?.listMessageIds(3);

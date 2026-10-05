@@ -1,14 +1,20 @@
 import { Router } from "express";
 import { MAIL_SOURCE_LABELS, mailSourceSchema, type MailSourceStatusDTO } from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
+import { describeMailSchedule } from "../../mail/mailSchedule.js";
 import { readMailSourceSetup, readMailSourceSetups } from "../../mail/mailSources.js";
 import type { MailSourceSetup } from "../../mail/mailSourceSetup.js";
 import { findLastMailRun, runMailSync } from "../../mail/syncMail.js";
 
 export const mailRouter = Router();
 
-const toStatus = async ({ source, missing, scope, intervalMinutes, openClient }: MailSourceSetup): Promise<MailSourceStatusDTO> => ({
-  source, enabled: missing.length === 0 && openClient !== null, missing, scope, intervalMinutes, lastRun: await findLastMailRun(source),
+const toStatus = async ({ source, missing, scope, schedule, openClient }: MailSourceSetup): Promise<MailSourceStatusDTO> => ({
+  source,
+  enabled: missing.length === 0 && openClient !== null,
+  missing,
+  scope,
+  schedule: schedule ? describeMailSchedule(schedule) : null,
+  lastRun: await findLastMailRun(source),
 });
 
 const missingText = (missing: string[]): string => `${missing.length === 1 ? "falta" : "faltan"} ${missing.join(", ")}`;

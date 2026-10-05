@@ -7,10 +7,10 @@ import { emulateMobile } from "../testing/viewport.js";
 import { ImportPage } from "./ImportPage.js";
 
 const MAIL_DISABLED = [
-  { source: "icloud", enabled: false, missing: ["ICLOUD_USER"], scope: null, intervalMinutes: null, lastRun: null },
+  { source: "icloud", enabled: false, missing: ["ICLOUD_USER"], scope: null, schedule: null, lastRun: null },
   {
     source: "gmail", enabled: false, missing: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"],
-    scope: null, intervalMinutes: null, lastRun: null,
+    scope: null, schedule: null, lastRun: null,
   },
 ];
 

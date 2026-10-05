@@ -4,7 +4,7 @@ import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import { MAIL_SOURCE_LABELS, type MailSource, type MailSourceStatusDTO } from "@ledgerly/shared";
 import { useMailSync } from "../api/hooks.js";
 import {
-  mailDisabledTitle, mailIntervalLabel, mailLastRunLabel, mailMissingMessage, mailScopeLabel, mailSearchLabel,
+  mailDisabledTitle, mailLastRunLabel, mailMissingMessage, mailScopeLabel, mailSearchLabel,
 } from "../mailImport.js";
 import { useIsMobile } from "../useIsMobile.js";
 import { MailSyncResult } from "./MailSyncResult.js";
@@ -43,7 +43,7 @@ const MailSyncCard = ({ status }: MailSyncCardProps) => {
   const handleSync = () => sync.mutate();
   const buttonLabel = sync.isPending ? "Buscando…" : mailSearchLabel(status.source);
   const buttonIcon = sync.isPending ? <CircularProgress size={16} color="inherit" /> : <MailOutlineIcon />;
-  const intervalText = `Búsqueda automática: ${mailIntervalLabel(status.intervalMinutes)}`;
+  const scheduleText = `Búsqueda automática: ${status.schedule ?? "apagada"}`;
 
   return (
     <Card variant="outlined">
@@ -51,7 +51,7 @@ const MailSyncCard = ({ status }: MailSyncCardProps) => {
         <Box sx={headerSx}>
           <Box sx={textsSx}>
             <Typography variant="body1">{mailLastRunLabel(status.source, run)}</Typography>
-            <Typography variant="body2" color="text.secondary">{intervalText}</Typography>
+            <Typography variant="body2" color="text.secondary">{scheduleText}</Typography>
             <Typography variant="caption" component="p" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
               {mailScopeLabel(status.source, status.scope)}
             </Typography>

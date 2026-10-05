@@ -1,21 +1,14 @@
 import {
   MAIL_SOURCE_LABELS, type MailSource, type MailSyncOutcome, type MailSyncRunDTO, type MailSyncTrigger,
 } from "@ledgerly/shared";
+import { nextMailRunDelayMs } from "./mailSchedule.js";
 import type { MailSourceSetup } from "./mailSourceSetup.js";
 import { notifyRun } from "./notifyRun.js";
 import { findLastMailRun, runMailSync } from "./syncMail.js";
 
-export const MAIL_STARTUP_DELAY_MS = 60_000;
-const MINUTE_MS = 60_000;
 const UNEXPECTED_ERROR = "Error inesperado";
 
 const TRIGGER_LOG_LABELS: Record<MailSyncTrigger, string> = { manual: "manual", job: "automática" };
-
-export function nextMailRunDelayMs(lastStartedAt: Date | null, intervalMinutes: number, now: Date): number {
-  if (!lastStartedAt) return MAIL_STARTUP_DELAY_MS;
-  const dueInMs = lastStartedAt.getTime() + intervalMinutes * MINUTE_MS - now.getTime();
-  return Math.max(MAIL_STARTUP_DELAY_MS, dueInMs);
-}
 
 const countOf = (run: MailSyncRunDTO, outcome: MailSyncOutcome): number =>
   run.items.filter((item) => item.outcome === outcome).length;
@@ -52,14 +45,15 @@ const previousRun = async (source: MailSource): Promise<MailSyncRunDTO | null> =
 };
 
 export async function startMailJob(setup: MailSourceSetup): Promise<() => void> {
-  const { source, intervalMinutes, openClient } = setup;
-  if (intervalMinutes === null || openClient === null) return () => {};
+  const { source, schedule: mailSchedule, openClient } = setup;
+  if (mailSchedule === null || openClient === null) return () => {};
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
 
   const runOnce = async (): Promise<void> => {
     const previous = await previousRun(source);
+    const startedAt = new Date();
     let run: MailSyncRunDTO | null = null;
     try {
       run = await runMailSync(source, openClient, "job");
@@ -67,7 +61,7 @@ export async function startMailJob(setup: MailSourceSetup): Promise<() => void> 
     } catch (err) {
       console.error(`${logPrefix(source, "job")}: error — ${err instanceof Error ? err.message : UNEXPECTED_ERROR}`);
     }
-    schedule(intervalMinutes * MINUTE_MS);
+    schedule(nextMailRunDelayMs(mailSchedule, startedAt, new Date()));
     if (run) await notifyRun(run, previous);
   };
 
@@ -80,7 +74,7 @@ export async function startMailJob(setup: MailSourceSetup): Promise<() => void> 
   };
 
   const last = await previousRun(source);
-  schedule(nextMailRunDelayMs(last ? new Date(last.startedAt) : null, intervalMinutes, new Date()));
+  schedule(nextMailRunDelayMs(mailSchedule, last ? new Date(last.startedAt) : null, new Date()));
 
   return () => {
     stopped = true;
