@@ -42,7 +42,7 @@ feature **no los toca**:
 ## Decisiones tomadas
 
 - **El grupo es el patrón sugerido, no el `merchant` crudo.** Los resúmenes traen variantes del mismo
-  comercio con referencias que cambian (`STEAMGAMES.COM 4259522985`, `STEAMGAMES.COM 4259518112`):
+  comercio con referencias que cambian (`COMERCIO.COM 1234567890`, `COMERCIO.COM 9876543210`):
   agrupar por `suggestPattern(merchant)` las junta, y la regla con ese patrón cubre a todas.
 - **Pendiente = `category: "Sin categoría"` y `type: "purchase"`.** Pagos, impuestos y
   bonificaciones también quedan sin categoría, pero no entran en ningún gráfico por categoría

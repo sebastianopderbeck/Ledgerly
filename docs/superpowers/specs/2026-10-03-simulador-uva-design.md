@@ -150,7 +150,7 @@ mientras saldo > 0:
   si cuotas > MAX_CUOTAS: null
 ```
 
-- `RESIDUO = 0.01`. Un remanente menor al 1 % de una cuota se suma a la cuota actual, en vez de generar una cuota fantasma de centavos. Con el saldo que deriva `computeCreditProgress`, el cuadro base da exactamente `cuotasTotales − cuotasPagadas`. Se verificó al diseñar contra `server/src/testing/couponFixtures.ts`: 229 = 240 − 11. Sin esa absorción aparecería una cuota 230 de décimas de UVA.
+- `RESIDUO = 0.01`. Un remanente menor al 1 % de una cuota se suma a la cuota actual, en vez de generar una cuota fantasma de centavos. Con el saldo que deriva `computeCreditProgress`, el cuadro base da exactamente `cuotasTotales − cuotasPagadas`. Se verificó al diseñar contra `server/src/testing/couponFixtures.ts`. Sin esa absorción aparecería una cuota de más, de décimas de UVA.
 - `MAX_CUOTAS = 600` (50 años) corta cualquier dato absurdo.
 - También devuelve `null` si `!(saldoUva > 0)`, `!(tasaMensual > 0)` o `!(cuotaUva > 0)`.
 - Se recorre el cuadro en vez de usar la fórmula cerrada `n = −ln(1 − B·i/P) / ln(1 + i)` porque así salen directo la última cuota parcial y el interés total, y se lee igual que el cuadro del banco. Son a lo sumo 600 iteraciones.
@@ -308,7 +308,7 @@ Ninguna de las dos depende del filtro de año.
 ### Mobile (`useIsMobile()`)
 
 - `TextField` y `ToggleButtonGroup` van `fullWidth`, en columna. El grupo queda horizontal, porque dos opciones entran en 390px. Cada `ToggleButton` lleva `tapTargetSx` (44px).
-- `inputMode="decimal"` abre el teclado numérico del iPhone.
+- `inputMode="decimal"` abre el teclado numérico del celular.
 - Los tiles van en una sola columna.
 - «Ver Contexto» sale del `action` del `Alert` y va debajo del texto, como `Button` `fullWidth` con `tapTargetSx`.
 - No hace falta `BottomSheet`: no hay tabla ni edición de registros.
@@ -345,7 +345,7 @@ Ninguna de las dos depende del filtro de año.
   - El link «Ver Contexto» apunta a `/contexto?year=2026` cuando la ruta es `/credits?year=2026`.
   - Con summary 204 no hay `region` «Simulador de precancelación».
   - Mobile (`emulateMobile()`): los `ToggleButton` y «Ver Contexto» tienen `min-height:44px` (`cssFor`).
-- **`client/src/pages/CreditsPage.test.tsx`** — el stub de `/credits/summary` suma `tasaRealMensual: 0.0074`. Hay que agregar una ruta para `/macro/series` (`{ desde: "2025-01", meses: [], hoy: { fecha: "2026-10-02", usdOficial: null, uva: 2075.56, tasa30: null } }`), porque hoy el stub devuelve `{}` para cualquier URL desconocida y `uvaDeHoy` fallaría. Se agrega un caso: la página muestra la `region` «Simulador de precancelación» después de los KPIs y antes de los gráficos, tanto en compu como en mobile. Y otro: con un summary sin `tasaRealMensual` (un server viejo), la página sigue mostrando los KPIs y no monta el simulador.
+- **`client/src/pages/CreditsPage.test.tsx`** — el stub de `/credits/summary` suma `tasaRealMensual`. Hay que agregar una ruta para `/macro/series` (`{ desde: "2025-01", meses: [], hoy: { fecha: "2026-10-02", usdOficial: null, uva: 2075.56, tasa30: null } }`), porque hoy el stub devuelve `{}` para cualquier URL desconocida y `uvaDeHoy` fallaría. Se agrega un caso: la página muestra la `region` «Simulador de precancelación» después de los KPIs y antes de los gráficos, tanto en compu como en mobile. Y otro: con un summary sin `tasaRealMensual` (un server viejo), la página sigue mostrando los KPIs y no monta el simulador.
 
 ## Fuera de alcance
 

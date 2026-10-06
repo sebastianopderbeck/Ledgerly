@@ -395,7 +395,7 @@ De arriba hacia abajo:
      `detalle · al {fecha}`. A la derecha, alineado a la derecha y `noWrap`, el monto en su moneda
      original (`formatMoney(montoOriginal, moneda)`, 600) y debajo, en caption, la otra moneda
      (`≈ US$ …` para ARS, `≈ $ …` para USD).
-   - La fila es `flex` con `flexWrap: "wrap"`: en el iPhone el monto baja debajo del nombre si no
+   - La fila es `flex` con `flexWrap: "wrap"`: en el celular el monto baja debajo del nombre si no
      entra.
    - Los ítems `fuente === "manual"` son `ListItemButton` con `aria-label={`editar ${label}`}`,
      `minHeight: 56` y un `ChevronRightIcon` al final como pista de que se tocan; abren el editor. El
@@ -525,7 +525,7 @@ valuación o la fecha difiere de `today`.
 - Las listas de Activos y Pasivos ya son tarjetas, sin tablas ni scroll horizontal. Las filas
   editables miden ≥ 56px, y los montos bajan de línea si no entran.
 - El editor es una hoja desde abajo (`BottomSheet`), con `inputMode="decimal"` para el valor y el
-  date picker nativo de iOS para la fecha. Todos los botones, toggles e íconos tienen ≥ 44px
+  date picker nativo del celular para la fecha. Todos los botones, toggles e íconos tienen ≥ 44px
   (`tapTarget.ts`).
 - Gráfico con las reglas de "series por mes" de `useChartLayout`: margen izquierdo de 56, a lo
   sumo 6 ticks y tooltip por mes.

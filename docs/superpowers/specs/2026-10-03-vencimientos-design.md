@@ -64,7 +64,7 @@ Archivos de esta feature: `client/src/vencimientos.ts` (+ test), `client/src/use
   puede importar código del server, así que la constante se repite), corrido al lunes si cae en fin
   de semana. Ese ítem es *estimado* pero lleva el saldo del resumen **sin «≈»**, porque el monto sí
   sale del documento, y su detalle dice «vencimiento estimado». Esas fechas también arman el patrón
-  de la tarjeta. **Hallazgo con datos reales:** los 8 resúmenes Visa importados tienen
+  de la tarjeta. **Hallazgo con datos reales:** los resúmenes Visa importados tienen
   `dueDate: null` (el parser no lo está leyendo); sin esta regla, Visa no aparecía en la página.
 - **Montos:**
   - un ítem confirmado lleva el monto de su documento;
