@@ -201,6 +201,7 @@ describe("stats", () => {
   });
 
   it("last-statement/by-category respeta cardLabel y currency", async () => {
+    vi.mocked(fetchOficialRate).mockResolvedValue(1000);
     const visa = await StatementModel.create({
       issuer: "visa_signature", cardLabel: "VISA1", last4: null, closingDate: new Date("2026-07-05"), dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
@@ -217,13 +218,47 @@ describe("stats", () => {
         direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null, comprobante: "21", fingerprint: "f21" },
     ]);
     const arsAll = await request(app).get("/api/stats/last-statement/by-category?currency=ARS");
-    expect(arsAll.body.map((c: { category: string }) => c.category).sort()).toEqual(["Compras", "Transporte", "VisaCat"]);
+    expect(arsAll.body.map((c: { category: string }) => c.category).sort()).toEqual(["Compras", "Dolar", "Transporte", "VisaCat"]);
 
     const onlyVisa = await request(app).get("/api/stats/last-statement/by-category?currency=ARS&cardLabel=VISA1");
-    expect(onlyVisa.body).toEqual([{ category: "VisaCat", total: 300, count: 1 }]);
+    expect(onlyVisa.body).toEqual([
+      { category: "Dolar", total: 40_000, count: 1 },
+      { category: "VisaCat", total: 300, count: 1 },
+    ]);
 
     const usd = await request(app).get("/api/stats/last-statement/by-category?currency=USD");
     expect(usd.body).toEqual([{ category: "Dolar", total: 40, count: 1 }]);
+  });
+
+  async function addUsdPurchaseToLastStatement() {
+    const s = await StatementModel.findOne({});
+    await TransactionModel.create({
+      statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-12"), descriptionRaw: "UBER USD",
+      merchant: "UBER", category: "Transporte", categorySource: "rule", amount: 2, currency: "USD",
+      direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
+      comprobante: "30", fingerprint: "f-usd",
+    });
+  }
+
+  it("last-statement/by-category en ARS suma los consumos en USD al oficial de hoy dentro de su categoría", async () => {
+    vi.mocked(fetchOficialRate).mockResolvedValue(1000);
+    await addUsdPurchaseToLastStatement();
+    const res = await request(app).get("/api/stats/last-statement/by-category?currency=ARS");
+    expect(res.body).toEqual([
+      { category: "Transporte", total: 2500, count: 2 },
+      { category: "Compras", total: 1500, count: 1 },
+    ]);
+    expect(fetchOficialRate).toHaveBeenCalledWith(new Date().toISOString().slice(0, 10));
+  });
+
+  it("last-statement/by-category en ARS sin cotización deja afuera los consumos en USD", async () => {
+    vi.mocked(fetchOficialRate).mockResolvedValue(null);
+    await addUsdPurchaseToLastStatement();
+    const res = await request(app).get("/api/stats/last-statement/by-category?currency=ARS");
+    expect(res.body).toEqual([
+      { category: "Compras", total: 1500, count: 1 },
+      { category: "Transporte", total: 500, count: 1 },
+    ]);
   });
 
   it("monthly y by-category con year dejan afuera los otros años", async () => {
