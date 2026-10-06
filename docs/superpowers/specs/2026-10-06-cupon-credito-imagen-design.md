@@ -54,6 +54,14 @@ cambios. Los cupones en PDF se siguen importando igual que hoy.
 - **Control de sumas:** `capital + intereses + IVA + seguros` tiene que dar `Total pagado` al
   centavo (la cuenta se hace en centavos enteros). Si no da, se rechaza la imagen: un monto mal
   leído por el OCR no llega a la base.
+- **Control contra los cupones anteriores:** lo que el control de sumas no cubre se compara con el
+  cupón de `fechaDebito` más reciente.
+  - `cuotaNro − cuota anterior` tiene que ser igual a los meses entre los dos vencimientos. Sirve
+    también para cuotas viejas.
+  - `Total en UVA` tiene que ser igual a su `cuotaPuraUva` (es constante en el sistema francés UVA).
+  - Si no coincide, se rechaza la imagen. Así una cuota mal leída no pisa otra con «Reemplazar».
+- **Vencimiento inexistente** (por ejemplo `17/17/2025` o `31/02/2026`): el parser lo rechaza.
+  Además, `saveCoupon` valida el cupón nuevo antes de borrar el existente en un reemplazo.
 - **Dedupe y reemplazo:** los mismos de hoy, por `(prestamoNro, cuotaNro)` con `?replace=true`.
   Tampoco cambia el tipo de cambio oficial al importar. Para que el camino PDF y el de imagen no
   dupliquen esa lógica, se extrae a una función común.
@@ -140,6 +148,7 @@ Todos extienden `IngestionError`, así que la ruta los devuelve como 422 con su 
 | `UnrecognizedCouponImageError`| No se reconoció la captura del cupón                   |
 | `CouponImageTotalsError`      | Los montos leídos no cierran con el total pagado       |
 | `MissingPreviousCouponError`  | Importá primero un cupón PDF del préstamo              |
+| `CouponImageMismatchError`    | La cuota, el vencimiento o el total en UVA no coinciden con los cupones anteriores |
 
 ### Ruta `POST /api/import` (`server/src/http/routes/import.ts`)
 
