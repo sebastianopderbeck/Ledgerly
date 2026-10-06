@@ -66,6 +66,7 @@ describe("CashFlowPage", () => {
     expect(screen.getByText("promedio 2 meses: 28,0%")).toBeInTheDocument();
     expect(screen.getByText("Ingreso, egresos y margen por mes")).toBeInTheDocument();
     expect(screen.getByText("Próximos 2 meses (estimado)")).toBeInTheDocument();
+    expect(screen.getByText(/más los aumentos de enero, mayo y septiembre por el IPC de los 4 meses anteriores/)).toBeInTheDocument();
     expect(screen.getByText(/Los meses incompletos se ven atenuados y sin margen: Sep 2026/)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Detalle del flujo de caja" });
     expect(within(table).getByText("Proyectado")).toBeInTheDocument();

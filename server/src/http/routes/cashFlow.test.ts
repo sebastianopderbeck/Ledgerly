@@ -4,7 +4,7 @@ import { cashFlowDtoSchema, type CashFlowDTO } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
 import { createApp } from "../app.js";
 import {
-  AutoCouponModel, MacroSeriesModel, MortgageCouponModel, PayslipModel, StatementModel, TransactionModel,
+  AutoCouponModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel, PayslipModel, StatementModel, TransactionModel,
 } from "../../db/models.js";
 
 withDb();
@@ -119,5 +119,18 @@ describe("GET /api/cash-flow", () => {
     expect(mesDe(flow, "2026-10")?.estimados).toEqual(
       expect.arrayContaining(["Hipoteca (última cuota +2,0% por mes)", "Auto (último cupón +25,0% por mes)"]),
     );
+  });
+
+  it("proyecta el aumento de enero con el IPC publicado y el último REM para lo que falta", async () => {
+    await seed();
+    await InflationRateModel.create([{ periodo: "2026-08", variacionMensual: 1.7 }, { periodo: "2026-09", variacionMensual: 2 }]);
+    await MacroSeriesModel.create([
+      { serie: "rem_12m", fecha: "2026-08-31", valor: 40 },
+      { serie: "rem_12m", fecha: "2026-09-30", valor: 26.8242 },
+    ]);
+    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    expect(mesDe(flow, "2026-12")?.ingreso).toBe(1_650_000);
+    expect(mesDe(flow, "2027-01")?.ingreso).toBeCloseTo(1_100_000 * 1.02 ** 4, 0);
+    expect(mesDe(flow, "2027-01")?.estimados[0]).toBe("Sueldo (último neto +8,2% por aumento de enero · IPC esperado del REM)");
   });
 });
