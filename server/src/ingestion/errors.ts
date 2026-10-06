@@ -95,3 +95,10 @@ export class MissingPreviousCouponError extends IngestionError {
     this.name = "MissingPreviousCouponError";
   }
 }
+
+export class CouponImageMismatchError extends IngestionError {
+  constructor() {
+    super("La cuota, el vencimiento o el total en UVA no coinciden con los cupones anteriores");
+    this.name = "CouponImageMismatchError";
+  }
+}

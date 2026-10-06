@@ -9,7 +9,8 @@ vi.mock("../fx/dollarRate.js", () => ({ fetchOficialRate: vi.fn() }));
 import { fetchOficialRate } from "../fx/dollarRate.js";
 import { MortgageCouponModel } from "../db/models.js";
 import {
-  CouponImageTotalsError, MissingPreviousCouponError, OcrFailedError, UnrecognizedCouponImageError,
+  CouponImageMismatchError, CouponImageTotalsError, MissingPreviousCouponError, OcrFailedError,
+  UnrecognizedCouponImageError,
 } from "../ingestion/errors.js";
 import { importCouponImage } from "./importCouponImage.js";
 
@@ -112,6 +113,36 @@ describe("importCouponImage", () => {
     mockedOcr.mockResolvedValue(observe(withoutLine("Seguros")));
     await expect(importCouponImage({ data: png, fileName: "cortada.png" }))
       .rejects.toBeInstanceOf(UnrecognizedCouponImageError);
+  });
+
+  it("si la cuota leída no corresponde al mes del vencimiento falla y no guarda nada", async () => {
+    mockedOcr.mockResolvedValue(observe(fixture.replace("Cuota 3/240", "Cuota 8/240")));
+    await expect(importCouponImage({ data: png, fileName: "cuota-8.png" }))
+      .rejects.toBeInstanceOf(CouponImageMismatchError);
+    expect(await MortgageCouponModel.countDocuments({ cuotaNro: 8 })).toBe(0);
+  });
+
+  it("con replace, una cuota mal leída no pisa la cuota que ya estaba", async () => {
+    mockedOcr.mockResolvedValue(observe(fixture.replace("Cuota 3/240", "Cuota 2/240")));
+    await expect(importCouponImage({ data: png, fileName: "cuota-2.png", replace: true }))
+      .rejects.toBeInstanceOf(CouponImageMismatchError);
+    const docs = await MortgageCouponModel.find({ cuotaNro: 2 }).lean();
+    expect(docs).toHaveLength(1);
+    expect(docs[0].sourceFileName).toBe("cupon-2.pdf");
+  });
+
+  it("si el total en UVA no es el de las cuotas anteriores falla y no guarda nada", async () => {
+    mockedOcr.mockResolvedValue(observe(fixture.replace("UVA 499,90", "UVA 459,90")));
+    await expect(importCouponImage({ data: png, fileName: "cuota-3.png" }))
+      .rejects.toBeInstanceOf(CouponImageMismatchError);
+    expect(await MortgageCouponModel.countDocuments({ cuotaNro: 3 })).toBe(0);
+  });
+
+  it("una cuota anterior a la última con el mes correcto se acepta y se trata como duplicado", async () => {
+    const older = fixture.replace("Cuota 3/240", "Cuota 1/240").replace("17/11/2025", "17/09/2025");
+    mockedOcr.mockResolvedValue(observe(older));
+    const { result } = await importCouponImage({ data: png, fileName: "cuota-1.png" });
+    expect(result.status).toBe("duplicate");
   });
 
   it("propaga el error del OCR", async () => {
