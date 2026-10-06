@@ -1,11 +1,14 @@
 import { Box, Chip, IconButton, Link } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
+import EventRepeatOutlinedIcon from "@mui/icons-material/EventRepeatOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import { Link as RouterLink } from "react-router-dom";
 import type { SubscriptionDTO } from "@ledgerly/shared";
 import { formatMoney, formatMoneyOrDash } from "../format.js";
 import {
   AMOUNT_LABEL,
+  cadenceAmountCaption,
+  cadenceToggleLabel,
   increaseShortLabel,
   increaseSinceDetail,
   previousCurrencyLabel,
@@ -21,13 +24,22 @@ interface SubscriptionCardProps {
   item: SubscriptionDTO;
   variant: SubscriptionVariant;
   onHide: (key: string) => void;
+  onToggleAnnual: (key: string, annual: boolean) => void;
 }
 
 const movementsLinkSx: SxProps<Theme> = { display: "inline-flex", alignItems: "center", minHeight: MIN_TAP_SIZE };
 
-const highlightsOf = ({ montoActual, moneda, montoMensualArs }: SubscriptionDTO, variant: SubscriptionVariant): RecordField[] => [
-  { label: AMOUNT_LABEL[variant], value: formatMoney(montoActual, moneda) },
-  { label: "En pesos", value: formatMoneyOrDash(montoMensualArs, "ARS") },
+const actionsSx: SxProps<Theme> = { display: "flex" };
+
+const amountOf = ({ montoActual, moneda, cadencia }: SubscriptionDTO): string => {
+  const amount = formatMoney(montoActual, moneda);
+  const caption = cadenceAmountCaption(cadencia);
+  return caption === null ? amount : `${amount} ${caption}`;
+};
+
+const highlightsOf = (item: SubscriptionDTO, variant: SubscriptionVariant): RecordField[] => [
+  { label: AMOUNT_LABEL[variant], value: amountOf(item) },
+  { label: "En pesos", value: formatMoneyOrDash(item.montoMensualArs, "ARS") },
 ];
 
 const detailsOf = (item: SubscriptionDTO, variant: SubscriptionVariant): RecordField[] => {
@@ -58,12 +70,19 @@ const detailsOf = (item: SubscriptionDTO, variant: SubscriptionVariant): RecordF
   ];
 };
 
-const SubscriptionCard = ({ item, variant, onHide }: SubscriptionCardProps) => {
+const SubscriptionCard = ({ item, variant, onHide, onToggleAnnual }: SubscriptionCardProps) => {
   const badge = item.aumento ? <Chip size="small" color="warning" label={increaseShortLabel(item.aumento)} /> : undefined;
+  const toggleAnnual = () => onToggleAnnual(item.key, item.cadencia === "mensual");
+  const hide = () => onHide(item.key);
   const action = (
-    <IconButton aria-label={`Ocultar ${item.nombre}`} onClick={() => onHide(item.key)} sx={iconTapTargetSx}>
-      <VisibilityOffOutlinedIcon />
-    </IconButton>
+    <Box sx={actionsSx}>
+      <IconButton aria-label={cadenceToggleLabel(item.nombre, item.cadencia)} onClick={toggleAnnual} sx={iconTapTargetSx}>
+        <EventRepeatOutlinedIcon />
+      </IconButton>
+      <IconButton aria-label={`Ocultar ${item.nombre}`} onClick={hide} sx={iconTapTargetSx}>
+        <VisibilityOffOutlinedIcon />
+      </IconButton>
+    </Box>
   );
 
   return (
@@ -78,7 +97,9 @@ const SubscriptionCard = ({ item, variant, onHide }: SubscriptionCardProps) => {
   );
 };
 
-export const SubscriptionCards = ({ items, variant, onHide }: SubscriptionListProps) => {
-  const cards = items.map((item) => <SubscriptionCard key={item.key} item={item} variant={variant} onHide={onHide} />);
+export const SubscriptionCards = ({ items, variant, onHide, onToggleAnnual }: SubscriptionListProps) => {
+  const cards = items.map((item) => (
+    <SubscriptionCard key={item.key} item={item} variant={variant} onHide={onHide} onToggleAnnual={onToggleAnnual} />
+  ));
   return <Box sx={recordListSx}>{cards}</Box>;
 };

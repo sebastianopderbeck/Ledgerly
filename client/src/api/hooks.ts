@@ -246,6 +246,15 @@ export function useSetSubscriptionHidden() {
   });
 }
 
+export function useSetSubscriptionAnnual() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, annual }: { key: string; annual: boolean }) =>
+      apiFetch<void>(`/subscriptions/annual/${encodeURIComponent(key)}`, { method: annual ? "PUT" : "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
+  });
+}
+
 export const statementReviewKey = (id: string | null) => ["statement-review", id] as const;
 
 const fetchStatementReview = (id: string) => apiFetch<StatementReviewDTO>(`/statements/${id}/review`);

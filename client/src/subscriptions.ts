@@ -1,4 +1,4 @@
-import type { Currency, SubscriptionDTO, SubscriptionIncrease } from "@ledgerly/shared";
+import type { Cadencia, Currency, SubscriptionDTO, SubscriptionIncrease } from "@ledgerly/shared";
 import { ALL_YEARS } from "./filters/globalFilters.js";
 import { transactionsLink } from "./filters/transactionsLink.js";
 import { formatMoney, formatMonthLabel, formatPercent, formatSignedPercent } from "./format.js";
@@ -9,6 +9,7 @@ export interface SubscriptionListProps {
   items: SubscriptionDTO[];
   variant: SubscriptionVariant;
   onHide: (key: string) => void;
+  onToggleAnnual: (key: string, annual: boolean) => void;
 }
 
 export interface SubscriptionSections {
@@ -23,6 +24,8 @@ export interface SubscriptionSections {
 export const AMOUNT_LABEL: Record<SubscriptionVariant, string> = { activas: "Por mes", cortadas: "Último monto" };
 
 const CURRENCY_NAMES: Record<Currency, string> = { ARS: "pesos", USD: "dólares" };
+
+const OTHER_CADENCE: Record<Cadencia, Cadencia> = { mensual: "anual", anual: "mensual" };
 
 const monthName = (month: string): string => formatMonthLabel(month).toLowerCase();
 
@@ -77,4 +80,16 @@ export function monthlyKpiSub(activas: number, totalMensualUsd: number, cotizaci
 
 export function subscriptionTransactionsLink(busqueda: string): string {
   return transactionsLink({ year: ALL_YEARS, search: busqueda });
+}
+
+export function cadenceToggleLabel(nombre: string, cadencia: Cadencia): string {
+  return `Marcar ${nombre} como ${OTHER_CADENCE[cadencia]}`;
+}
+
+export function cadenceToggleTooltip(cadencia: Cadencia): string {
+  return `Es ${OTHER_CADENCE[cadencia]}`;
+}
+
+export function cadenceAmountCaption(cadencia: Cadencia): string | null {
+  return cadencia === "anual" ? "por año" : null;
 }

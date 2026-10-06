@@ -4,6 +4,9 @@ import { formatMoney } from "./format.js";
 import {
   AMOUNT_LABEL,
   activeCountLabel,
+  cadenceAmountCaption,
+  cadenceToggleLabel,
+  cadenceToggleTooltip,
   increaseDetail,
   increaseLabel,
   increaseShortLabel,
@@ -117,5 +120,22 @@ describe("subscriptionTransactionsLink", () => {
     const link = subscriptionTransactionsLink("GOOGLE *VideoP");
     expect(link).not.toContain(" ");
     expect(new URLSearchParams(link.split("?")[1]).get("search")).toBe("GOOGLE *VideoP");
+  });
+});
+
+describe("textos de cadencia", () => {
+  it("cadenceToggleLabel ofrece pasar a la otra cadencia", () => {
+    expect(cadenceToggleLabel("STREAMBOX", "mensual")).toBe("Marcar STREAMBOX como anual");
+    expect(cadenceToggleLabel("STREAMBOX", "anual")).toBe("Marcar STREAMBOX como mensual");
+  });
+
+  it("cadenceToggleTooltip nombra la cadencia de destino", () => {
+    expect(cadenceToggleTooltip("mensual")).toBe("Es anual");
+    expect(cadenceToggleTooltip("anual")).toBe("Es mensual");
+  });
+
+  it("cadenceAmountCaption aclara solo las anuales", () => {
+    expect(cadenceAmountCaption("anual")).toBe("por año");
+    expect(cadenceAmountCaption("mensual")).toBeNull();
   });
 });
