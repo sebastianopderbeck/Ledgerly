@@ -36,9 +36,9 @@ vista y con una nota al pie que explica el cálculo.
   apareció en un resumen: una cuota facturada en el último resumen cuyo vencimiento todavía no pasó
   es "a vencer". Una cuota que vence hoy cuenta como pagada.
 - **Fecha de pago de una cuota = vencimiento del resumen en que se factura** (`dueDate`). Si el
-  resumen no lo tiene (hoy **ningún** resumen de Visa Signature lo trae), se estima como
-  `closingDate + 12 días`. Verificado contra la base local el 2026-10-03: los 8 resúmenes ICBC traen
-  vencimiento y en 7 está a 12 días del cierre (el otro, a 13); los 8 de Visa Signature no lo traen.
+  resumen no lo tiene (los de Visa Signature **no** lo traen: el parser no lo lee), se estima como
+  `closingDate + 12 días`. Verificado contra la base local el 2026-10-03: los resúmenes ICBC traen
+  vencimiento y casi siempre está a 12 días del cierre (alguno, a 13); los de Visa Signature no lo traen.
   La regla vive en la base: `statementDueDate` y `DIAS_CIERRE_A_VENCIMIENTO` de
   `server/src/stats/statementDueDate.ts`.
 - **El cronograma se reconstruye** desde las apariciones reales de cada compra: las cuotas que se
@@ -97,16 +97,16 @@ Se leen las filas con `type: "purchase"`, `direction: "debit"`, `currency: "ARS"
   `comprobante`.
 
 Cómo se ven en los datos reales (verificado contra la base local el 2026-10-03, sin copiar montos ni
-comercios: 150 filas de cuotas en pesos, 49 compras):
+comercios):
 
 - La misma compra aparece una vez por resumen con `installmentCurrent` creciente y la misma `date`
-  (hasta en 7 resúmenes).
-- En 18 de las 49 compras el monto de alguna cuota difiere del resto (la cuota 1 con centavos de
+  (en varios resúmenes seguidos).
+- En bastantes compras el monto de alguna cuota difiere del resto (la cuota 1 con centavos de
   redondeo del banco): el monto no sirve como parte de la clave de compra.
-- Hay una compra con **dos cuotas en el mismo resumen** y compras que se saltean un resumen: por eso
+- Hay alguna compra con **dos cuotas en el mismo resumen** y compras que se saltean un resumen: por eso
   se usa la fecha real de cada cuota vista, no solo un ancla.
-- `comprobante` es `null` en 6 filas y no es único por sí solo. Agregarlo a la clave no parte
-  ninguna compra (las 49 claves son las mismas con y sin comprobante).
+- `comprobante` es `null` en algunas filas y no es único por sí solo. Agregarlo a la clave no parte
+  ninguna compra (las claves son las mismas con y sin comprobante).
 
 **Clave de compra**: `cardLabel | date | merchant | installmentTotal | comprobante ?? ""`. Con los
 datos reales agrupa sin colisiones y sin partir compras.
@@ -509,7 +509,7 @@ Con TDD, cada pieza arranca en rojo. Fixtures sintéticos.
 
 **Verificación final**: `bun run test`, `bun run typecheck` y `bun run build` en verde. La prueba
 manual en Cuotas (con "Todos", con una tarjeta, con USD —la sección desaparece— y en el ancho de un
-iPhone) queda para el usuario: esta rama no levanta la app.
+celular) queda para el usuario: esta rama no levanta la app.
 
 ## Orden de implementación
 

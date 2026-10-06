@@ -2043,7 +2043,7 @@ git commit -m "feat(client): página de vencimientos con agrupación por semana 
 
 ### Task 6: Resúmenes sin fecha de vencimiento (hallazgo con datos reales)
 
-Al correr el motor contra los datos reales (solo lectura, `GET` al servicio instalado, sin levantar la app ni guardar nada), Visa no aparecía: sus 8 resúmenes tienen `dueDate: null`. La base ya resolvió ese caso del lado del server con `statementDueDate` (cierre + 12 días). Este task lleva la misma regla al cliente y separa «fecha estimada» de «monto aproximado», para que el saldo de un resumen, que sí sale del documento, no lleve «≈».
+Al correr el motor contra los datos reales (solo lectura, `GET` al servicio instalado, sin levantar la app ni guardar nada), Visa no aparecía: sus resúmenes tienen `dueDate: null` (el parser no lo lee). La base ya resolvió ese caso del lado del server con `statementDueDate` (cierre + 12 días). Este task lleva la misma regla al cliente y separa «fecha estimada» de «monto aproximado», para que el saldo de un resumen, que sí sale del documento, no lleve «≈».
 
 **Files:**
 - Modify: `client/src/vencimientos.ts`

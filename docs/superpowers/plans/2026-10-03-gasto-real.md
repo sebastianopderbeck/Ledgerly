@@ -32,7 +32,7 @@
 
 ## Review Focus
 
-1. **Mes en curso o esperando el resumen de la otra tarjeta** (Visa cerró el 2/10, ICBC el 7/9): no se grafica septiembre aunque `/stats/monthly` lo traiga. → tests en Task 2 (dos emisores) y Task 3 (`realSpendingSeries` corta en `hasta`; `buildRealSpendingView` con mes abierto).
+1. **Mes en curso o esperando el resumen de la otra tarjeta** (una tarjeta ya cerró el mes y la otra todavía no): ese mes no se grafica aunque `/stats/monthly` lo traiga. → tests en Task 2 (dos emisores) y Task 3 (`realSpendingSeries` corta en `hasta`; `buildRealSpendingView` con mes abierto).
 2. **Año elegido sin meses completos** (`?year=2027`, o el año actual en enero antes del primer cierre): la tarjeta dice «Sin meses cerrados…», no se rompe ni muestra un gráfico vacío. → test en Task 3 (`years: ["2027"]`).
 3. **Meses posteriores al último IPC**: no se grafican con factor 1 (se verían más baratos que los anteriores). → test en Task 3 (`realSpendingSeries` corta en `pesosDe`).
 4. **El mismo mes del año anterior con gasto 0**: la interanual queda en «—», no en `Infinity`. → test en Task 3.

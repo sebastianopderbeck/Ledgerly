@@ -82,10 +82,10 @@ compartido. Esta feature **no toca** esos archivos:
 - **Los comercios se comparan con `merchantMatchKey`** (`server/src/stats/merchantKey.ts`, de la
   base): sin tildes, en mayúsculas, la puntuación como espacio, sin las palabras que tienen dígitos
   ni la palabra `USD`, todas las palabras unidas con un espacio; si no queda ninguna, el comercio
-  entero en mayúsculas. Así "SPOTIFY P1A2B3" y "SPOTIFY X9Y8" cuentan como el mismo comercio, y
+  entero en mayúsculas. Así "STREAMING P1A2B3" y "STREAMING X9Y8" cuentan como el mismo comercio, y
   "SERVICIO EXTERIOR USD 14,99" es el mismo que "SERVICIO EXTERIOR". No se crea un `merchantKey`
   propio: el `merchantKey` de ese módulo es el de suscripciones (dos primeras palabras) y no sirve
-  acá, porque "PEDIDOSYA PLUS" y "PEDIDOSYA PROPINA" tienen que ser comercios distintos.
+  acá, porque "DELIVERY PLUS" y "DELIVERY PROPINA" tienen que ser comercios distintos.
 - **Las cuotas viejas no son "nuevas"**: una cuota con `installmentCurrent > 1` es una compra de un
   ciclo anterior (aunque ese resumen no esté importado). No se marca como comercio nuevo ni como USD
   inusual.

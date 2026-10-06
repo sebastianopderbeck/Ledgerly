@@ -67,7 +67,7 @@ La feature reemplaza el stub de la página y el del router, y agrega sus módulo
 - **Sin resumen no hay flujo.** La historia empieza en el primer mes que tiene recibo y resumen de
   tarjeta a la vez: se toma el más tardío de los dos primeros meses. Si no hay recibos o no hay
   resúmenes, no hay flujo. Esto evita mostrar años de recibos sin egresos, que darían tasas de ahorro
-  del 90 %.
+  irreales.
 - **Mes incompleto = no se inventa nada.** Un mes cerrado queda **incompleto** si le falta alguna de
   estas cosas:
   - el recibo mensual;
@@ -392,7 +392,7 @@ Datos de partida:
 | Mes en curso | Nunca es el "último mes completo"; va en la proyección, con lo real que ya esté importado y el resto estimado |
 | Ingreso 0 | `tasaAhorro: null` |
 | Margen negativo | Se muestra en rojo y la tasa queda negativa |
-| La cuota del auto o de la hipoteca se paga con la tarjeta | Se contaría dos veces. Hoy no pasa: la hipoteca se debita de la cuenta y el auto se paga por Link o Banelco |
+| La cuota del auto o de la hipoteca se paga con la tarjeta | Se contaría dos veces. Se asume que esas cuotas se pagan por fuera de la tarjeta |
 
 ## API
 

@@ -12,7 +12,7 @@ La página detecta sola los comercios que se cobran todos los meses en las tarje
 
 - cuánto cuesta hoy, en su moneda y en pesos al oficial;
 - la fecha del primer y del último cobro;
-- si subió de precio («Subió 7,0% desde mayo de 2026»);
+- si subió de precio («Subió 10,0% desde marzo de 2026»);
 - si dejó de cobrarse.
 
 Arriba van el total mensual y el anualizado.
@@ -41,21 +41,21 @@ Lo que crea esta feature: `server/src/stats/subscriptions.ts` (+test), los handl
 ## Decisiones tomadas
 
 - **Detección automática, sin alta manual.** No se usa la categoría «Suscripciones» de las reglas: la recurrencia sale de las fechas y los montos. La categoría solo se muestra como dato.
-- **La racha se mide por mes calendario del cobro, no por resumen.** Los cierres se mueven (del 26 al 2 del mes siguiente), así que un resumen puede traer dos cobros mensuales y el siguiente ninguno. El mes de `date` es estable. Hace falta un cobro por mes durante **3 meses seguidos**.
+- **La racha se mide por mes calendario del cobro, no por resumen.** Los cierres se mueven (de fin de un mes a principios del siguiente), así que un resumen puede traer dos cobros mensuales y el siguiente ninguno. El mes de `date` es estable. Hace falta un cobro por mes durante **3 meses seguidos**.
 - **Solo cadencia mensual.** Los planes anuales o semanales quedan afuera.
-- **Todas las monedas de un comercio van juntas.** En los datos reales, dos suscripciones pasaron de cobrarse en pesos a cobrarse en dólares a mitad de año. Si se agrupara por moneda, la página anunciaría que «dejaron de cobrarse» cuando siguen activas.
+- **Todas las monedas de un comercio van juntas.** En los datos reales, hay suscripciones que pasaron de cobrarse en pesos a cobrarse en dólares. Si se agrupara por moneda, la página anunciaría que «dejaron de cobrarse» cuando siguen activas.
 - **El precio y el aumento se miden en la moneda del último cobro**, sin convertir el historial. Una suscripción en USD que no cambió en dólares no «subió», aunque el peso se haya devaluado.
 - **Los pesos se calculan al oficial de hoy**, con `fetchOficialRate` (venta). Es la misma cotización de `/api/fx/oficial` y de la tarjeta «A pagar al cierre» del Dashboard. Los montos van **sin impuestos ni percepciones**: esos se cobran en líneas aparte (`type: "tax"`).
 - **«Dejó de cobrarse» se decide contra el último resumen importado de esa tarjeta**, no contra la fecha de hoy. Si todavía no importaste el resumen que traería el cobro, la suscripción sigue activa.
-- **Ocultar se guarda en Mongo**, no en `localStorage`, porque la app se usa desde la compu y desde el iPhone. Las ocultas no suman a los totales y se pueden volver a mostrar.
-- **El débito del plan de ahorro del auto aparece como cobro recurrente**, porque lo es: entra a la tarjeta como compra común, sin «Cuota N/M». No se cruza automáticamente con `AutoCoupon`. Se saca con un clic en Ocultar.
+- **Ocultar se guarda en Mongo**, no en `localStorage`, porque la app se usa desde la compu y desde el celular. Las ocultas no suman a los totales y se pueden volver a mostrar.
+- **Si el plan de ahorro del auto se debita de la tarjeta, aparece como cobro recurrente**, porque lo es: entra como compra común, sin «Cuota N/M». No se cruza automáticamente con `AutoCoupon`. Se saca con un clic en Ocultar.
 - **El cálculo vive en el server** como función pura (`server/src/stats/subscriptions.ts`), igual que `futureInstallments.ts`, porque necesita todos los movimientos. El cliente solo arma secciones y textos (`client/src/subscriptions.ts`).
 - **Sin filtros globales.** La página describe el estado actual, y la regla del filtro de año dice que «lo que describe el estado actual no se filtra». No se muestra `FiltersBar`.
 - **Los umbrales son constantes** arriba del módulo, para ajustarlos al ver más datos (mismo criterio que `macroSignals.ts`).
 - **Nombres:** la ruta de UI va en español (`/suscripciones`, como `/sueldo` y `/contexto`) y la API en inglés (`/api/subscriptions`, como `/api/credits`).
 - **Fechas compartidas.** `subscriptions.ts` usa `addMonthsClamped`, `addDays` y `monthOf` de `months.ts` y re-exporta `addMonthsClamped` para que sus tests lo cubran desde la API del motor. `latestClosingByIssuer` queda en `subscriptions.ts`: la usa solo esta feature.
 - **Ambigüedad mirando solo los meses posteriores.** El paso 7 mira los cobros de **meses posteriores** al último mes de la racha, no los posteriores por fecha. Un cobro suelto del mismo mes que el último cobro ya lo descartó `monthlyRuns`; si contara como «posterior», una compra suelta parecida en el mismo comercio escondería una suscripción activa.
-- **Un mes raro cuesta dos pares.** `similarAmounts` cuenta pares de cobros consecutivos, así que un cobro raro en el medio de la racha rompe dos pares. Con cinco cobros, un mes raro se tolera en una punta (3 de 4 pares parecidos) pero no en el medio (2 de 4 no es más de la mitad); con seis o más cobros se tolera en cualquier lugar. En los datos reales el mes raro está dentro de una racha de 8 cobros (5 de 7 pares parecidos). Se prefiere esto a relajar el umbral, que haría pasar a la heladería (`[26300, 12600, 11600]`).
+- **Un mes raro cuesta dos pares.** `similarAmounts` cuenta pares de cobros consecutivos, así que un cobro raro en el medio de la racha rompe dos pares. Con cinco cobros, un mes raro se tolera en una punta (3 de 4 pares parecidos) pero no en el medio (2 de 4 no es más de la mitad); con seis o más cobros se tolera en cualquier lugar. En los datos reales el mes raro está dentro de una racha larga, donde igual más de la mitad de los pares son parecidos. Se prefiere esto a relajar el umbral, que haría pasar a un comercio con dos visitas de monto parecido precedidas de una distinta.
 - **Cada crédito anula a lo sumo un débito, y cada débito se anula a lo sumo una vez.** Con dos cobros iguales y una sola devolución, uno de los cobros sigue contando.
 - **La clave oculta se guarda recortada** (`key.trim()`), igual que la que calcula el server, que nunca tiene espacios en los extremos.
 - **Montos en pesos redondeados al centavo.** `montoMensualArs` y los tres totales se redondean a 2 decimales, para que `12.99 × 1465` sea `19030.35` y no `19030.350000000002`.
@@ -65,22 +65,22 @@ Lo que crea esta feature: `server/src/stats/subscriptions.ts` (+test), los handl
 
 ### Validación contra los datos reales
 
-El algoritmo de abajo se probó en modo solo lectura contra la base local: 16 resúmenes (8 por tarjeta, de enero a agosto de 2026) y unos 840 movimientos.
+El algoritmo de abajo se probó en modo solo lectura contra los resúmenes y movimientos de la base local.
 
-**Lo que detecta.** Encuentra 5 cobros recurrentes y ningún falso positivo:
+**Lo que detecta.** Encuentra los cobros recurrentes esperados y ningún falso positivo:
 
-- tres en USD, de los cuales dos se cobraban en pesos hasta mayo;
-- uno en pesos, con un aumento del 7 %;
-- el débito del plan de ahorro.
+- algunos en USD, incluidos los que antes se cobraban en pesos;
+- uno en pesos, con un aumento de precio;
+- un débito automático mensual que no es un servicio (se saca con Ocultar).
 
-**Lo que descarta.** Comercios de uso frecuente (transporte, delivery, cafés, supermercado) y una heladería con dos visitas de monto igual.
+**Lo que descarta.** Comercios de uso frecuente (varias compras por mes) y un comercio con dos visitas de monto igual.
 
-**Verificación de la implementación (2026-10-03).** El motor implementado, corrido en modo solo lectura contra la misma base (16 resúmenes, 628 movimientos de consumo o devolución), da los mismos 5 cobros, todos activos. Además del 7 % en pesos, informa dos aumentos: el plan de ahorro (+20,8 %, el valor móvil) y una de las que pasaron a USD (+48,9 %, de 4,66 a 6,94 USD entre junio y julio). Ese último sale de medir solo en la moneda nueva con dos cobros; si julio fue el mes con impuestos incluidos, desaparece solo con el cobro de agosto.
+**Verificación de la implementación (2026-10-03).** El motor implementado, corrido en modo solo lectura contra la misma base, da los mismos cobros, todos activos. Además del aumento en pesos, informa otros dos: el del débito automático (un valor que se actualiza solo) y el de una de las que pasaron a USD. Ese último sale de medir solo en la moneda nueva con dos cobros; si el último mes fue el de impuestos incluidos, desaparece solo con el cobro siguiente.
 
 **Casos reales que fijaron decisiones:**
 
 - **Anulación:** un cobro y su devolución al día siguiente. Sin el paso de anulaciones, ese mes tenía dos cobros y partía la racha.
-- **Mes con impuestos incluidos:** un mes el cobro vino con los impuestos dentro (+51 %). Por eso se tolera un mes raro.
+- **Mes con impuestos incluidos:** un mes el cobro vino con los impuestos dentro, bastante más alto que el resto. Por eso se tolera un mes raro.
 - **Descriptor truncado:** un mismo servicio aparece con el nombre entero algunos meses y truncado otros. Por eso se fusionan las claves que difieren solo por truncado.
 
 ## Datos
@@ -505,7 +505,7 @@ Ya cubiertos por la base (no se tocan): `merchantKey.test.ts`, `months.test.ts`,
 - Movimientos excluidos: cuotas, `tax`, `payment` y créditos.
 - Montos parecidos:
   - un mes con +51 % en la punta de cinco se tolera; en el medio de seis también;
-  - `[26300, 12600, 11600]` se rechaza (1 de 2 pares parecidos);
+  - dos visitas de monto parecido precedidas de una distinta se rechazan (1 de 2 pares parecidos);
   - los pares con cambio de moneda no cuentan.
 - Cambio de moneda ARS→USD: una sola suscripción, con `monedaAnterior: "ARS"` y `aumento` medido solo en USD.
 - Aumentos:
@@ -559,7 +559,7 @@ Ya cubiertos por la base (no se tocan): `merchantKey.test.ts`, `months.test.ts`,
 **Verificación final**
 
 1. `bun run test`, `bun run typecheck` y `bun run build` en verde.
-2. Correr el motor en modo solo lectura contra la base local (un script en el scratchpad que lee con Mongoose y llama a `detectSubscriptions`, sin escribir nada): tiene que dar los 5 cobros validados más arriba. Si la base local no está disponible, queda como pendiente para el usuario.
+2. Correr el motor en modo solo lectura contra la base local (un script en el scratchpad que lee con Mongoose y llama a `detectSubscriptions`, sin escribir nada): tiene que dar los cobros validados más arriba. Si la base local no está disponible, queda como pendiente para el usuario.
 3. Revisión visual en el navegador (compu y 375 px): queda para el usuario, porque los puertos del servicio y de las otras sesiones están ocupados.
 
 ## Orden de implementación
@@ -578,7 +578,7 @@ Ya cubiertos por la base (no se tocan): `merchantKey.test.ts`, `months.test.ts`,
 - Cuotas (`isInstallment`): tienen su página.
 - Impuestos a servicios digitales y percepciones: se cobran en líneas aparte y no se atribuyen a cada suscripción.
 - Débitos automáticos fuera de las tarjetas (cuenta bancaria, servicios): no hay datos.
-- Cruzar el débito del plan de ahorro con `AutoCoupon.totalAPagar` para excluirlo solo: se resuelve con Ocultar.
+- Cruzar un débito de plan de ahorro con `AutoCoupon.totalAPagar` para excluirlo solo: se resuelve con Ocultar.
 - Separar dos suscripciones con el mismo descriptor (por ejemplo, dos cuentas del mismo servicio) o una compra suelta en el mismo mes en que cambia el precio.
 - Comparar los aumentos contra la inflación.
 - Informar bajas de precio.
