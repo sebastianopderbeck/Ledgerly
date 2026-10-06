@@ -25,6 +25,17 @@ const amount = (text: string, re: RegExp, field: string): number =>
 
 const toCents = (value: number): number => Math.round(value * 100);
 
+const isRealDate = (iso: string): boolean => {
+  const date = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso;
+};
+
+const dueDate = (text: string): string => {
+  const iso = parseSlashDate(required(text, VENCIMIENTO, "vencimiento")[1]);
+  if (!isRealDate(iso)) throw new Error("Captura inválida: vencimiento inexistente");
+  return iso;
+};
+
 export const icbcMortgageImageParser: MortgageCouponImageParser = {
   detect(text) {
     return CUOTA.test(text) && text.includes(TOTAL_UVA_LABEL);
@@ -37,7 +48,7 @@ export const icbcMortgageImageParser: MortgageCouponImageParser = {
     return {
       cuotaNro: Number(cuota[1]),
       cuotasTotales: Number(cuota[2]),
-      fechaDebito: parseSlashDate(required(text, VENCIMIENTO, "vencimiento")[1]),
+      fechaDebito: dueDate(text),
       capital: amount(text, CAPITAL, "capital"),
       intereses: amount(text, INTERESES, "intereses"),
       iva: amount(text, IVA, "IVA"),

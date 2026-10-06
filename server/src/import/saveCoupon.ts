@@ -20,11 +20,10 @@ export async function saveCoupon({ coupon, fileName, sourceHash, replace = false
     cuotaNro: coupon.cuotaNro,
   });
   if (existing && !replace) return { status: "duplicate", couponId: existing._id.toString() };
-  if (existing && replace) await MortgageCouponModel.deleteOne({ _id: existing._id });
 
   const tipoCambioUsd = await fetchOficialRate(coupon.fechaDebito).catch(() => null);
 
-  const created = await MortgageCouponModel.create({
+  const created = new MortgageCouponModel({
     prestamoNro: coupon.prestamoNro,
     cuotaNro: coupon.cuotaNro,
     fechaDebito: new Date(coupon.fechaDebito),
@@ -42,5 +41,8 @@ export async function saveCoupon({ coupon, fileName, sourceHash, replace = false
     tipoCambioUsd,
     tipoCambioSource: tipoCambioUsd != null ? "api" : null,
   });
+  await created.validate();
+  if (existing) await MortgageCouponModel.deleteOne({ _id: existing._id });
+  await created.save();
   return { status: "imported", couponId: created._id.toString() };
 }

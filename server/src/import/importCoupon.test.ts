@@ -60,4 +60,16 @@ describe("importCoupon", () => {
     expect(doc?.tipoCambioUsd ?? null).toBeNull();
     expect(doc?.tipoCambioSource ?? null).toBeNull();
   });
+
+  it("replace no borra el cupón existente si el nuevo es inválido", async () => {
+    await importCoupon({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    mocked.mockResolvedValueOnce({
+      coupon: { ...coupon, fechaDebito: "2025-17-17" },
+      meta: { producer: null, creator: null, pageCount: 1, encrypted: false },
+    });
+    await expect(importCoupon({ data: new Uint8Array([2]), fileName: "b.pdf", replace: true })).rejects.toThrow();
+    const docs = await MortgageCouponModel.find({ cuotaNro: 1 }).lean();
+    expect(docs).toHaveLength(1);
+    expect(docs[0].sourceFileName).toBe("a.pdf");
+  });
 });

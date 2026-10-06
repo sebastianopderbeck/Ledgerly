@@ -51,6 +51,11 @@ describe("icbcMortgageImageParser.parse", () => {
   it("falla si el total en UVA es cero", () => {
     expect(() => parse(text.replace("UVA 499,90", "UVA 0,00"))).toThrow(/UVA/);
   });
+
+  it("falla si el vencimiento leído no es una fecha real", () => {
+    expect(() => parse(text.replace("17/11/2025", "17/17/2025"))).toThrow(/vencimiento/);
+    expect(() => parse(text.replace("17/11/2025", "31/02/2026"))).toThrow(/vencimiento/);
+  });
 });
 
 describe("totalsMatch", () => {
