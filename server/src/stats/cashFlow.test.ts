@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { CashFlowDTO, CashFlowMonthDTO, PayslipTipo } from "@ledgerly/shared";
 import {
   buildCashFlow, incomeByMonth, installmentFloor, projectPlanPayment, statementAmountArs, toCashFlowCard,
-  ESTIMADO_AUTO, ESTIMADO_HIPOTECA, ESTIMADO_SAC, ESTIMADO_SUELDO, FALTA_AUTO, FALTA_COTIZACION, FALTA_HIPOTECA,
-  FALTA_RECIBO, FALTA_SAC, estimadoTarjeta, faltaResumen,
+  ESTIMADO_SAC, ESTIMADO_SUELDO, FALTA_AUTO, FALTA_COTIZACION, FALTA_HIPOTECA,
+  FALTA_RECIBO, FALTA_SAC, estimadoAuto, estimadoHipoteca, estimadoTarjeta, faltaResumen,
   type CashFlowCard, type CashFlowInput, type CashFlowPayslip, type CashFlowPlan, type CashFlowStatement,
 } from "./cashFlow.js";
 
@@ -21,7 +21,7 @@ const statement = (overrides: Partial<CashFlowStatement> = {}): CashFlowStatemen
 const payslip = (fechaPago: string, neto: number, tipo: PayslipTipo = "mensual"): CashFlowPayslip => ({ fechaPago, tipo, neto });
 
 const TODAY = "2026-10-03";
-const NO_PLAN: CashFlowPlan = { coupons: [], cuotasTotales: null };
+const NO_PLAN: CashFlowPlan = { coupons: [], cuotasTotales: null, aumentoMensual: 0 };
 
 const input = (overrides: Partial<CashFlowInput> = {}): CashFlowInput => ({
   today: TODAY,
@@ -56,8 +56,8 @@ const ejemplo = (): CashFlowInput => input({
     },
     { issuer: "icbc", cardLabel: "ICBC", baseMonth: "2026-09", installments: [{ amount: 10_000, remaining: 2 }] },
   ],
-  mortgage: { coupons: [{ fecha: "2026-09-17", cuotaNro: 12, monto: 300_000 }], cuotasTotales: 240 },
-  auto: { coupons: [{ fecha: "2026-09-10", cuotaNro: 20, monto: 150_000 }], cuotasTotales: 120 },
+  mortgage: { coupons: [{ fecha: "2026-09-17", cuotaNro: 12, monto: 300_000 }], cuotasTotales: 240, aumentoMensual: 0 },
+  auto: { coupons: [{ fecha: "2026-09-10", cuotaNro: 20, monto: 150_000 }], cuotasTotales: 120, aumentoMensual: 0 },
   usdRates: [
     { fecha: "2026-09-12", valor: 1_380 },
     { fecha: "2026-09-14", valor: 1_400 },
@@ -136,7 +136,7 @@ describe("projectPlanPayment", () => {
       { fecha: "2026-08-17", cuotaNro: 11, monto: 290_000 },
       { fecha: "2026-09-17", cuotaNro: 12, monto: 300_000 },
     ],
-    cuotasTotales: 14,
+    cuotasTotales: 14, aumentoMensual: 0,
   };
 
   it("repite la última cuota en los meses siguientes", () => {
@@ -155,7 +155,25 @@ describe("projectPlanPayment", () => {
 
   it("sin cuotas totales proyecta siempre, y sin cupones da 0", () => {
     expect(projectPlanPayment({ ...plan, cuotasTotales: null }, "2030-01")).toBe(300_000);
-    expect(projectPlanPayment({ coupons: [], cuotasTotales: null }, "2026-10")).toBe(0);
+    expect(projectPlanPayment({ coupons: [], cuotasTotales: null, aumentoMensual: 0 }, "2026-10")).toBe(0);
+  });
+
+  it("compone el aumento mensual por cada mes desde el último cupón", () => {
+    const conAumento = { ...plan, aumentoMensual: 0.02 };
+    expect(projectPlanPayment(conAumento, "2026-10")).toBeCloseTo(306_000, 6);
+    expect(projectPlanPayment(conAumento, "2026-11")).toBeCloseTo(312_120, 6);
+  });
+});
+
+describe("etiquetas de la hipoteca y el auto estimados", () => {
+  it("sin aumento dicen que repiten la última cuota", () => {
+    expect(estimadoHipoteca(0)).toBe("Hipoteca (última cuota)");
+    expect(estimadoAuto(0)).toBe("Auto (último cupón)");
+  });
+
+  it("con aumento muestran el porcentaje mensual", () => {
+    expect(estimadoHipoteca(0.0198)).toBe("Hipoteca (última cuota +2,0% por mes)");
+    expect(estimadoAuto(0.0229)).toBe("Auto (último cupón +2,3% por mes)");
   });
 });
 
@@ -308,9 +326,9 @@ describe("buildCashFlow: meses cerrados", () => {
       statements: visaMensual(["2026-09"]),
       mortgage: {
         coupons: [{ fecha: "2026-09-01", cuotaNro: 5, monto: 100_000 }, { fecha: "2026-09-28", cuotaNro: 6, monto: 110_000 }],
-        cuotasTotales: 240,
+        cuotasTotales: 240, aumentoMensual: 0,
       },
-      auto: { coupons: [{ fecha: "2026-09-10", cuotaNro: 20, monto: 150_000 }], cuotasTotales: 120 },
+      auto: { coupons: [{ fecha: "2026-09-10", cuotaNro: 20, monto: 150_000 }], cuotasTotales: 120, aumentoMensual: 0 },
     }));
     expect(mesDe(flow, "2026-09")).toMatchObject({ hipoteca: 210_000, auto: 150_000, egresos: 460_000 });
   });
@@ -329,10 +347,10 @@ describe("buildCashFlow: meses cerrados", () => {
     const flow = buildCashFlow(input({
       payslips: recibosMensuales(["2026-07", "2026-08", "2026-09"]),
       statements: visaMensual(["2026-07", "2026-08", "2026-09"]),
-      mortgage: { coupons: [{ fecha: "2026-08-17", cuotaNro: 1, monto: 300_000 }], cuotasTotales: 240 },
+      mortgage: { coupons: [{ fecha: "2026-08-17", cuotaNro: 1, monto: 300_000 }], cuotasTotales: 240, aumentoMensual: 0 },
       auto: {
         coupons: [{ fecha: "2026-07-10", cuotaNro: 19, monto: 150_000 }, { fecha: "2026-09-10", cuotaNro: 21, monto: 150_000 }],
-        cuotasTotales: 120,
+        cuotasTotales: 120, aumentoMensual: 0,
       },
     }));
     expect(mesDe(flow, "2026-07")?.faltantes).toEqual([]);
@@ -344,7 +362,7 @@ describe("buildCashFlow: meses cerrados", () => {
     const flow = buildCashFlow(input({
       payslips: recibosMensuales(["2026-07", "2026-08", "2026-09"]),
       statements: visaMensual(["2026-07", "2026-08", "2026-09"]),
-      mortgage: { coupons: [{ fecha: "2026-07-17", cuotaNro: 24, monto: 300_000 }], cuotasTotales: 24 },
+      mortgage: { coupons: [{ fecha: "2026-07-17", cuotaNro: 24, monto: 300_000 }], cuotasTotales: 24, aumentoMensual: 0 },
     }));
     expect(mesDe(flow, "2026-08")).toMatchObject({ estado: "completo", hipoteca: 0, faltantes: [] });
     expect(mesDe(flow, "2026-09")).toMatchObject({ estado: "completo", hipoteca: 0, faltantes: [] });
@@ -367,16 +385,33 @@ describe("buildCashFlow: proyección", () => {
     ]);
   });
 
+  it("proyecta la hipoteca y el auto con su aumento mensual y lo anota", () => {
+    const base = ejemplo();
+    const flow = buildCashFlow({
+      ...base,
+      mortgage: { ...base.mortgage, aumentoMensual: 0.02 },
+      auto: { ...base.auto, aumentoMensual: 0.05 },
+    });
+    expect(mesDe(flow, "2026-10")?.hipoteca).toBeCloseTo(306_000, 6);
+    expect(mesDe(flow, "2026-10")?.auto).toBeCloseTo(157_500, 6);
+    expect(mesDe(flow, "2026-10")?.margen).toBeCloseTo(126_500, 6);
+    expect(mesDe(flow, "2026-11")?.hipoteca).toBeCloseTo(312_120, 6);
+    expect(mesDe(flow, "2026-11")?.auto).toBeCloseTo(165_375, 6);
+    expect(mesDe(flow, "2026-10")?.estimados).toEqual([
+      ESTIMADO_SUELDO, estimadoTarjeta("ICBC"), "Hipoteca (última cuota +2,0% por mes)", "Auto (último cupón +5,0% por mes)",
+    ]);
+  });
+
   it("anota qué parte de cada mes es estimada", () => {
     const flow = buildCashFlow(ejemplo());
     expect(mesDe(flow, "2026-10")).toMatchObject({
       faltantes: [],
-      estimados: [ESTIMADO_SUELDO, estimadoTarjeta("ICBC"), ESTIMADO_HIPOTECA, ESTIMADO_AUTO],
+      estimados: [ESTIMADO_SUELDO, estimadoTarjeta("ICBC"), estimadoHipoteca(0), estimadoAuto(0)],
       tasaAhorro: 140_000 / 1_100_000,
     });
     expect(mesDe(flow, "2026-12")).toMatchObject({
       conSac: true,
-      estimados: [ESTIMADO_SUELDO, ESTIMADO_SAC, estimadoTarjeta("Visa Signature"), estimadoTarjeta("ICBC"), ESTIMADO_HIPOTECA, ESTIMADO_AUTO],
+      estimados: [ESTIMADO_SUELDO, ESTIMADO_SAC, estimadoTarjeta("Visa Signature"), estimadoTarjeta("ICBC"), estimadoHipoteca(0), estimadoAuto(0)],
     });
     expect(mesDe(flow, "2026-11")?.conSac).toBe(false);
   });
@@ -394,17 +429,17 @@ describe("buildCashFlow: proyección", () => {
       mortgage: { ...base.mortgage, coupons: [...base.mortgage.coupons, { fecha: "2026-10-16", cuotaNro: 13, monto: 310_000 }] },
     });
     expect(mesDe(flow, "2026-10")).toMatchObject({ ingreso: 1_200_000, hipoteca: 310_000 });
-    expect(mesDe(flow, "2026-10")?.estimados).toEqual([estimadoTarjeta("ICBC"), ESTIMADO_AUTO]);
+    expect(mesDe(flow, "2026-10")?.estimados).toEqual([estimadoTarjeta("ICBC"), estimadoAuto(0)]);
     expect(mesDe(flow, "2026-11")).toMatchObject({ ingreso: 1_200_000, hipoteca: 310_000 });
   });
 
   it("un plan terminado no se proyecta", () => {
     const flow = buildCashFlow({
       ...ejemplo(),
-      mortgage: { coupons: [{ fecha: "2026-09-17", cuotaNro: 24, monto: 300_000 }], cuotasTotales: 24 },
+      mortgage: { coupons: [{ fecha: "2026-09-17", cuotaNro: 24, monto: 300_000 }], cuotasTotales: 24, aumentoMensual: 0 },
     });
     expect(mesDe(flow, "2026-10")?.hipoteca).toBe(0);
-    expect(mesDe(flow, "2026-10")?.estimados).not.toContain(ESTIMADO_HIPOTECA);
+    expect(mesDe(flow, "2026-10")?.estimados).not.toContain(estimadoHipoteca(0));
   });
 
   it("sin cotización para un saldo en USD lista la cotización pero calcula el margen", () => {

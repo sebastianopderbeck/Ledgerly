@@ -13,9 +13,17 @@ export const FALTA_COTIZACION = "Cotización del dólar";
 export const faltaResumen = (cardLabel: string): string => `Resumen ${cardLabel}`;
 export const ESTIMADO_SUELDO = "Sueldo (último neto)";
 export const ESTIMADO_SAC = "SAC (½ del último neto)";
-export const ESTIMADO_HIPOTECA = "Hipoteca (última cuota)";
-export const ESTIMADO_AUTO = "Auto (último cupón)";
 export const estimadoTarjeta = (cardLabel: string): string => `${cardLabel} (solo cuotas)`;
+
+const AUMENTO_MENSUAL = new Intl.NumberFormat("es-AR", {
+  style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: "exceptZero",
+});
+
+const detalleAumento = (aumentoMensual: number): string =>
+  aumentoMensual === 0 ? "" : ` ${AUMENTO_MENSUAL.format(aumentoMensual)} por mes`;
+
+export const estimadoHipoteca = (aumentoMensual: number): string => `Hipoteca (última cuota${detalleAumento(aumentoMensual)})`;
+export const estimadoAuto = (aumentoMensual: number): string => `Auto (último cupón${detalleAumento(aumentoMensual)})`;
 
 export interface CashFlowPayslip {
   fechaPago: string;
@@ -54,6 +62,7 @@ export interface CashFlowCoupon {
 export interface CashFlowPlan {
   coupons: CashFlowCoupon[];
   cuotasTotales: number | null;
+  aumentoMensual: number;
 }
 
 export interface InstallmentTxInput {
@@ -109,7 +118,7 @@ export function projectPlanPayment(plan: CashFlowPlan, month: string): number {
   const offset = monthsBetween(monthOf(last.fecha), month);
   if (offset < 1) return 0;
   if (plan.cuotasTotales !== null && last.cuotaNro + offset > plan.cuotasTotales) return 0;
-  return last.monto;
+  return last.monto * (1 + plan.aumentoMensual) ** offset;
 }
 
 export function incomeByMonth(payslips: CashFlowPayslip[]): Map<string, CashFlowPayslip[]> {
@@ -323,8 +332,8 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
       ...onlyIf(sueldoEstimado, ESTIMADO_SUELDO),
       ...onlyIf(sacEstimado, ESTIMADO_SAC),
       ...estimadas.map(({ track }) => estimadoTarjeta(track.cardLabel)),
-      ...onlyIf(hipoteca.estimado, ESTIMADO_HIPOTECA),
-      ...onlyIf(auto.estimado, ESTIMADO_AUTO),
+      ...onlyIf(hipoteca.estimado, estimadoHipoteca(ctx.mortgage.aumentoMensual)),
+      ...onlyIf(auto.estimado, estimadoAuto(ctx.auto.aumentoMensual)),
     ],
   };
 }

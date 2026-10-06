@@ -7,6 +7,8 @@ import {
 import { latestStatementIdsPerIssuer, type StatementRecency } from "../../stats/lastStatement.js";
 import { computeCreditProgress, type CouponInput } from "../../stats/amortization.js";
 import { AUTO_CUOTAS_TOTALES } from "../../stats/autoProgress.js";
+import { autoMonthlyGrowth, mortgageMonthlyGrowth } from "../../stats/planGrowth.js";
+import type { RatePoint } from "../../stats/rateOnDate.js";
 import {
   buildCashFlow, toCashFlowCard,
   type CashFlowCard, type CashFlowCoupon, type CashFlowPayslip, type CashFlowStatement, type InstallmentTxInput,
@@ -78,6 +80,8 @@ const toCouponInput = (coupon: CouponInput): CouponInput => ({
   tna: coupon.tna,
 });
 
+const toRatePoint = ({ fecha, valor }: RatePoint): RatePoint => ({ fecha, valor });
+
 const toInstallmentTx = (tx: InstallmentRow): InstallmentTxInput => ({
   amount: tx.amount,
   installmentCurrent: tx.installmentCurrent ?? null,
@@ -99,12 +103,13 @@ export const cashFlowRouter = Router();
 
 cashFlowRouter.get("/", asyncHandler(async (_req, res) => {
   const today = new Date().toISOString().slice(0, 10);
-  const [payslips, statements, mortgageCoupons, autoCoupons, usdPoints] = await Promise.all([
+  const [payslips, statements, mortgageCoupons, autoCoupons, usdPoints, uvaPoints] = await Promise.all([
     PayslipModel.find().lean(),
     StatementModel.find().lean(),
     MortgageCouponModel.find().sort({ cuotaNro: 1 }).lean(),
     AutoCouponModel.find().sort({ cuotaNro: 1 }).lean(),
     MacroSeriesModel.find({ serie: "usd_oficial" }).sort({ fecha: 1 }).lean(),
+    MacroSeriesModel.find({ serie: "uva" }).sort({ fecha: 1 }).lean(),
   ]);
   const latestIds = latestStatementIdsPerIssuer(statements.map(toRecency));
   const installmentTxs = await TransactionModel.find({
@@ -119,11 +124,16 @@ cashFlowRouter.get("/", asyncHandler(async (_req, res) => {
     mortgage: {
       coupons: mortgageCoupons.map((coupon) => toFlowCoupon(coupon.fechaDebito, coupon.cuotaNro, coupon.totalDebitado)),
       cuotasTotales: credit?.cuotasTotales ?? null,
+      aumentoMensual: mortgageMonthlyGrowth(
+        uvaPoints.map(toRatePoint),
+        mortgageCoupons.map((coupon) => ({ cuotaNro: coupon.cuotaNro, valor: coupon.cotizacionUva })),
+      ),
     },
     auto: {
       coupons: autoCoupons.map((coupon) => toFlowCoupon(coupon.fechaVencimiento, coupon.cuotaNro, coupon.totalAPagar)),
       cuotasTotales: AUTO_CUOTAS_TOTALES,
+      aumentoMensual: autoMonthlyGrowth(autoCoupons.map((coupon) => ({ cuotaNro: coupon.cuotaNro, valor: coupon.valorMovil }))),
     },
-    usdRates: usdPoints.map((point) => ({ fecha: point.fecha, valor: point.valor })),
+    usdRates: usdPoints.map(toRatePoint),
   }));
 }));
