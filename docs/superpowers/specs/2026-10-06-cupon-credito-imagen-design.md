@@ -98,8 +98,9 @@ Es pura y no conoce el formato del cupón.
   `{ cuotaNro, cuotasTotales, fechaDebito, capital, intereses, iva, seguros, totalPagado, totalUva }`.
   - Los montos aceptan `$` con o sin espacio, porque el OCR a veces lo pega al número.
   - El UVA se lee de `UVA nnn,nn`.
-  - Si falta un campo tira error.
-  - Si no cierran las sumas tira un error distinto, para poder dar un mensaje preciso.
+  - Si falta un campo, o el total en UVA es 0, tira error.
+- `totalsMatch(parsed): boolean` hace el control de sumas en centavos. El importador lo usa para
+  dar un mensaje preciso; ningún parser del repo depende de los errores de ingesta.
 - Es pura: no consulta la base.
 - `ParsedCouponImage` vive en `shared/src/types.ts`, junto a `ParsedCoupon`.
 
@@ -170,8 +171,8 @@ Los fixtures sintéticos usan montos inventados.
 - **`icbcMortgageImage.test.ts`** (fixture `__fixtures__/icbc-mortgage-image.sample.txt`):
   - `detect` positivo, y negativo con el texto del cupón PDF.
   - Todos los campos, con `$` pegado y con espacio.
-  - Error si falta un campo.
-  - Error de sumas si se altera un monto.
+  - Error si falta un campo o si el total en UVA es 0.
+  - `totalsMatch` da `false` si se altera un monto.
 - **`saveCoupon`:** los tests actuales de `importCoupon` siguen pasando sin cambios.
 - **`importCouponImage.test.ts`** (`withDb`, `recognizeImage` y `fetchOficialRate` mockeados):
   - Copia `prestamoNro`, `tea`, `tna` y `cft` del cupón más reciente.
