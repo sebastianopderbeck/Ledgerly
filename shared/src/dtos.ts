@@ -326,6 +326,8 @@ export const subscriptionIncreaseSchema = z.object({
   montoAnterior: z.number(),
 });
 
+export const cadenciaSchema = z.enum(["mensual", "anual"]);
+
 export const subscriptionDtoSchema = z.object({
   key: z.string(),
   nombre: z.string(),
@@ -343,6 +345,7 @@ export const subscriptionDtoSchema = z.object({
   oculta: z.boolean(),
   aumento: subscriptionIncreaseSchema.nullable(),
   monedaAnterior: currencySchema.nullable(),
+  cadencia: cadenciaSchema,
 });
 
 export const subscriptionsReportDtoSchema = z.object({
@@ -351,6 +354,10 @@ export const subscriptionsReportDtoSchema = z.object({
   totalMensualUsd: z.number(),
   totalAnualArs: z.number(),
   items: z.array(subscriptionDtoSchema),
+});
+
+export const manualSubscriptionInputSchema = z.object({
+  merchant: z.string().trim().min(1).max(200),
 });
 
 export const reviewReasonSchema = z.enum(["duplicado", "usd", "nuevo", "sin-categoria"]);
@@ -616,9 +623,11 @@ export type InflationRateDTO = z.infer<typeof inflationRateDtoSchema>;
 export type CashFlowEstado = z.infer<typeof cashFlowEstadoSchema>;
 export type CashFlowMonthDTO = z.infer<typeof cashFlowMonthSchema>;
 export type CashFlowDTO = z.infer<typeof cashFlowDtoSchema>;
+export type Cadencia = z.infer<typeof cadenciaSchema>;
 export type SubscriptionIncrease = z.infer<typeof subscriptionIncreaseSchema>;
 export type SubscriptionDTO = z.infer<typeof subscriptionDtoSchema>;
 export type SubscriptionsReportDTO = z.infer<typeof subscriptionsReportDtoSchema>;
+export type ManualSubscriptionInput = z.infer<typeof manualSubscriptionInputSchema>;
 export type ReviewReason = z.infer<typeof reviewReasonSchema>;
 export type ReviewCheck = z.infer<typeof reviewCheckSchema>;
 export type ReviewDuplicateRef = z.infer<typeof reviewDuplicateRefSchema>;

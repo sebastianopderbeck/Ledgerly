@@ -1,8 +1,9 @@
+import { Fragment } from "react";
 import { NavLink } from "react-router-dom";
-import { Box, ButtonBase, Typography } from "@mui/material";
+import { Box, ButtonBase, Divider, Typography } from "@mui/material";
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import { BottomSheet } from "../BottomSheet.js";
-import { MORE_ITEMS } from "./navItems.js";
+import { MORE_GROUPS } from "./navItems.js";
 import { useNavSearch } from "./useNavSearch.js";
 
 interface MoreSheetProps {
@@ -33,17 +34,24 @@ const itemSx: SxProps<Theme> = {
 export const MoreSheet = ({ open, onClose }: MoreSheetProps) => {
   const search = useNavSearch();
 
-  const links = MORE_ITEMS.map(({ to, label, icon: Icon }) => (
-    <ButtonBase key={to} component={NavLink} to={{ pathname: to, search }} onClick={onClose} sx={itemSx}>
-      <Icon />
-      <Typography variant="caption" sx={{ fontWeight: 500 }}>{label}</Typography>
-    </ButtonBase>
+  const groups = MORE_GROUPS.map(({ id, items }, index) => (
+    <Fragment key={id}>
+      {index > 0 && <Divider sx={{ my: 1.5 }} />}
+      <Box sx={gridSx}>
+        {items.map(({ to, label, icon: Icon }) => (
+          <ButtonBase key={to} component={NavLink} to={{ pathname: to, search }} onClick={onClose} sx={itemSx}>
+            <Icon />
+            <Typography variant="caption" sx={{ fontWeight: 500 }}>{label}</Typography>
+          </ButtonBase>
+        ))}
+      </Box>
+    </Fragment>
   ));
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Más secciones">
-      <Box component="nav" aria-label="más secciones" sx={gridSx}>
-        {links}
+      <Box component="nav" aria-label="más secciones">
+        {groups}
       </Box>
     </BottomSheet>
   );

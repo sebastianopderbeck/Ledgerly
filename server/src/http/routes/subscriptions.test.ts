@@ -4,7 +4,9 @@ import request from "supertest";
 import { subscriptionsReportDtoSchema } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
 import { createApp } from "../app.js";
-import { HiddenSubscriptionModel, StatementModel, TransactionModel } from "../../db/models.js";
+import {
+  AnnualSubscriptionModel, HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, TransactionModel,
+} from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 
 withDb();
@@ -51,6 +53,8 @@ const streamflixAndNoise = (): TxSeed[] => MONTHS.flatMap((month, index) => [
   { date: `${month}-12`, merchant: "CAFE MARTINEZ 12", amount: 5200, category: "Comida" },
   { date: `${month}-20`, merchant: "CAFE MARTINEZ 12", amount: 6100, category: "Comida" },
 ]);
+
+const cafeRosita = (): TxSeed[] => [{ date: "2026-08-15", merchant: "CAFE ROSITA 4471", amount: 3800, category: "Comida" }];
 
 beforeEach(() => {
   vi.mocked(fetchOficialRate).mockResolvedValue(COTIZACION);
@@ -121,5 +125,95 @@ describe("ocultar suscripciones", () => {
   it("guarda la clave recortada", async () => {
     await request(app).put("/api/subscriptions/hidden/%20STREAMFLIX%20COM%20");
     expect((await HiddenSubscriptionModel.findOne().lean())?.key).toBe("STREAMFLIX COM");
+  });
+});
+
+describe("GET /api/subscriptions con marcas guardadas", () => {
+  it("un comercio marcado a mano aparece desde su primer cobro", async () => {
+    await seedVisa(cafeRosita());
+    expect((await request(app).get("/api/subscriptions")).body.items).toEqual([]);
+    await ManualSubscriptionModel.create({ key: "CAFE ROSITA" });
+    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    expect(report.items).toMatchObject([{ key: "CAFE ROSITA", cobros: 1, cadencia: "mensual", estado: "activa" }]);
+  });
+});
+
+describe("marcar suscripciones a mano", () => {
+  it("POST /manual responde 204 y el comercio aparece con un solo cobro", async () => {
+    await seedVisa(cafeRosita());
+    const res = await request(app).post("/api/subscriptions/manual").send({ merchant: "CAFE ROSITA 4471" });
+    expect(res.status).toBe(204);
+    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    expect(report.items).toMatchObject([
+      { key: "CAFE ROSITA", cobros: 1, cadencia: "mensual", estado: "activa", oculta: false },
+    ]);
+  });
+
+  it("guarda la clave cruda del comercio y marcar dos veces deja una sola marca", async () => {
+    expect((await request(app).post("/api/subscriptions/manual").send({ merchant: "  GOOGLE *VideoPremium  " })).status).toBe(204);
+    expect((await request(app).post("/api/subscriptions/manual").send({ merchant: "GOOGLE *VideoPremium" })).status).toBe(204);
+    const docs = await ManualSubscriptionModel.find().lean();
+    expect(docs.map(({ key }) => key)).toEqual(["GOOGLE VIDEOPREMIUM"]);
+  });
+
+  it.each([
+    ["sin comercio", {}],
+    ["con el comercio en blanco", { merchant: "   " }],
+    ["con un comercio de más de 200 caracteres", { merchant: "A".repeat(201) }],
+  ])("POST /manual %s responde 400", async (_label, body) => {
+    const res = await request(app).post("/api/subscriptions/manual").send(body);
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "Comercio inválido" });
+  });
+
+  it("POST /manual con un comercio sin palabras responde 400 y no guarda nada", async () => {
+    const res = await request(app).post("/api/subscriptions/manual").send({ merchant: "123456 7890" });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "Este comercio no tiene un nombre reconocible" });
+    expect(await ManualSubscriptionModel.countDocuments()).toBe(0);
+  });
+
+  it("marcar un comercio oculto lo vuelve a mostrar", async () => {
+    await seedVisa(cafeRosita());
+    await request(app).put("/api/subscriptions/hidden/CAFE%20ROSITA");
+    await request(app).post("/api/subscriptions/manual").send({ merchant: "CAFE ROSITA 4471" });
+    expect(await HiddenSubscriptionModel.countDocuments()).toBe(0);
+    const res = await request(app).get("/api/subscriptions");
+    expect(res.body.items).toMatchObject([{ key: "CAFE ROSITA", oculta: false }]);
+  });
+});
+
+describe("marcar suscripciones anuales", () => {
+  it("PUT la pasa a anual, es idempotente y divide por 12", async () => {
+    await seedVisa(streamflixAndNoise());
+    expect((await request(app).put("/api/subscriptions/annual/STREAMFLIX%20COM")).status).toBe(204);
+    expect((await request(app).put("/api/subscriptions/annual/STREAMFLIX%20COM")).status).toBe(204);
+    expect(await AnnualSubscriptionModel.countDocuments()).toBe(1);
+    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    expect(report.items).toMatchObject([{
+      key: "STREAMFLIX COM", cadencia: "anual", cobros: 1, proximoCobro: "2027-08-09", montoMensualArs: 1585.86,
+    }]);
+    expect(report).toMatchObject({ totalMensualArs: 1585.86, totalMensualUsd: 1.08 });
+  });
+
+  it("DELETE la vuelve mensual y también es idempotente", async () => {
+    await seedVisa(streamflixAndNoise());
+    await request(app).put("/api/subscriptions/annual/STREAMFLIX%20COM");
+    expect((await request(app).delete("/api/subscriptions/annual/STREAMFLIX%20COM")).status).toBe(204);
+    expect((await request(app).delete("/api/subscriptions/annual/STREAMFLIX%20COM")).status).toBe(204);
+    const res = await request(app).get("/api/subscriptions");
+    expect(res.body.items).toMatchObject([{ cadencia: "mensual", cobros: 4 }]);
+    expect(res.body.totalMensualUsd).toBe(12.99);
+  });
+
+  it.each([
+    ["PUT", "en blanco", "%20%20"],
+    ["PUT", "de más de 60 caracteres", "A".repeat(61)],
+    ["DELETE", "en blanco", "%20%20"],
+  ])("%s /annual con una clave %s responde 400", async (method, _label, key) => {
+    const url = `/api/subscriptions/annual/${key}`;
+    const res = method === "PUT" ? await request(app).put(url) : await request(app).delete(url);
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "Clave inválida" });
   });
 });

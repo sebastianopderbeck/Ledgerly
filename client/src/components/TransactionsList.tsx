@@ -15,6 +15,7 @@ interface TransactionsListProps {
   rows: TransactionDTO[];
   onCategoryChange: (id: string, category: string) => void;
   onDelete: (ids: string[]) => void;
+  onMarkSubscription: (merchant: string) => void;
 }
 
 interface TransactionRowProps {
@@ -82,7 +83,7 @@ const TransactionRow = ({ row, selecting, selected, onOpen, onToggle }: Transact
   );
 };
 
-export const TransactionsList = ({ rows, onCategoryChange, onDelete }: TransactionsListProps) => {
+export const TransactionsList = ({ rows, onCategoryChange, onDelete, onMarkSubscription }: TransactionsListProps) => {
   const [visibleCount, setVisibleCount] = useState(TRANSACTIONS_PAGE_SIZE);
   const { target, open, show, close } = useSheetTarget<TransactionDTO>();
   const visibleRows = useMemo(() => rows.slice(0, visibleCount), [rows, visibleCount]);
@@ -139,7 +140,14 @@ export const TransactionsList = ({ rows, onCategoryChange, onDelete }: Transacti
           </Button>
         </Box>
       )}
-      <TransactionSheet transaction={target} open={open} onClose={close} onSave={onCategoryChange} onDelete={askDeleteOne} />
+      <TransactionSheet
+        transaction={target}
+        open={open}
+        onClose={close}
+        onSave={onCategoryChange}
+        onDelete={askDeleteOne}
+        onMarkSubscription={onMarkSubscription}
+      />
       <ConfirmDialog
         open={pendingIds !== null}
         title="Borrar movimientos"

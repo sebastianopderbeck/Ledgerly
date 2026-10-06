@@ -7,7 +7,9 @@ import {
   statementReviewKey,
   useBudgetSpending,
   useMarkFindingsReviewed,
+  useMarkSubscription,
   useNetWorth,
+  useSetSubscriptionAnnual,
   useSetSubscriptionHidden,
   useStatementReview,
 } from "./hooks.js";
@@ -48,6 +50,31 @@ describe("hooks de las features nuevas", () => {
       "PUT /api/subscriptions/hidden/STREAMFLIX%20COM",
       "DELETE /api/subscriptions/hidden/STREAMFLIX%20COM",
     ]);
+  });
+
+  it("useSetSubscriptionAnnual codifica la clave, usa PUT para anual y DELETE para mensual, e invalida las suscripciones", async () => {
+    vi.stubGlobal("fetch", respond(204));
+    const client = newClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useSetSubscriptionAnnual(), { wrapper: wrapperFor(client) });
+    await act(() => result.current.mutateAsync({ key: "STREAMBOX PLUS", annual: true }));
+    await act(() => result.current.mutateAsync({ key: "STREAMBOX PLUS", annual: false }));
+    expect(calledUrls()).toEqual([
+      "PUT /api/subscriptions/annual/STREAMBOX%20PLUS",
+      "DELETE /api/subscriptions/annual/STREAMBOX%20PLUS",
+    ]);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["subscriptions"] });
+  });
+
+  it("useMarkSubscription manda el comercio por POST e invalida las suscripciones", async () => {
+    vi.stubGlobal("fetch", respond(204));
+    const client = newClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useMarkSubscription(), { wrapper: wrapperFor(client) });
+    await act(() => result.current.mutateAsync("VIDEOMAX 99123"));
+    expect(calledUrls()).toEqual(["POST /api/subscriptions/manual"]);
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ merchant: "VIDEOMAX 99123" });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["subscriptions"] });
   });
 
   it("useBudgetSpending manda los años como parámetros repetidos", async () => {

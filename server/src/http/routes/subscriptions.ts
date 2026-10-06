@@ -1,8 +1,13 @@
 import { Router, type Request } from "express";
-import type { Currency, Direction, Issuer, SubscriptionsReportDTO, TxType } from "@ledgerly/shared";
+import {
+  manualSubscriptionInputSchema, type Currency, type Direction, type Issuer, type SubscriptionsReportDTO, type TxType,
+} from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
-import { HiddenSubscriptionModel, StatementModel, TransactionModel } from "../../db/models.js";
+import {
+  AnnualSubscriptionModel, HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, TransactionModel,
+} from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
+import { merchantKey } from "../../stats/merchantKey.js";
 import {
   detectSubscriptions,
   latestClosingByIssuer,
@@ -11,10 +16,12 @@ import {
 } from "../../stats/subscriptions.js";
 
 const MAX_CLAVE = 60;
+const INVALID_MERCHANT = "Comercio inválido";
+const UNRECOGNIZABLE_MERCHANT = "Este comercio no tiene un nombre reconocible";
 
 export const subscriptionsRouter = Router();
 
-const hiddenKeyOf = (req: Request): string => {
+const keyParamOf = (req: Request): string => {
   const key = String(req.params.key ?? "").trim();
   if (key === "" || key.length > MAX_CLAVE) throw new HttpError(400, "Clave inválida");
   return key;
@@ -22,10 +29,12 @@ const hiddenKeyOf = (req: Request): string => {
 
 subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
   const hoy = new Date().toISOString().slice(0, 10);
-  const [transactions, statements, hidden, cotizacion] = await Promise.all([
+  const [transactions, statements, hidden, manual, annual, cotizacion] = await Promise.all([
     TransactionModel.find({ isInstallment: false, type: { $in: ["purchase", "refund"] } }).lean(),
     StatementModel.find({}, { issuer: 1, closingDate: 1 }).lean(),
     HiddenSubscriptionModel.find().lean(),
+    ManualSubscriptionModel.find().lean(),
+    AnnualSubscriptionModel.find().lean(),
     fetchOficialRate(hoy),
   ]);
   const txs: SubscriptionTx[] = transactions.map((t) => ({
@@ -44,6 +53,8 @@ subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
     hoy,
     ultimoCierre: latestClosingByIssuer(statements.map((s) => ({ issuer: s.issuer, closingDate: s.closingDate ?? null }))),
     ocultas: new Set(hidden.map((h) => h.key)),
+    manuales: new Set(manual.map((m) => m.key)),
+    anuales: new Set(annual.map((a) => a.key)),
     cotizacion,
   });
   const report: SubscriptionsReportDTO = { cotizacionOficial: cotizacion, ...summarizeSubscriptions(items), items };
@@ -51,13 +62,37 @@ subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
 }));
 
 subscriptionsRouter.put("/hidden/:key", asyncHandler(async (req, res) => {
-  const key = hiddenKeyOf(req);
+  const key = keyParamOf(req);
   await HiddenSubscriptionModel.updateOne({ key }, { $setOnInsert: { key } }, { upsert: true });
   res.status(204).end();
 }));
 
 subscriptionsRouter.delete("/hidden/:key", asyncHandler(async (req, res) => {
-  const key = hiddenKeyOf(req);
+  const key = keyParamOf(req);
   await HiddenSubscriptionModel.deleteOne({ key });
+  res.status(204).end();
+}));
+
+subscriptionsRouter.post("/manual", asyncHandler(async (req, res) => {
+  const parsed = manualSubscriptionInputSchema.safeParse(req.body);
+  if (!parsed.success) throw new HttpError(400, INVALID_MERCHANT);
+  const key = merchantKey(parsed.data.merchant);
+  if (key === "") throw new HttpError(400, UNRECOGNIZABLE_MERCHANT);
+  await Promise.all([
+    ManualSubscriptionModel.updateOne({ key }, { $setOnInsert: { key } }, { upsert: true }),
+    HiddenSubscriptionModel.deleteOne({ key }),
+  ]);
+  res.status(204).end();
+}));
+
+subscriptionsRouter.put("/annual/:key", asyncHandler(async (req, res) => {
+  const key = keyParamOf(req);
+  await AnnualSubscriptionModel.updateOne({ key }, { $setOnInsert: { key } }, { upsert: true });
+  res.status(204).end();
+}));
+
+subscriptionsRouter.delete("/annual/:key", asyncHandler(async (req, res) => {
+  const key = keyParamOf(req);
+  await AnnualSubscriptionModel.deleteOne({ key });
   res.status(204).end();
 }));

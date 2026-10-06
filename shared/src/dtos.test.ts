@@ -135,7 +135,8 @@ describe("macroRefreshDtoSchema", () => {
 import {
   budgetDtoSchema, budgetInputSchema, budgetPatchSchema, budgetSpendingDtoSchema, cashFlowDtoSchema,
   inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSourceStatusDtoSchema, mailSyncRunDtoSchema,
-  MANUAL_ASSET_TYPE_LABELS, manualAssetCreateSchema, manualAssetTypeSchema, manualAssetUpdateSchema, netWorthDtoSchema,
+  MANUAL_ASSET_TYPE_LABELS, manualAssetCreateSchema, manualAssetTypeSchema, manualAssetUpdateSchema,
+  manualSubscriptionInputSchema, netWorthDtoSchema,
   statementReviewDtoSchema, statementReviewKeysDtoSchema, statementReviewPatchSchema, subscriptionsReportDtoSchema,
   uncategorizedInboxDtoSchema,
 } from "./dtos.js";
@@ -177,6 +178,7 @@ const subscription = {
   primerCobro: "2026-03-12", ultimoCobro: "2026-08-12", proximoCobro: "2026-09-12",
   cobros: 6, estado: "activa", oculta: false,
   aumento: { variacion: 0.1002, desde: "2026-03", montoAnterior: 4990 }, monedaAnterior: null,
+  cadencia: "mensual",
 };
 
 describe("subscriptionsReportDtoSchema", () => {
@@ -196,6 +198,30 @@ describe("subscriptionsReportDtoSchema", () => {
     const dto = { cotizacionOficial: null, totalMensualArs: 0, totalMensualUsd: 0, totalAnualArs: 0,
       items: [{ ...subscription, cobros: 0 }] };
     expect(subscriptionsReportDtoSchema.safeParse(dto).success).toBe(false);
+  });
+
+  it("valida la cadencia anual y rechaza una desconocida o ausente", () => {
+    const report = (item: object) => ({
+      cotizacionOficial: null, totalMensualArs: 0, totalMensualUsd: 0, totalAnualArs: 0, items: [item],
+    });
+    expect(subscriptionsReportDtoSchema.parse(report({ ...subscription, cadencia: "anual" })).items[0].cadencia).toBe("anual");
+    expect(subscriptionsReportDtoSchema.safeParse(report({ ...subscription, cadencia: "semanal" })).success).toBe(false);
+    expect(subscriptionsReportDtoSchema.safeParse(report({ ...subscription, cadencia: undefined })).success).toBe(false);
+  });
+});
+
+describe("manualSubscriptionInputSchema", () => {
+  it("recorta el comercio", () => {
+    expect(manualSubscriptionInputSchema.parse({ merchant: "  VIDEOMAX 99123  " })).toEqual({ merchant: "VIDEOMAX 99123" });
+  });
+
+  it.each([
+    ["sin comercio", {}],
+    ["con el comercio en blanco", { merchant: "   " }],
+    ["con más de 200 caracteres", { merchant: "A".repeat(201) }],
+    ["con un comercio que no es texto", { merchant: 42 }],
+  ])("rechaza un body %s", (_label, body) => {
+    expect(manualSubscriptionInputSchema.safeParse(body).success).toBe(false);
   });
 });
 

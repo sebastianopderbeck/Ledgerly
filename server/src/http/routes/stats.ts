@@ -100,9 +100,14 @@ statsRouter.get("/last-statement/by-category", asyncHandler(async (req, res) => 
     res.json([]);
     return;
   }
+  const usdToArs = currency === "ARS" ? await fetchOficialRate(new Date().toISOString().slice(0, 10)) : null;
+  const currencies = usdToArs === null ? [currency] : ["ARS", "USD"];
+  const amountInCurrency = usdToArs === null
+    ? "$amount"
+    : { $cond: [{ $eq: ["$currency", "USD"] }, { $multiply: ["$amount", usdToArs] }, "$amount"] };
   const rows = await TransactionModel.aggregate([
-    { $match: { type: "purchase", currency, statementId: { $in: ids } } },
-    { $group: { _id: "$category", total: { $sum: "$amount" }, count: { $sum: 1 } } },
+    { $match: { type: "purchase", currency: { $in: currencies }, statementId: { $in: ids } } },
+    { $group: { _id: "$category", total: { $sum: amountInCurrency }, count: { $sum: 1 } } },
     { $project: { _id: 0, category: "$_id", total: 1, count: 1 } },
     { $sort: { total: -1 } },
   ]);

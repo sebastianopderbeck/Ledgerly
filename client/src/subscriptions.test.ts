@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { SubscriptionDTO, SubscriptionIncrease } from "@ledgerly/shared";
+import type { SubscriptionDTO, SubscriptionIncrease, TransactionDTO } from "@ledgerly/shared";
 import { formatMoney } from "./format.js";
 import {
   AMOUNT_LABEL,
   activeCountLabel,
+  cadenceAmountCaption,
+  cadenceToggleLabel,
+  cadenceToggleTooltip,
+  canMarkAsSubscription,
   increaseDetail,
   increaseLabel,
   increaseShortLabel,
@@ -34,6 +38,7 @@ const item = (overrides: Partial<SubscriptionDTO>): SubscriptionDTO => ({
   oculta: false,
   aumento: null,
   monedaAnterior: null,
+  cadencia: "mensual",
   ...overrides,
 });
 
@@ -116,5 +121,48 @@ describe("subscriptionTransactionsLink", () => {
     const link = subscriptionTransactionsLink("GOOGLE *VideoP");
     expect(link).not.toContain(" ");
     expect(new URLSearchParams(link.split("?")[1]).get("search")).toBe("GOOGLE *VideoP");
+  });
+});
+
+describe("textos de cadencia", () => {
+  it("cadenceToggleLabel ofrece pasar a la otra cadencia", () => {
+    expect(cadenceToggleLabel("STREAMBOX", "mensual")).toBe("Marcar STREAMBOX como anual");
+    expect(cadenceToggleLabel("STREAMBOX", "anual")).toBe("Marcar STREAMBOX como mensual");
+  });
+
+  it("cadenceToggleTooltip nombra la cadencia de destino", () => {
+    expect(cadenceToggleTooltip("mensual")).toBe("Es anual");
+    expect(cadenceToggleTooltip("anual")).toBe("Es mensual");
+  });
+
+  it("cadenceAmountCaption aclara solo las anuales", () => {
+    expect(cadenceAmountCaption("anual")).toBe("por año");
+    expect(cadenceAmountCaption("mensual")).toBeNull();
+  });
+});
+
+describe("canMarkAsSubscription", () => {
+  const purchase: TransactionDTO = {
+    id: "t1", statementId: "s", issuer: "icbc", cardLabel: "ICBC", date: "2026-09-15",
+    descriptionRaw: "VIDEOMAX 99123", merchant: "VIDEOMAX 99123", category: "Entretenimiento", categorySource: "rule",
+    amount: 4500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
+    installmentCurrent: null, installmentTotal: null, comprobante: null,
+  };
+
+  const NOT_ELIGIBLE: [string, Partial<TransactionDTO>][] = [
+    ["una cuota", { isInstallment: true, installmentCurrent: 3, installmentTotal: 12 }],
+    ["un crédito", { direction: "credit" }],
+    ["un pago", { type: "payment", direction: "credit" }],
+    ["un impuesto", { type: "tax" }],
+    ["un monto en cero", { amount: 0 }],
+  ];
+
+  it("acepta un consumo en un pago, en pesos o en dólares", () => {
+    expect(canMarkAsSubscription(purchase)).toBe(true);
+    expect(canMarkAsSubscription({ ...purchase, currency: "USD" })).toBe(true);
+  });
+
+  it.each(NOT_ELIGIBLE)("rechaza %s", (_label, overrides) => {
+    expect(canMarkAsSubscription({ ...purchase, ...overrides })).toBe(false);
   });
 });

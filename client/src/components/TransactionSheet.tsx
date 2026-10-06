@@ -1,12 +1,14 @@
 import { useState, type SyntheticEvent } from "react";
 import { Autocomplete, Box, Button, TextField, type AutocompleteRenderInputParams } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 import type { TransactionDTO } from "@ledgerly/shared";
 import { useCategories } from "../api/hooks.js";
 import { formatMoney } from "../format.js";
+import { canMarkAsSubscription } from "../subscriptions.js";
 import { installmentLabel } from "../transactionInstallment.js";
 import { BottomSheet } from "./BottomSheet.js";
 import { RecordFields, type RecordField } from "./RecordCard.js";
-import { tapTargetSx } from "./tapTarget.js";
+import { MIN_TAP_SIZE, tapTargetSx } from "./tapTarget.js";
 
 interface TransactionSheetProps {
   transaction: TransactionDTO | null;
@@ -14,6 +16,7 @@ interface TransactionSheetProps {
   onClose: () => void;
   onSave: (id: string, category: string) => void;
   onDelete: (transaction: TransactionDTO) => void;
+  onMarkSubscription: (merchant: string) => void;
 }
 
 interface TransactionFormProps {
@@ -21,13 +24,16 @@ interface TransactionFormProps {
   onClose: () => void;
   onSave: (id: string, category: string) => void;
   onDelete: (transaction: TransactionDTO) => void;
+  onMarkSubscription: (merchant: string) => void;
 }
 
 const NO_CATEGORIES: string[] = [];
 
+const markSubscriptionSx: SxProps<Theme> = { minHeight: MIN_TAP_SIZE, mt: 2 };
+
 const renderCategoryInput = (params: AutocompleteRenderInputParams) => <TextField {...params} label="Categoría" />;
 
-const TransactionForm = ({ transaction, onClose, onSave, onDelete }: TransactionFormProps) => {
+const TransactionForm = ({ transaction, onClose, onSave, onDelete, onMarkSubscription }: TransactionFormProps) => {
   const { data: categories = NO_CATEGORIES } = useCategories();
   const [category, setCategory] = useState(transaction.category);
   const nextCategory = category.trim();
@@ -50,6 +56,15 @@ const TransactionForm = ({ transaction, onClose, onSave, onDelete }: Transaction
 
   const remove = () => onDelete(transaction);
 
+  const markSubscription = () => {
+    onMarkSubscription(transaction.merchant);
+    onClose();
+  };
+
+  const subscriptionButton = canMarkAsSubscription(transaction) && (
+    <Button fullWidth variant="outlined" onClick={markSubscription} sx={markSubscriptionSx}>Es una suscripción</Button>
+  );
+
   return (
     <>
       <RecordFields fields={fields} />
@@ -61,6 +76,7 @@ const TransactionForm = ({ transaction, onClose, onSave, onDelete }: Transaction
         renderInput={renderCategoryInput}
         sx={{ mt: 2.5 }}
       />
+      {subscriptionButton}
       <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
         <Button fullWidth color="error" onClick={remove} sx={tapTargetSx}>Borrar</Button>
         <Button fullWidth variant="contained" disabled={!changed} onClick={save} sx={tapTargetSx}>Guardar</Button>
@@ -69,10 +85,17 @@ const TransactionForm = ({ transaction, onClose, onSave, onDelete }: Transaction
   );
 };
 
-export const TransactionSheet = ({ transaction, open, onClose, onSave, onDelete }: TransactionSheetProps) => (
+export const TransactionSheet = ({ transaction, open, onClose, onSave, onDelete, onMarkSubscription }: TransactionSheetProps) => (
   <BottomSheet open={open} onClose={onClose} title={transaction?.merchant ?? "Movimiento"}>
     {transaction && (
-      <TransactionForm key={transaction.id} transaction={transaction} onClose={onClose} onSave={onSave} onDelete={onDelete} />
+      <TransactionForm
+        key={transaction.id}
+        transaction={transaction}
+        onClose={onClose}
+        onSave={onSave}
+        onDelete={onDelete}
+        onMarkSubscription={onMarkSubscription}
+      />
     )}
   </BottomSheet>
 );

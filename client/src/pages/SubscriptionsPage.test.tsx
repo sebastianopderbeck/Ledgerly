@@ -11,7 +11,7 @@ const streamflix: SubscriptionDTO = {
   key: "STREAMFLIX COM", nombre: "STREAMFLIX.COM", busqueda: "STREAMFLIX", categoria: "Suscripciones",
   cardLabel: "Visa Signature", moneda: "USD", montoActual: 12.99, montoMensualArs: 19030.35,
   primerCobro: "2026-01-09", ultimoCobro: "2026-08-09", proximoCobro: "2026-09-09", cobros: 8,
-  estado: "activa", oculta: false, aumento: null, monedaAnterior: "ARS",
+  estado: "activa", oculta: false, aumento: null, monedaAnterior: "ARS", cadencia: "mensual",
 };
 
 const musicapp: SubscriptionDTO = {
@@ -42,9 +42,11 @@ const money = (amount: number, currency: Currency): string => formatMoney(amount
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+const isMutation = (url: string): boolean =>
+  url.includes("/subscriptions/hidden/") || url.includes("/subscriptions/annual/");
+
 const serve = (body: SubscriptionsReportDTO): void => {
-  vi.stubGlobal("fetch", vi.fn(async (url: string) =>
-    (url.includes("/subscriptions/hidden/") ? new Response(null, { status: 204 }) : json(body))));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => (isMutation(url) ? new Response(null, { status: 204 }) : json(body))));
 };
 
 const mutations = (): string[] => vi.mocked(fetch).mock.calls
@@ -62,6 +64,9 @@ describe("SubscriptionsPage", () => {
     renderWithProviders(<SubscriptionsPage />, { route: "/suscripciones" });
     expect(screen.getByRole("heading", { level: 4, name: "Suscripciones" })).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    expect(screen.getByText(
+      "Cobros que se repiten en tus tarjetas: los que aparecen 3 meses seguidos con montos parecidos, los de la categoría Suscripciones y los que marcaste desde Movimientos. No incluye cuotas ni impuestos.",
+    )).toBeInTheDocument();
   });
 
   it("muestra los KPIs, las activas con su aumento y las que dejaron de cobrarse", async () => {
@@ -102,6 +107,29 @@ describe("SubscriptionsPage", () => {
     await waitFor(() => expect(mutations()).toEqual(["DELETE /api/subscriptions/hidden/PLAN%20AUTOAHORRO"]));
   });
 
+  it("marcar como anual una activa manda el PUT con la clave codificada", async () => {
+    serve(report);
+    renderWithProviders(<SubscriptionsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Marcar STREAMFLIX.COM como anual" }));
+    await waitFor(() => expect(mutations()).toEqual(["PUT /api/subscriptions/annual/STREAMFLIX%20COM"]));
+  });
+
+  it("una anual que dejó de cobrarse se vuelve mensual con DELETE", async () => {
+    serve({ ...report, items: [streamflix, musicapp, { ...gimnasio, cadencia: "anual" }, plan] });
+    renderWithProviders(<SubscriptionsPage />);
+    const cortadas = await screen.findByRole("table", { name: "Suscripciones que dejaron de cobrarse" });
+    await userEvent.click(within(cortadas).getByRole("button", { name: "Marcar GIMNASIO NORTE como mensual" }));
+    await waitFor(() => expect(mutations()).toEqual(["DELETE /api/subscriptions/annual/GIMNASIO%20NORTE"]));
+  });
+
+  it("una anual aclara «por año» en el monto y «por mes» en pesos", async () => {
+    serve({ ...report, items: [streamflix, { ...musicapp, cadencia: "anual", montoActual: 60000, montoMensualArs: 5000 }] });
+    renderWithProviders(<SubscriptionsPage />);
+    const activas = await screen.findByRole("table", { name: "Suscripciones activas" });
+    expect(within(activas).getByText("por año")).toBeInTheDocument();
+    expect(within(activas).getByText("por mes")).toBeInTheDocument();
+  });
+
   it("el link de movimientos busca el comercio en todos los años", async () => {
     serve(report);
     renderWithProviders(<SubscriptionsPage />);
@@ -128,10 +156,12 @@ describe("SubscriptionsPage", () => {
     expect(screen.getByRole("button", { name: /Ocultas \(1\)/ })).toBeInTheDocument();
   });
 
-  it("sin cobros recurrentes muestra el estado vacío", async () => {
+  it("sin suscripciones muestra el estado vacío", async () => {
     serve({ cotizacionOficial: 1465, totalMensualArs: 0, totalMensualUsd: 0, totalAnualArs: 0, items: [] });
     renderWithProviders(<SubscriptionsPage />);
-    expect(await screen.findByText(/No encontramos cobros recurrentes/)).toBeInTheDocument();
+    expect(await screen.findByText(
+      "No encontramos suscripciones. Aparecen solas con 3 meses seguidos de cobros del mismo comercio, con la categoría Suscripciones o marcándolas desde Movimientos.",
+    )).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 4, name: "Suscripciones" })).toBeInTheDocument();
   });
 
@@ -184,5 +214,14 @@ describe("SubscriptionsPage en mobile", () => {
     const card = await screen.findByRole("article", { name: "STREAMFLIX.COM" });
     await userEvent.click(within(card).getByRole("button", { name: "Ver detalle" }));
     expect(within(card).getByText("Antes se cobraba en pesos")).toBeInTheDocument();
+  });
+
+  it("una anual suma «por año» al monto de la tarjeta y se vuelve mensual desde ahí", async () => {
+    serve({ ...report, items: [streamflix, { ...musicapp, cadencia: "anual", montoActual: 60000, montoMensualArs: 5000 }] });
+    renderWithProviders(<SubscriptionsPage />);
+    const card = await screen.findByRole("article", { name: "MUSICAPP" });
+    expect(within(card).getByText(`${money(60000, "ARS")} por año`)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Marcar MUSICAPP como mensual" }));
+    await waitFor(() => expect(mutations()).toEqual(["DELETE /api/subscriptions/annual/MUSICAPP"]));
   });
 });

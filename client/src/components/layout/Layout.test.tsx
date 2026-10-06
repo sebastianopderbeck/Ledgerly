@@ -4,11 +4,11 @@ import { Link } from "react-router-dom";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
 import { emulateDesktop, emulateMobile } from "../../testing/viewport.js";
 import { Layout } from "./Layout.js";
-import { NAV_ITEMS } from "./navItems.js";
+import { NAV_GROUPS, NAV_ITEMS } from "./navItems.js";
 
 const SECTIONS = [
-  /dashboard/i, /cuotas/i, /créditos/i, /auto/i, /patrimonio/i, /sueldo/i, /vencimientos/i, /contexto/i, /flujo/i,
-  /presupuestos/i, /movimientos/i, /suscripciones/i, /reglas/i, /importar/i,
+  /dashboard/i, /créditos/i, /auto/i, /patrimonio/i, /sueldo/i, /vencimientos/i, /contexto/i, /flujo/i,
+  /movimientos/i, /suscripciones/i, /reglas/i,
 ];
 
 const renderLayout = (route = "/") => renderWithProviders(<Layout><div>contenido</div></Layout>, { route });
@@ -31,6 +31,17 @@ describe("Layout", () => {
     }
   });
 
+  it("separa los grupos del menú con una línea", () => {
+    renderLayout();
+    expect(within(mainNavigation()).getAllByRole("separator")).toHaveLength(NAV_GROUPS.length - 1);
+  });
+
+  it("con la sidebar colapsada los grupos siguen separados", () => {
+    renderLayout();
+    fireEvent.click(screen.getByRole("button", { name: "colapsar menú" }));
+    expect(within(mainNavigation()).getAllByRole("separator")).toHaveLength(NAV_GROUPS.length - 1);
+  });
+
   it("todos los links conservan los filtros globales y descartan los de Movimientos", () => {
     renderLayout("/transactions?year=2025&currency=USD&category=Compras&search=uber");
     for (const { to, label } of NAV_ITEMS) {
@@ -45,10 +56,23 @@ describe("Layout", () => {
     expect(screen.getByRole("link", { name: /dashboard/i })).not.toHaveAttribute("aria-current");
   });
 
-  it("agrupa actualizar datos y cambiar tema en las acciones rápidas", () => {
+  it("agrupa importar, actualizar datos y cambiar tema en las acciones rápidas", () => {
     renderLayout();
+    expect(within(quickActions()).getByRole("link", { name: "importar" })).toBeInTheDocument();
     expect(within(quickActions()).getByLabelText("actualizar datos")).toBeInTheDocument();
     expect(within(quickActions()).getByLabelText("cambiar tema")).toBeInTheDocument();
+  });
+
+  it("importar no está en la navegación principal", () => {
+    renderLayout();
+    expect(within(mainNavigation()).queryByRole("link", { name: /importar/i })).not.toBeInTheDocument();
+  });
+
+  it("importar conserva los filtros globales y se marca activo en su ruta", () => {
+    renderLayout("/import?year=2025&currency=USD&category=Compras");
+    const importLink = within(quickActions()).getByRole("link", { name: "importar" });
+    expect(importLink).toHaveAttribute("href", "/import?year=2025&currency=USD");
+    expect(importLink).toHaveAttribute("aria-current", "page");
   });
 
   it("colapsar la sidebar oculta los textos pero mantiene los links accesibles", () => {
@@ -103,11 +127,16 @@ describe("Layout en mobile", () => {
 
   const moreButton = () => within(mainNavigation()).getByRole("button", { name: "Más" });
 
-  it("la barra inferior muestra Inicio, Cuotas, Movimientos, Importar y Más", () => {
+  it("la barra inferior muestra Inicio, Movimientos y Más", () => {
     renderLayout();
     const links = within(mainNavigation()).getAllByRole("link").map((link) => link.textContent);
-    expect(links).toEqual(["Inicio", "Cuotas", "Movimientos", "Importar"]);
+    expect(links).toEqual(["Inicio", "Movimientos"]);
     expect(moreButton()).toBeInTheDocument();
+  });
+
+  it("importar sigue a mano en las acciones rápidas", () => {
+    renderLayout();
+    expect(within(quickActions()).getByRole("link", { name: "importar" })).toBeInTheDocument();
   });
 
   it("no monta la sidebar de compu", () => {
@@ -130,7 +159,7 @@ describe("Layout en mobile", () => {
 
   it("los links de la barra conservan los filtros globales y descartan los de Movimientos", () => {
     renderLayout("/transactions?year=2025&currency=USD&category=Compras");
-    expect(within(mainNavigation()).getByRole("link", { name: "Cuotas" })).toHaveAttribute("href", "/installments?year=2025&currency=USD");
+    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).toHaveAttribute("href", "/?year=2025&currency=USD");
   });
 
   it("«Más» abre el resto de las secciones y la hoja se cierra al elegir una", async () => {

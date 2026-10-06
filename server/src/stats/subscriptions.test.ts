@@ -3,6 +3,8 @@ import type { SubscriptionDTO } from "@ledgerly/shared";
 import { addMonths } from "./months.js";
 import {
   addMonthsClamped,
+  annualRun,
+  CATEGORIA_SUSCRIPCIONES,
   detectSubscriptions,
   latestClosingByIssuer,
   monthlyRuns,
@@ -25,7 +27,7 @@ const tx = (date: string, amount: number, overrides: Partial<SubscriptionTx> = {
   direction: "debit",
   type: "purchase",
   isInstallment: false,
-  category: "Suscripciones",
+  category: "Entretenimiento",
   issuer: "visa_signature",
   cardLabel: "Visa Signature",
   ...overrides,
@@ -47,9 +49,14 @@ const ctx = (overrides: Partial<SubscriptionContext> = {}): SubscriptionContext 
   hoy: "2026-10-03",
   ultimoCierre: {},
   ocultas: new Set<string>(),
+  manuales: new Set<string>(),
+  anuales: new Set<string>(),
   cotizacion: 1000,
   ...overrides,
 });
+
+const SUSCRIPCION: Partial<SubscriptionTx> = { category: CATEGORIA_SUSCRIPCIONES };
+const CIERRE_SEPTIEMBRE = { visa_signature: "2026-09-26" };
 
 const monthly = (values: number[], firstMonth = "2026-01", overrides: Partial<SubscriptionTx> = {}): SubscriptionTx[] =>
   values.map((amount, index) => tx(`${addMonths(firstMonth, index)}-09`, amount, overrides));
@@ -165,6 +172,46 @@ describe("monthlyRuns", () => {
   });
 });
 
+describe("annualRun", () => {
+  it("salta de a 12 meses hacia atrás desde el último cobro, cruzando años", () => {
+    const charges = [charge("2024-01-05", 100), charge("2025-01-05", 110), charge("2026-01-05", 120)];
+    expect(dates(annualRun(charges))).toEqual(["2024-01-05", "2025-01-05", "2026-01-05"]);
+  });
+
+  it("deja afuera los cobros mensuales que no caen a 12 meses", () => {
+    const charges = [
+      ...monthlyCharges(Array.from({ length: 11 }, () => 5000), "2024-10"),
+      charge("2025-09-09", 50000),
+      charge("2026-09-09", 60000),
+    ];
+    expect(dates(annualRun(charges))).toEqual(["2025-09-09", "2026-09-09"]);
+  });
+
+  it("en un mes con varios cobros elige el de la misma moneda con el monto más cercano", () => {
+    const charges = [
+      charge("2025-01-03", 300),
+      charge("2025-01-05", 950),
+      charge("2025-01-20", 990, { currency: "USD" }),
+      charge("2026-01-05", 1000),
+    ];
+    expect(amounts(annualRun(charges))).toEqual([950, 1000]);
+  });
+
+  it("si ninguno de los varios cobros es de la misma moneda, la racha termina", () => {
+    const charges = [charge("2025-01-03", 300), charge("2025-01-05", 950), charge("2026-01-05", 10, { currency: "USD" })];
+    expect(dates(annualRun(charges))).toEqual(["2026-01-05"]);
+  });
+
+  it("un único cobro en el mes entra aunque sea de otra moneda", () => {
+    const charges = [charge("2025-01-05", 90000), charge("2026-01-05", 80, { currency: "USD" })];
+    expect(dates(annualRun(charges))).toEqual(["2025-01-05", "2026-01-05"]);
+  });
+
+  it("devuelve la racha ordenada aunque los cobros lleguen desordenados", () => {
+    expect(dates(annualRun([charge("2026-01-05", 120), charge("2025-01-05", 110)]))).toEqual(["2025-01-05", "2026-01-05"]);
+  });
+});
+
 describe("similarAmounts", () => {
   it("tolera un mes con +51 % en la punta de cinco cobros", () => {
     expect(similarAmounts(monthlyCharges([151, 100, 100, 100, 100]))).toBe(true);
@@ -232,7 +279,7 @@ describe("detectSubscriptions", () => {
       key: "STREAMFLIX COM",
       nombre: "STREAMFLIX.COM",
       busqueda: "STREAMFLIX",
-      categoria: "Suscripciones",
+      categoria: "Entretenimiento",
       cardLabel: "Visa Signature",
       moneda: "ARS",
       montoActual: 5490,
@@ -245,6 +292,7 @@ describe("detectSubscriptions", () => {
       oculta: false,
       aumento: null,
       monedaAnterior: null,
+      cadencia: "mensual",
     }]);
   });
 
@@ -427,6 +475,196 @@ describe("detectSubscriptions", () => {
   });
 });
 
+describe("detectSubscriptions con suscripciones forzadas", () => {
+  it("un solo cobro con la categoría Suscripciones aparece activa y mensual", () => {
+    const txs = [tx("2026-09-15", 4500, { merchant: "VIDEOMAX 99123", ...SUSCRIPCION })];
+    expect(detectSubscriptions(txs, ctx({ ultimoCierre: CIERRE_SEPTIEMBRE }))).toEqual([expect.objectContaining({
+      key: "VIDEOMAX",
+      nombre: "VIDEOMAX",
+      categoria: CATEGORIA_SUSCRIPCIONES,
+      primerCobro: "2026-09-15",
+      ultimoCobro: "2026-09-15",
+      proximoCobro: "2026-10-15",
+      cobros: 1,
+      estado: "activa",
+      cadencia: "mensual",
+      montoMensualArs: 4500,
+      aumento: null,
+    })]);
+  });
+
+  it("un solo cobro con la categoría Suscripciones de hace meses queda cortada", () => {
+    const txs = [tx("2026-01-20", 4500, { merchant: "VIDEOMAX", ...SUSCRIPCION })];
+    expect(detectSubscriptions(txs, ctx({ ultimoCierre: CIERRE_SEPTIEMBRE }))).toMatchObject([
+      { key: "VIDEOMAX", estado: "cortada", cadencia: "mensual", cobros: 1 },
+    ]);
+  });
+
+  it("la categoría en un cobro viejo pero no en el último no la fuerza", () => {
+    const txs = [
+      tx("2026-07-10", 4500, { merchant: "VIDEOMAX", ...SUSCRIPCION }),
+      tx("2026-09-10", 4500, { merchant: "VIDEOMAX" }),
+    ];
+    expect(detectSubscriptions(txs, ctx())).toEqual([]);
+  });
+
+  it("la categoría se compara por nombre exacto", () => {
+    const txs = [tx("2026-09-15", 4500, { merchant: "VIDEOMAX", category: "suscripciones" })];
+    expect(detectSubscriptions(txs, ctx())).toEqual([]);
+  });
+
+  it("la marca manual la fuerza por la clave canónica", () => {
+    const txs = [tx("2026-09-15", 4500, { merchant: "VIDEOMAX 99123" })];
+    expect(detectSubscriptions(txs, ctx({ manuales: new Set(["VIDEOMAX"]) }))).toMatchObject([
+      { key: "VIDEOMAX", cobros: 1, cadencia: "mensual" },
+    ]);
+  });
+
+  it("la marca manual la fuerza por una clave cruda que se fusionó en la canónica", () => {
+    const txs = [
+      tx("2026-08-09", 3500, { merchant: "GOOGLE *VideoP X1y2Z3" }),
+      tx("2026-09-09", 3500, { merchant: "GOOGLE *VideoPremium" }),
+    ];
+    expect(detectSubscriptions(txs, ctx({ manuales: new Set(["GOOGLE VIDEOPREMIUM"]) }))).toMatchObject([
+      { key: "GOOGLE VIDEOP", cobros: 2, primerCobro: "2026-08-09" },
+    ]);
+  });
+
+  it("una racha válida no cambia por estar forzada", () => {
+    const txs = [...monthly([100, 100, 100], "2026-01", SUSCRIPCION), tx("2026-05-09", 900, SUSCRIPCION)];
+    expect(detectSubscriptions(txs, ctx())).toMatchObject([{ ultimoCobro: "2026-03-09", cobros: 3, montoActual: 100 }]);
+  });
+
+  it("si la racha válida tiene un cobro parecido después, toma la última racha", () => {
+    const txs = [...monthly([100, 100, 100]), ...monthly([100, 100], "2026-05", SUSCRIPCION)];
+    expect(detectSubscriptions(txs, ctx())).toMatchObject([
+      { primerCobro: "2026-05-09", ultimoCobro: "2026-06-09", cobros: 2 },
+    ]);
+  });
+
+  it("la última racha de una forzada no chequea montos", () => {
+    const txs = monthly([26300, 12600], "2026-08", { merchant: "VIDEOMAX", ...SUSCRIPCION });
+    expect(detectSubscriptions(txs, ctx())).toMatchObject([{ cobros: 2, montoActual: 12600 }]);
+  });
+
+  it("si su único mes tiene dos cobros, aparece con el último", () => {
+    const txs = [
+      tx("2026-09-05", 4500, { merchant: "VIDEOMAX", ...SUSCRIPCION }),
+      tx("2026-09-18", 1200, { merchant: "VIDEOMAX", ...SUSCRIPCION }),
+    ];
+    expect(detectSubscriptions(txs, ctx())).toMatchObject([
+      { primerCobro: "2026-09-18", ultimoCobro: "2026-09-18", cobros: 1, montoActual: 1200 },
+    ]);
+  });
+
+  it("si su último mes tiene varios cobros y antes hubo uno suelto, aparece activa desde el último mes", () => {
+    const txs = [
+      tx("2026-08-05", 4500, { merchant: "VIDEOMAX", ...SUSCRIPCION }),
+      tx("2026-09-05", 5850, { merchant: "VIDEOMAX", ...SUSCRIPCION }),
+      tx("2026-09-18", 300, { merchant: "VIDEOMAX", ...SUSCRIPCION }),
+    ];
+    expect(detectSubscriptions(txs, ctx({ ultimoCierre: CIERRE_SEPTIEMBRE }))).toMatchObject([
+      { estado: "activa", ultimoCobro: "2026-09-18", cobros: 1 },
+    ]);
+  });
+
+  it("marcada a mano con un cobro viejo suelto y varios en el último mes, se sigue listando", () => {
+    const txs = [
+      tx("2025-03-10", 4500, { merchant: "VIDEOMAX" }),
+      tx("2026-09-05", 5850, { merchant: "VIDEOMAX" }),
+      tx("2026-09-18", 300, { merchant: "VIDEOMAX" }),
+    ];
+    expect(detectSubscriptions(txs, ctx({ manuales: new Set(["VIDEOMAX"]), ultimoCierre: CIERRE_SEPTIEMBRE }))).toMatchObject([
+      { estado: "activa", ultimoCobro: "2026-09-18" },
+    ]);
+  });
+
+  it("una forzada oculta llega oculta", () => {
+    const txs = [tx("2026-09-15", 4500, { merchant: "VIDEOMAX", ...SUSCRIPCION })];
+    expect(detectSubscriptions(txs, ctx({ ocultas: new Set(["VIDEOMAX"]) }))).toMatchObject([{ oculta: true }]);
+  });
+});
+
+const ANUAL: Partial<SubscriptionContext> = { anuales: new Set(["STREAMBOX"]) };
+
+describe("detectSubscriptions con cadencia anual", () => {
+  it("una anual cobra de nuevo en un año y suma un doceavo por mes", () => {
+    const txs = [tx("2026-01-14", 60000, { merchant: "STREAMBOX 4410" })];
+    expect(detectSubscriptions(txs, ctx({ ...ANUAL, ultimoCierre: CIERRE_SEPTIEMBRE }))).toEqual([expect.objectContaining({
+      key: "STREAMBOX",
+      cadencia: "anual",
+      estado: "activa",
+      cobros: 1,
+      montoActual: 60000,
+      montoMensualArs: 5000,
+      ultimoCobro: "2026-01-14",
+      proximoCobro: "2027-01-14",
+    })]);
+  });
+
+  it("sin la marca, ese mismo cobro con la categoría Suscripciones es una mensual cortada", () => {
+    const txs = [tx("2026-01-14", 60000, { merchant: "STREAMBOX 4410", ...SUSCRIPCION })];
+    expect(detectSubscriptions(txs, ctx({ ultimoCierre: CIERRE_SEPTIEMBRE }))).toMatchObject([
+      { cadencia: "mensual", estado: "cortada", proximoCobro: "2026-02-14" },
+    ]);
+  });
+
+  it("una anual en dólares pasa a pesos y divide por 12", () => {
+    const txs = [tx("2026-01-14", 99.99, { merchant: "STREAMBOX", currency: "USD" })];
+    expect(detectSubscriptions(txs, ctx({ ...ANUAL, cotizacion: 1465 }))).toMatchObject([{ montoMensualArs: 12207.11 }]);
+  });
+
+  it("queda cortada si el próximo cobro más la gracia cae antes del último cierre, y se sigue listando", () => {
+    const txs = [tx("2025-03-10", 60000, { merchant: "STREAMBOX" })];
+    expect(detectSubscriptions(txs, ctx({ ...ANUAL, ultimoCierre: CIERRE_SEPTIEMBRE }))).toMatchObject([
+      { cadencia: "anual", estado: "cortada", proximoCobro: "2026-03-10" },
+    ]);
+  });
+
+  it("una anual cortada deja de listarse 12 meses después de su próximo cobro", () => {
+    const txs = [tx("2024-08-10", 60000, { merchant: "STREAMBOX" })];
+    expect(detectSubscriptions(txs, ctx({ ...ANUAL, ultimoCierre: CIERRE_SEPTIEMBRE }))).toEqual([]);
+  });
+
+  it("si pasó de mensual a anual, junta solo los cobros anuales y mide el aumento contra el del año anterior", () => {
+    const txs = [
+      ...monthly(Array.from({ length: 11 }, () => 5000), "2024-10", { merchant: "STREAMBOX" }),
+      tx("2025-09-09", 50000, { merchant: "STREAMBOX" }),
+      tx("2026-09-09", 60000, { merchant: "STREAMBOX" }),
+    ];
+    expect(detectSubscriptions(txs, ctx(ANUAL))).toMatchObject([{
+      cadencia: "anual",
+      cobros: 2,
+      primerCobro: "2025-09-09",
+      aumento: { variacion: expect.closeTo(0.2, 6), desde: "2025-09", montoAnterior: 50000 },
+    }]);
+  });
+
+  it("mide el aumento aunque el cobro del año anterior haya caído unos días antes en el mes", () => {
+    const txs = [tx("2025-01-05", 50000, { merchant: "STREAMBOX" }), tx("2026-01-08", 60000, { merchant: "STREAMBOX" })];
+    expect(detectSubscriptions(txs, ctx(ANUAL))).toMatchObject([
+      { aumento: { variacion: expect.closeTo(0.2, 6), desde: "2025-01", montoAnterior: 50000 } },
+    ]);
+  });
+
+  it("la marca anual se busca también por la clave cruda", () => {
+    const txs = [
+      tx("2025-01-09", 3500, { merchant: "GOOGLE *VideoP X1y2Z3" }),
+      tx("2026-01-09", 3500, { merchant: "GOOGLE *VideoPremium" }),
+    ];
+    expect(detectSubscriptions(txs, ctx({ anuales: new Set(["GOOGLE VIDEOPREMIUM"]) }))).toMatchObject([
+      { key: "GOOGLE VIDEOP", cadencia: "anual", cobros: 2 },
+    ]);
+  });
+
+  it("marcada como anual y oculta a la vez, llega oculta", () => {
+    const txs = [tx("2026-01-14", 60000, { merchant: "STREAMBOX" })];
+    expect(detectSubscriptions(txs, ctx({ ...ANUAL, ocultas: new Set(["STREAMBOX"]) }))).toMatchObject([
+      { cadencia: "anual", oculta: true },
+    ]);
+  });
+});
+
 describe("summarizeSubscriptions", () => {
   const item = (overrides: Partial<SubscriptionDTO>): SubscriptionDTO => ({
     key: "K",
@@ -445,6 +683,7 @@ describe("summarizeSubscriptions", () => {
     oculta: false,
     aumento: null,
     monedaAnterior: null,
+    cadencia: "mensual",
     ...overrides,
   });
 
@@ -456,6 +695,15 @@ describe("summarizeSubscriptions", () => {
       item({ montoActual: 3000, montoMensualArs: 3000, estado: "cortada" }),
       item({ montoActual: 7000, montoMensualArs: 7000, oculta: true }),
     ])).toEqual({ totalMensualArs: 19650, totalMensualUsd: 15, totalAnualArs: 235800 });
+  });
+
+  it("una anual suma un doceavo: los pesos ya vienen divididos y los dólares se dividen por 12", () => {
+    expect(summarizeSubscriptions([
+      item({ montoActual: 5000, montoMensualArs: 5000 }),
+      item({ cadencia: "anual", montoActual: 60000, montoMensualArs: 5000 }),
+      item({ cadencia: "anual", moneda: "USD", montoActual: 120, montoMensualArs: 14650 }),
+      item({ moneda: "USD", montoActual: 10, montoMensualArs: 14650 }),
+    ])).toEqual({ totalMensualArs: 39300, totalMensualUsd: 20, totalAnualArs: 471600 });
   });
 
   it("sin suscripciones da totales en cero", () => {
