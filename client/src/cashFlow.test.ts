@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { CashFlowMonthDTO } from "@ledgerly/shared";
 import {
   averageSavingsRate, cashFlowChartRows, cashFlowYears, closedMonths, closedMonthsInYears, detailRows, formatSavingsRate,
-  incompleteCaption, isNegative, lastClosedMonth, lastCompleteMonth, monthNotes, notesText, projectionMonths,
+  incompleteCaption, isNegative, lastClosedMonth, lastCompleteMonth, monthNotes, projectionMonths,
   savingsAverageLabel, shortMonth,
 } from "./cashFlow.js";
 
@@ -107,9 +107,7 @@ describe("textos", () => {
       { label: "Falta", text: "Resumen ICBC, Cupón del auto" },
       { label: "Estimado", text: "Sueldo (último neto)" },
     ]);
-    expect(notesText(mes)).toBe("Falta: Resumen ICBC, Cupón del auto · Estimado: Sueldo (último neto)");
     expect(monthNotes(month("2026-08"))).toEqual([]);
-    expect(notesText(month("2026-08"))).toBe("");
   });
 
   it("explica los meses incompletos del gráfico", () => {

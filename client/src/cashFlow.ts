@@ -93,9 +93,6 @@ export const monthNotes = ({ faltantes, estimados }: CashFlowMonthDTO): MonthNot
   ...note("Estimado", estimados),
 ];
 
-export const notesText = (mes: CashFlowMonthDTO): string =>
-  monthNotes(mes).map(({ label, text }) => `${label}: ${text}`).join(" · ");
-
 export const shortMonth = (mes: string): string => `${monthLabel(mes)} ${mes.slice(0, 4)}`;
 
 export const incompleteCaption = (meses: CashFlowMonthDTO[]): string | null => {

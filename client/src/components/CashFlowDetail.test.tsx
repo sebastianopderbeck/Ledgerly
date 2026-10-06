@@ -46,14 +46,15 @@ const conSac: CashFlowMonthDTO = {
 const meses = [conSac, negativo, incompleto, completo];
 
 describe("CashFlowTable", () => {
-  it("muestra una fila por mes con su estado, montos y notas", () => {
+  it("muestra una fila por mes con su estado y montos, sin notas", () => {
     renderWithProviders(<CashFlowTable meses={meses} />);
     const table = screen.getByRole("table", { name: "Detalle del flujo de caja" });
     expect(within(table).getAllByRole("row")).toHaveLength(5);
     const septiembre = within(table).getByRole("row", { name: /Septiembre de 2026/ });
     expect(within(septiembre).getByText("Incompleto")).toBeInTheDocument();
     expect(within(septiembre).getAllByText("—")).toHaveLength(2);
-    expect(within(septiembre).getByText("Falta: Resumen ICBC")).toBeInTheDocument();
+    expect(within(septiembre).queryByText(/Resumen ICBC/)).not.toBeInTheDocument();
+    expect(within(table).queryByRole("columnheader", { name: "Notas" })).not.toBeInTheDocument();
     const agosto = within(table).getByRole("row", { name: /Agosto de 2026/ });
     expect(within(agosto).getByText("Completo")).toBeInTheDocument();
     expect(within(agosto).getByText("10,0%")).toBeInTheDocument();
