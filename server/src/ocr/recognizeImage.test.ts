@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { OcrFailedError, OcrUnavailableError } from "../ingestion/errors.js";
@@ -7,6 +7,10 @@ import { recognizeImage, type OcrObservation, type RecognizeImageDeps } from "./
 const OBSERVATIONS: OcrObservation[] = [{ text: "Capital", x: 0.04, y: 0.38, height: 0.03 }];
 
 const darwin = (runScript: RecognizeImageDeps["runScript"]): RecognizeImageDeps => ({ platform: "darwin", runScript });
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("recognizeImage", () => {
   it("fuera de macOS falla con OcrUnavailableError sin correr el script", async () => {
@@ -52,4 +56,22 @@ describe("recognizeImage", () => {
     await expect(recognizeImage(new Uint8Array([1]), "a.png", darwin(notJson))).rejects.toBeInstanceOf(OcrFailedError);
     await expect(recognizeImage(new Uint8Array([1]), "a.png", darwin(wrongShape))).rejects.toBeInstanceOf(OcrFailedError);
   });
+});
+
+describe("recognizeImage, registro de fallas", () => {
+  it("deja en el log el motivo por el que falló el OCR", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const runScript = vi.fn(async (_script: string, _imagePath: string): Promise<string> => {
+      throw new Error("Vision sin permiso");
+    });
+    await expect(recognizeImage(new Uint8Array([1]), "a.png", darwin(runScript))).rejects.toBeInstanceOf(OcrFailedError);
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("Vision sin permiso"));
+  });
+
+  it.skipIf(process.platform !== "darwin")("en macOS el log incluye el error real de osascript", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(recognizeImage(new TextEncoder().encode("no soy una imagen"), "falsa.png"))
+      .rejects.toBeInstanceOf(OcrFailedError);
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("Vision no pudo procesar la imagen"));
+  }, 60_000);
 });

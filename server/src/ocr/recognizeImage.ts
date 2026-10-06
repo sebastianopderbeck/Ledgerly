@@ -23,8 +23,8 @@ const IMAGE_EXTENSION = /^\.(png|jpe?g|heic)$/;
 
 const runOsascript = (scriptPath: string, imagePath: string): Promise<string> =>
   new Promise((resolve, reject) => {
-    execFile("osascript", ["-l", "JavaScript", scriptPath, imagePath], { timeout: TIMEOUT_MS }, (error, stdout) => {
-      if (error) reject(error);
+    execFile("osascript", ["-l", "JavaScript", scriptPath, imagePath], { timeout: TIMEOUT_MS }, (error, stdout, stderr) => {
+      if (error) reject(new Error(stderr.trim() || error.message));
       else resolve(stdout);
     });
   });
@@ -59,7 +59,8 @@ export async function recognizeImage(
   try {
     await writeFile(imagePath, data);
     return parseObservations(await deps.runScript(SCRIPT_PATH, imagePath));
-  } catch {
+  } catch (err) {
+    console.error(`OCR (Vision): ${err instanceof Error ? err.message : String(err)}`);
     throw new OcrFailedError();
   } finally {
     await rm(dir, { recursive: true, force: true });
