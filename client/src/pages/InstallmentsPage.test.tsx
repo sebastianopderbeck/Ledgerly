@@ -12,10 +12,22 @@ const detail = [
   { month: "2026-06", total: 1500, count: 1, items: [item(3)] },
   { month: "2026-07", total: 1500, count: 1, items: [item(4)] },
 ];
+const purchases = [{
+  id: "ICBC|2026-01-15|MERCADOLIBRE|3|1", cardLabel: "ICBC", merchant: "MERCADOLIBRE", category: "Compras",
+  purchaseDate: "2026-01-15", installmentTotal: 3,
+  installments: [
+    { number: 1, amount: 1000, paymentDate: "2026-02-10" },
+    { number: 2, amount: 1000, paymentDate: "2026-03-10" },
+    { number: 3, amount: 1000, paymentDate: "2026-04-10" },
+  ],
+}];
+const inflation = [{ periodo: "2026-02", variacionMensual: 2 }, { periodo: "2026-03", variacionMensual: 2 }];
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-    const body = url.includes("/stats/future-installments/detail") ? detail
+    const body = url.includes("/stats/installment-purchases") ? purchases
+      : url.includes("/inflation") ? inflation
+      : url.includes("/stats/future-installments/detail") ? detail
       : url.includes("/stats/future-installments") ? [{ month: "2026-06", total: 1500 }, { month: "2026-07", total: 1500 }]
       : url.includes("/transactions/categories") ? []
       : url.includes("/statements") ? []
@@ -26,6 +38,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const detailUrl = () => vi.mocked(fetch).mock.calls.map((call) => String(call[0])).find((url) => url.includes("/stats/future-installments/detail"));
+const savingsRegion = () => screen.queryByRole("region", { name: "Cuánto te ahorran las cuotas" });
 
 describe("InstallmentsPage", () => {
   it("en mobile el chip de la cuota va debajo del comercio", async () => {
@@ -69,5 +82,35 @@ describe("InstallmentsPage", () => {
     renderWithProviders(<InstallmentsPage />, { route: "/installments?year=2026&year=2027" });
     await waitFor(() => expect(detailUrl()).toBeDefined());
     expect(detailUrl()).toContain("year=2026&year=2027");
+  });
+
+  it("muestra el ahorro de las cuotas en pesos entre los gráficos y el detalle por mes", async () => {
+    renderWithProviders(<InstallmentsPage />, { route: "/installments?year=2026" });
+    expect(await screen.findByText("Ahorro real")).toBeInTheDocument();
+    const region = savingsRegion()!;
+    const charts = screen.getByText("Cuotas pendientes por categoría");
+    const firstMonth = screen.getByText("Junio de 2026");
+    expect(charts.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(region.compareDocumentPosition(firstMonth) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("con dólares no muestra el ahorro de las cuotas", async () => {
+    renderWithProviders(<InstallmentsPage />, { route: "/installments?currency=USD" });
+    expect(await screen.findByText("Cuotas pendientes")).toBeInTheDocument();
+    expect(savingsRegion()).not.toBeInTheDocument();
+  });
+
+  it("muestra el ahorro aunque no haya cuotas pendientes en los años elegidos", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const body = url.includes("/stats/installment-purchases") ? purchases
+        : url.includes("/inflation") ? inflation
+        : url.includes("/stats/future-installments") ? []
+        : {};
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    }));
+    renderWithProviders(<InstallmentsPage />, { route: "/installments?year=2026" });
+    expect(await screen.findByText("No hay cuotas que venzan en 2026")).toBeInTheDocument();
+    expect(await screen.findByText("Ahorro real")).toBeInTheDocument();
+    expect(savingsRegion()).toBeInTheDocument();
   });
 });
