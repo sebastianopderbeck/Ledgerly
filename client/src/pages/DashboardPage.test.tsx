@@ -4,6 +4,7 @@ import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { DashboardPage } from "./DashboardPage.js";
 
 function route(url: string) {
+  if (url.includes("/inflation")) return [];
   if (url.includes("/statements")) return [
     {
       id: "i1", issuer: "icbc", cardLabel: "ICBC", last4: "1234",
@@ -24,6 +25,7 @@ function route(url: string) {
   if (url.includes("/stats/last-statement/by-category")) return [{ category: "Restaurantes", total: 900, count: 2 }];
   if (url.includes("/stats/by-category")) return [{ category: "Compras", total: 1500, count: 1 }];
   if (url.includes("/stats/monthly")) return [{ month: "2026-05", total: 2000, count: 2 }];
+  if (url.includes("/stats/future-installments/detail")) return [];
   if (url.includes("/stats/future-installments")) return [{ month: "2026-06", total: 1500 }];
   if (url.includes("/stats/top-merchants")) return [{ merchant: "MERCADOLIBRE", total: 1500, count: 1 }];
   return {};
@@ -44,6 +46,7 @@ describe("DashboardPage", () => {
     await waitFor(() => expect(screen.getByText(/total gastado/i)).toBeInTheDocument());
     expect(screen.getByText("Gasto por categoría")).toBeInTheDocument();
     expect(screen.getByText("Gasto por categoría (último resumen)")).toBeInTheDocument();
+    expect(screen.getByText("Gasto real (pesos de hoy)")).toBeInTheDocument();
     expect(await screen.findByText("A pagar al cierre")).toBeInTheDocument();
     expect(await screen.findByText("A pagar por mes en USD (al oficial)")).toBeInTheDocument();
     expect(screen.getAllByText((text) => text.includes("≈")).length).toBeGreaterThan(0);
@@ -71,5 +74,11 @@ describe("DashboardPage", () => {
     renderWithProviders(<DashboardPage />, { route: "/?year=2025&year=2026" });
     await waitFor(() => expect(urlOf("/stats/monthly-usd")).toBeDefined());
     expect(urlOf("/stats/monthly-usd")).toContain("year=2025&year=2026");
+  });
+
+  it("el gasto real pide el detalle de cuotas sin year", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/?year=2025&year=2026" });
+    await waitFor(() => expect(urlOf("/stats/future-installments/detail")).toBeDefined());
+    expect(urlOf("/stats/future-installments/detail")).not.toContain("year=");
   });
 });
