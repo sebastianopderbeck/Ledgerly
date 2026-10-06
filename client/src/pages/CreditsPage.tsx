@@ -5,6 +5,7 @@ import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { yearsOf } from "../filters/globalFilters.js";
 import { useCreditCouponsInYears } from "../filters/useInYears.js";
 import { CreditKpiCards } from "../components/CreditKpiCards.js";
+import { PrepaymentSimulatorCard } from "../components/PrepaymentSimulatorCard.js";
 import { MortgageCouponCards } from "../components/MortgageCouponCards.js";
 import { MortgageCouponsTable } from "../components/MortgageCouponsTable.js";
 import { MotionBox } from "../components/motion/motion.js";
@@ -43,6 +44,7 @@ export const CreditsPage = () => {
         <>
           <FiltersBar fields={CREDIT_FIELDS} yearOptions={yearOptions} />
           <CreditKpiCards />
+          <PrepaymentSimulatorCard />
           <MotionBox
             variants={staggerContainer}
             initial="hidden"

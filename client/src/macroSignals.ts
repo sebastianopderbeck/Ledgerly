@@ -199,7 +199,7 @@ function retornoPesos({ tasaAnualPesos, inflacionEsperada }: MacroAssumptions): 
   return ((1 + tea) / (1 + inflacionEsperada / 100) - 1) * 100;
 }
 
-function retornoAdelantar(credit: CreditSummaryDTO | undefined): number | null {
+export function retornoAdelantar(credit: CreditSummaryDTO | undefined): number | null {
   if (!credit) return null;
   return ((1 + credit.tasaRealMensual) ** 12 - 1) * 100;
 }
