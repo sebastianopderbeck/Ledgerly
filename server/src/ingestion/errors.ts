@@ -60,3 +60,17 @@ export class EncryptedPdfError extends IngestionError {
     this.name = "EncryptedPdfError";
   }
 }
+
+export class OcrUnavailableError extends IngestionError {
+  constructor() {
+    super("La lectura de imágenes sólo funciona en macOS");
+    this.name = "OcrUnavailableError";
+  }
+}
+
+export class OcrFailedError extends IngestionError {
+  constructor() {
+    super("No se pudo leer el texto de la imagen");
+    this.name = "OcrFailedError";
+  }
+}
