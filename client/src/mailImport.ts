@@ -1,5 +1,6 @@
 import {
-  MAIL_SOURCE_LABELS, type MailSource, type MailSyncItemDTO, type MailSyncOutcome, type MailSyncRunDTO, type MailSyncTrigger,
+  MAIL_SOURCE_LABELS, type MailSource, type MailSourceStatusDTO, type MailSyncItemDTO, type MailSyncOutcome, type MailSyncRunDTO,
+  type MailSyncTrigger,
 } from "@ledgerly/shared";
 import { formatLocalDate } from "./format.js";
 import { IMPORTED_FILE_KIND_LABELS } from "./importedFiles.js";
@@ -36,6 +37,8 @@ const SETUP_SECTIONS: Record<MailSource, string> = { gmail: "Importar desde Gmai
 
 const SCOPE_PREFIXES: Record<MailSource, string> = { gmail: "Consulta", icloud: "Revisa" };
 
+const HIDDEN_MAIL_SOURCES: MailSource[] = ["gmail"];
+
 const OUTCOME_COUNT_LABELS: Record<MailSyncOutcome, CountLabels> = {
   imported: { one: "importado", many: "importados" },
   duplicate: { one: "ya estaba", many: "ya estaban" },
@@ -50,6 +53,9 @@ export const joinWithY = (items: string[]): string =>
   (items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`);
 
 export const formatDateTime = (iso: string): string => DATE_TIME_FORMAT.format(new Date(iso));
+
+export const visibleMailStatuses = (statuses: MailSourceStatusDTO[]): MailSourceStatusDTO[] =>
+  statuses.filter(({ source }) => !HIDDEN_MAIL_SOURCES.includes(source));
 
 export const mailSearchLabel = (source: MailSource): string => `Buscar en ${MAIL_SOURCE_LABELS[source]}`;
 

@@ -76,15 +76,16 @@ afterEach(() => {
 });
 
 describe("MailImportSection", () => {
-  it("muestra una tarjeta por fuente, iCloud primero", async () => {
-    withStatuses(disabled("icloud", ["ICLOUD_USER"]), disabled("gmail", GMAIL_VARS));
+  it("muestra solo la tarjeta de iCloud: Gmail queda oculto aunque el server lo informe", async () => {
+    withStatuses(icloudEnabled(), GMAIL_ENABLED);
     renderWithProviders(<MailImportSection />);
     expect(screen.getByRole("heading", { level: 2, name: "Mails" })).toBeInTheDocument();
     await card("iCloud");
-    expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual(["iCloud", "Gmail"]);
+    expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual(["iCloud"]);
+    expect(screen.queryByRole("button", { name: "Buscar en Gmail" })).not.toBeInTheDocument();
   });
 
-  it("deshabilitadas explican qué falta y no ofrecen buscar", async () => {
+  it("deshabilitada explica qué falta y no ofrece buscar", async () => {
     withStatuses(disabled("icloud", ["ICLOUD_USER"]), disabled("gmail", GMAIL_VARS));
     renderWithProviders(<MailImportSection />);
     const icloud = await card("iCloud");
@@ -92,8 +93,6 @@ describe("MailImportSection", () => {
     expect(within(icloud).getByText(
       "Falta ICLOUD_USER. Los pasos están en el README, sección «Importar desde iCloud»; después reiniciá el server.",
     )).toBeInTheDocument();
-    const gmail = await card("Gmail");
-    expect(within(gmail).getByText(/^Faltan GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET y GMAIL_REFRESH_TOKEN\./)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /buscar en/i })).not.toBeInTheDocument();
   });
 
@@ -109,7 +108,7 @@ describe("MailImportSection", () => {
     expect(await screen.findByText("Mongo caído")).toBeInTheDocument();
   });
 
-  it("habilitadas y sin corridas invitan a buscar, cada una con su alcance", async () => {
+  it("habilitada y sin corridas invita a buscar con su alcance", async () => {
     withStatuses(icloudEnabled(), GMAIL_ENABLED);
     renderWithProviders(<MailImportSection />);
     const icloud = await card("iCloud");
@@ -117,10 +116,6 @@ describe("MailImportSection", () => {
     expect(within(icloud).getByText("Búsqueda automática: todos los días a las 21 h, del 25 al 5")).toBeInTheDocument();
     expect(within(icloud).getByText(`Revisa: ${ICLOUD_SCOPE}`)).toBeInTheDocument();
     expect(await icloudButton()).toBeEnabled();
-    const gmail = await card("Gmail");
-    expect(within(gmail).getByText(`Consulta: ${QUERY}`)).toBeInTheDocument();
-    expect(within(gmail).getByText("Búsqueda automática: apagada")).toBeInTheDocument();
-    expect(within(gmail).getByRole("button", { name: "Buscar en Gmail" })).toBeEnabled();
   });
 
   it("buscar en iCloud llama a su ruta y muestra el resultado en su tarjeta", async () => {
@@ -133,7 +128,6 @@ describe("MailImportSection", () => {
     expect(within(icloud).getByText("resumen-icbc.pdf")).toBeInTheDocument();
     expect(within(icloud).getByText(`Tarjeta · ICBC · 64 movimientos · ${formatLocalDate(RECEIVED_AT)}`)).toBeInTheDocument();
     expect(within(icloud).queryByText("factura-luz.pdf")).not.toBeInTheDocument();
-    expect(within(await card("Gmail")).queryByText(/^Revisé/)).not.toBeInTheDocument();
   });
 
   it("mientras busca el botón dice «Buscando…» y queda deshabilitado", async () => {

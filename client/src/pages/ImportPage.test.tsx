@@ -132,7 +132,7 @@ describe("ImportPage", () => {
     expect(await screen.findByText("COMERCIO UNO")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "revisado: COMERCIO UNO" })).not.toBeChecked();
     const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
-    expect(headings.indexOf("Revisión antes de pagar")).toBeGreaterThan(headings.indexOf("Gmail"));
+    expect(headings.indexOf("Revisión antes de pagar")).toBeGreaterThan(headings.indexOf("Mails"));
     expect(headings.indexOf("Revisión antes de pagar")).toBeLessThan(headings.indexOf("Archivos importados"));
   });
 

@@ -1,6 +1,7 @@
 import { Alert, CircularProgress, Stack, Typography } from "@mui/material";
 import type { MailSourceStatusDTO } from "@ledgerly/shared";
 import { useMailStatus } from "../api/hooks.js";
+import { visibleMailStatuses } from "../mailImport.js";
 import { MailSourceCard } from "./MailSourceCard.js";
 
 interface MailSourceListProps {
@@ -8,7 +9,7 @@ interface MailSourceListProps {
 }
 
 const MailSourceList = ({ statuses }: MailSourceListProps) => {
-  const cards = statuses.map((status) => <MailSourceCard key={status.source} status={status} />);
+  const cards = visibleMailStatuses(statuses).map((status) => <MailSourceCard key={status.source} status={status} />);
   return <Stack spacing={3}>{cards}</Stack>;
 };
 
