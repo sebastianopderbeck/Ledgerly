@@ -9,7 +9,7 @@ export interface SubscriptionListProps {
   items: SubscriptionDTO[];
   variant: SubscriptionVariant;
   onHide: (key: string) => void;
-  onToggleAnnual: (key: string, annual: boolean) => void;
+  onChangeCadence: (key: string, cadencia: Cadencia) => void;
 }
 
 export interface SubscriptionSections {
@@ -25,7 +25,9 @@ export const AMOUNT_LABEL: Record<SubscriptionVariant, string> = { activas: "Por
 
 const CURRENCY_NAMES: Record<Currency, string> = { ARS: "pesos", USD: "dólares" };
 
-const OTHER_CADENCE: Record<Cadencia, Cadencia> = { mensual: "anual", anual: "mensual" };
+export const CADENCE_LABELS: Record<Cadencia, string> = { mensual: "Mensual", bimestral: "Bimestral", anual: "Anual" };
+
+const AMOUNT_CAPTIONS: Record<Cadencia, string | null> = { mensual: null, bimestral: "cada 2 meses", anual: "por año" };
 
 const monthName = (month: string): string => formatMonthLabel(month).toLowerCase();
 
@@ -82,16 +84,16 @@ export function subscriptionTransactionsLink(busqueda: string): string {
   return transactionsLink({ year: ALL_YEARS, search: busqueda });
 }
 
-export function cadenceToggleLabel(nombre: string, cadencia: Cadencia): string {
-  return `Marcar ${nombre} como ${OTHER_CADENCE[cadencia]}`;
+export function cadenceMenuLabel(nombre: string): string {
+  return `Frecuencia de ${nombre}`;
 }
 
-export function cadenceToggleTooltip(cadencia: Cadencia): string {
-  return `Es ${OTHER_CADENCE[cadencia]}`;
+export function cadenceMenuTooltip(cadencia: Cadencia): string {
+  return `Frecuencia: ${CADENCE_LABELS[cadencia].toLowerCase()}`;
 }
 
 export function cadenceAmountCaption(cadencia: Cadencia): string | null {
-  return cadencia === "anual" ? "por año" : null;
+  return AMOUNT_CAPTIONS[cadencia];
 }
 
 export function canMarkAsSubscription({ type, direction, isInstallment, amount }: TransactionDTO): boolean {

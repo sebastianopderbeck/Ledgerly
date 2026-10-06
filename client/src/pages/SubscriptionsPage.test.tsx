@@ -43,7 +43,7 @@ const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 const isMutation = (url: string): boolean =>
-  url.includes("/subscriptions/hidden/") || url.includes("/subscriptions/annual/");
+  url.includes("/subscriptions/hidden/") || url.includes("/subscriptions/cadence/");
 
 const serve = (body: SubscriptionsReportDTO): void => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => (isMutation(url) ? new Response(null, { status: 204 }) : json(body))));
@@ -52,6 +52,10 @@ const serve = (body: SubscriptionsReportDTO): void => {
 const mutations = (): string[] => vi.mocked(fetch).mock.calls
   .filter(([, init]) => init?.method === "PUT" || init?.method === "DELETE")
   .map(([url, init]) => `${init?.method} ${String(url)}`);
+
+const mutationBodies = (): unknown[] => vi.mocked(fetch).mock.calls
+  .filter(([, init]) => init?.method === "PUT" && init.body)
+  .map(([, init]) => JSON.parse(String(init?.body)));
 
 afterEach(() => {
   cleanup();
@@ -107,19 +111,44 @@ describe("SubscriptionsPage", () => {
     await waitFor(() => expect(mutations()).toEqual(["DELETE /api/subscriptions/hidden/PLAN%20AUTOAHORRO"]));
   });
 
-  it("marcar como anual una activa manda el PUT con la clave codificada", async () => {
+  it("el menú de frecuencia marca la actual y elegir bimestral manda el PUT con la clave codificada", async () => {
     serve(report);
     renderWithProviders(<SubscriptionsPage />);
-    await userEvent.click(await screen.findByRole("button", { name: "Marcar STREAMFLIX.COM como anual" }));
-    await waitFor(() => expect(mutations()).toEqual(["PUT /api/subscriptions/annual/STREAMFLIX%20COM"]));
+    await userEvent.click(await screen.findByRole("button", { name: "Frecuencia de STREAMFLIX.COM" }));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((option) => option.textContent)).toEqual(["Mensual", "Bimestral", "Anual"]);
+    expect(within(menu).getByRole("menuitem", { name: "Mensual" })).toHaveClass("Mui-selected");
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Bimestral" }));
+    await waitFor(() => expect(mutations()).toEqual(["PUT /api/subscriptions/cadence/STREAMFLIX%20COM"]));
+    expect(mutationBodies()).toEqual([{ cadencia: "bimestral" }]);
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
   });
 
-  it("una anual que dejó de cobrarse se vuelve mensual con DELETE", async () => {
+  it("elegir la cadencia que ya tiene no manda nada", async () => {
+    serve(report);
+    renderWithProviders(<SubscriptionsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Frecuencia de STREAMFLIX.COM" }));
+    await userEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Mensual" }));
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+    expect(mutations()).toEqual([]);
+  });
+
+  it("una anual que dejó de cobrarse se vuelve mensual desde el menú", async () => {
     serve({ ...report, items: [streamflix, musicapp, { ...gimnasio, cadencia: "anual" }, plan] });
     renderWithProviders(<SubscriptionsPage />);
     const cortadas = await screen.findByRole("table", { name: "Suscripciones que dejaron de cobrarse" });
-    await userEvent.click(within(cortadas).getByRole("button", { name: "Marcar GIMNASIO NORTE como mensual" }));
-    await waitFor(() => expect(mutations()).toEqual(["DELETE /api/subscriptions/annual/GIMNASIO%20NORTE"]));
+    await userEvent.click(within(cortadas).getByRole("button", { name: "Frecuencia de GIMNASIO NORTE" }));
+    await userEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Mensual" }));
+    await waitFor(() => expect(mutations()).toEqual(["PUT /api/subscriptions/cadence/GIMNASIO%20NORTE"]));
+    expect(mutationBodies()).toEqual([{ cadencia: "mensual" }]);
+  });
+
+  it("una bimestral aclara «cada 2 meses» en el monto y «por mes» en pesos", async () => {
+    serve({ ...report, items: [streamflix, { ...musicapp, cadencia: "bimestral", montoActual: 36000, montoMensualArs: 18000 }] });
+    renderWithProviders(<SubscriptionsPage />);
+    const activas = await screen.findByRole("table", { name: "Suscripciones activas" });
+    expect(within(activas).getByText("cada 2 meses")).toBeInTheDocument();
+    expect(within(activas).getByText("por mes")).toBeInTheDocument();
   });
 
   it("una anual aclara «por año» en el monto y «por mes» en pesos", async () => {
@@ -221,7 +250,16 @@ describe("SubscriptionsPage en mobile", () => {
     renderWithProviders(<SubscriptionsPage />);
     const card = await screen.findByRole("article", { name: "MUSICAPP" });
     expect(within(card).getByText(`${money(60000, "ARS")} por año`)).toBeInTheDocument();
-    await userEvent.click(within(card).getByRole("button", { name: "Marcar MUSICAPP como mensual" }));
-    await waitFor(() => expect(mutations()).toEqual(["DELETE /api/subscriptions/annual/MUSICAPP"]));
+    await userEvent.click(within(card).getByRole("button", { name: "Frecuencia de MUSICAPP" }));
+    await userEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Mensual" }));
+    await waitFor(() => expect(mutations()).toEqual(["PUT /api/subscriptions/cadence/MUSICAPP"]));
+    expect(mutationBodies()).toEqual([{ cadencia: "mensual" }]);
+  });
+
+  it("una bimestral suma «cada 2 meses» al monto de la tarjeta", async () => {
+    serve({ ...report, items: [streamflix, { ...musicapp, cadencia: "bimestral", montoActual: 36000, montoMensualArs: 18000 }] });
+    renderWithProviders(<SubscriptionsPage />);
+    const card = await screen.findByRole("article", { name: "MUSICAPP" });
+    expect(within(card).getByText(`${money(36000, "ARS")} cada 2 meses`)).toBeInTheDocument();
   });
 });

@@ -24,7 +24,7 @@ export const VENTANA_CORTADAS_MESES = 12;
 export const DIAS_ANULACION = 15;
 export const TOLERANCIA_ANULACION = 0.01;
 export const CATEGORIA_SUSCRIPCIONES = "Suscripciones";
-export const MESES_CADENCIA: Record<Cadencia, number> = { mensual: 1, anual: 12 };
+export const MESES_CADENCIA: Record<Cadencia, number> = { mensual: 1, bimestral: 2, anual: 12 };
 
 export interface SubscriptionTx {
   date: string;
@@ -44,7 +44,7 @@ export interface SubscriptionContext {
   ultimoCierre: Partial<Record<Issuer, string>>;
   ocultas: ReadonlySet<string>;
   manuales: ReadonlySet<string>;
-  anuales: ReadonlySet<string>;
+  cadencias: ReadonlyMap<string, Cadencia>;
   cotizacion: number | null;
 }
 
@@ -60,6 +60,10 @@ interface KeyedTx {
 }
 
 type Marked = (marks: ReadonlySet<string>) => boolean;
+
+type SpacedCadencia = Exclude<Cadencia, "mensual">;
+
+type PreviousCharge = (current: Charge, monthCharges: Charge[]) => Charge | undefined;
 
 const LOG_PARECIDO = Math.log(1 + VARIACION_PARECIDA);
 
@@ -165,17 +169,26 @@ export function monthlyRuns(charges: Charge[]): Charge[][] {
   return runs;
 }
 
-const previousYearCharge = (current: Charge, monthCharges: Charge[]): Charge | undefined =>
+const previousYearCharge: PreviousCharge = (current, monthCharges) =>
   monthCharges.length === 1 ? monthCharges[0] : closestSameCurrency(current, monthCharges);
 
-export function annualRun(charges: Charge[]): Charge[] {
+const previousBimonthCharge: PreviousCharge = (current, monthCharges) =>
+  closestTo(current, monthCharges.filter((candidate) => isSimilar(current, candidate)));
+
+const PREVIOUS_CHARGE: Record<SpacedCadencia, PreviousCharge> = {
+  bimestral: previousBimonthCharge,
+  anual: previousYearCharge,
+};
+
+export function spacedRun(charges: Charge[], cadencia: SpacedCadencia): Charge[] {
   const months = groupBy(charges, ({ date }) => monthOf(date));
+  const previousCharge = PREVIOUS_CHARGE[cadencia];
   const run: Charge[] = [];
   let current = latestCharge(charges);
   while (current !== undefined) {
     run.unshift(current);
-    const previousMonth = addMonths(monthOf(current.date), -MESES_CADENCIA.anual);
-    current = previousYearCharge(current, months.get(previousMonth) ?? []);
+    const previousMonth = addMonths(monthOf(current.date), -MESES_CADENCIA[cadencia]);
+    current = previousCharge(current, months.get(previousMonth) ?? []);
   }
   return run;
 }
@@ -238,8 +251,11 @@ const previousCurrency = (run: Charge[], last: Charge): Currency | null =>
 const hasMark = (key: string, rawKeys: ReadonlySet<string>, marks: ReadonlySet<string>): boolean =>
   marks.has(key) || [...rawKeys].some((rawKey) => marks.has(rawKey));
 
-const isForced = (charges: Charge[], marked: Marked, { manuales, anuales }: SubscriptionContext): boolean =>
-  latestCharge(charges)?.category === CATEGORIA_SUSCRIPCIONES || marked(manuales) || marked(anuales);
+const markedCadence = (key: string, rawKeys: ReadonlySet<string>, cadencias: ReadonlyMap<string, Cadencia>): Cadencia =>
+  [key, ...rawKeys].map((candidate) => cadencias.get(candidate)).find((cadencia) => cadencia !== undefined) ?? "mensual";
+
+const isForced = (charges: Charge[], marked: Marked, cadencia: Cadencia, { manuales }: SubscriptionContext): boolean =>
+  latestCharge(charges)?.category === CATEGORIA_SUSCRIPCIONES || marked(manuales) || cadencia !== "mensual";
 
 const detectedRun = (charges: Charge[]): Charge[] | undefined => {
   const run = monthlyRuns(charges).filter(isValidRun).at(-1);
@@ -259,14 +275,18 @@ const monthlyRun = (charges: Charge[], forced: boolean): Charge[] | undefined =>
   detectedRun(charges) ?? (forced ? lastMonthlyRun(charges) : undefined);
 
 const runFor = (charges: Charge[], cadencia: Cadencia, forced: boolean): Charge[] | undefined =>
-  cadencia === "anual" ? annualRun(charges) : monthlyRun(charges, forced);
+  cadencia === "mensual" ? monthlyRun(charges, forced) : spacedRun(charges, cadencia);
 
 const tooOldToList = (cadencia: Cadencia, last: Charge, proximoCobro: string, hoy: string): boolean =>
   (cadencia === "anual" ? proximoCobro : last.date) < addMonthsClamped(hoy, -VENTANA_CORTADAS_MESES);
 
-const subscriptionOf = (charges: Charge[], marked: Marked, ctx: SubscriptionContext): SubscriptionDTO | null => {
-  const cadencia: Cadencia = marked(ctx.anuales) ? "anual" : "mensual";
-  const run = runFor(charges, cadencia, isForced(charges, marked, ctx));
+const subscriptionOf = (
+  charges: Charge[],
+  cadencia: Cadencia,
+  marked: Marked,
+  ctx: SubscriptionContext,
+): SubscriptionDTO | null => {
+  const run = runFor(charges, cadencia, isForced(charges, marked, cadencia, ctx));
   if (run === undefined) return null;
   const first = run[0];
   const last = run[run.length - 1];
@@ -320,7 +340,7 @@ export function detectSubscriptions(txs: SubscriptionTx[], ctx: SubscriptionCont
     .flatMap(([key, charges]) => {
       const rawKeys = new Set((rowsByGroup.get(key) ?? []).map(({ rawKey }) => rawKey));
       const marked: Marked = (marks) => hasMark(key, rawKeys, marks);
-      const subscription = subscriptionOf(charges, marked, ctx);
+      const subscription = subscriptionOf(charges, markedCadence(key, rawKeys, ctx.cadencias), marked, ctx);
       return subscription ? [subscription] : [];
     })
     .sort(compareSubscriptions);

@@ -4,9 +4,10 @@ import { formatMoney } from "./format.js";
 import {
   AMOUNT_LABEL,
   activeCountLabel,
+  CADENCE_LABELS,
   cadenceAmountCaption,
-  cadenceToggleLabel,
-  cadenceToggleTooltip,
+  cadenceMenuLabel,
+  cadenceMenuTooltip,
   canMarkAsSubscription,
   increaseDetail,
   increaseLabel,
@@ -125,18 +126,22 @@ describe("subscriptionTransactionsLink", () => {
 });
 
 describe("textos de cadencia", () => {
-  it("cadenceToggleLabel ofrece pasar a la otra cadencia", () => {
-    expect(cadenceToggleLabel("STREAMBOX", "mensual")).toBe("Marcar STREAMBOX como anual");
-    expect(cadenceToggleLabel("STREAMBOX", "anual")).toBe("Marcar STREAMBOX como mensual");
+  it("CADENCE_LABELS nombra cada cadencia", () => {
+    expect(CADENCE_LABELS).toEqual({ mensual: "Mensual", bimestral: "Bimestral", anual: "Anual" });
   });
 
-  it("cadenceToggleTooltip nombra la cadencia de destino", () => {
-    expect(cadenceToggleTooltip("mensual")).toBe("Es anual");
-    expect(cadenceToggleTooltip("anual")).toBe("Es mensual");
+  it("cadenceMenuLabel nombra el comercio", () => {
+    expect(cadenceMenuLabel("STREAMBOX")).toBe("Frecuencia de STREAMBOX");
   });
 
-  it("cadenceAmountCaption aclara solo las anuales", () => {
+  it("cadenceMenuTooltip dice la cadencia actual", () => {
+    expect(cadenceMenuTooltip("mensual")).toBe("Frecuencia: mensual");
+    expect(cadenceMenuTooltip("bimestral")).toBe("Frecuencia: bimestral");
+  });
+
+  it("cadenceAmountCaption aclara las que no son mensuales", () => {
     expect(cadenceAmountCaption("anual")).toBe("por año");
+    expect(cadenceAmountCaption("bimestral")).toBe("cada 2 meses");
     expect(cadenceAmountCaption("mensual")).toBeNull();
   });
 });

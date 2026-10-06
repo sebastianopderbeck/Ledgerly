@@ -137,8 +137,8 @@ import {
   inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSourceStatusDtoSchema, mailSyncRunDtoSchema,
   MANUAL_ASSET_TYPE_LABELS, manualAssetCreateSchema, manualAssetTypeSchema, manualAssetUpdateSchema,
   manualSubscriptionInputSchema, netWorthDtoSchema,
-  statementReviewDtoSchema, statementReviewKeysDtoSchema, statementReviewPatchSchema, subscriptionsReportDtoSchema,
-  uncategorizedInboxDtoSchema,
+  statementReviewDtoSchema, statementReviewKeysDtoSchema, statementReviewPatchSchema, subscriptionCadenceInputSchema,
+  subscriptionsReportDtoSchema, uncategorizedInboxDtoSchema,
 } from "./dtos.js";
 
 const cashFlowMonth = {
@@ -200,13 +200,27 @@ describe("subscriptionsReportDtoSchema", () => {
     expect(subscriptionsReportDtoSchema.safeParse(dto).success).toBe(false);
   });
 
-  it("valida la cadencia anual y rechaza una desconocida o ausente", () => {
+  it("valida las cadencias bimestral y anual y rechaza una desconocida o ausente", () => {
     const report = (item: object) => ({
       cotizacionOficial: null, totalMensualArs: 0, totalMensualUsd: 0, totalAnualArs: 0, items: [item],
     });
+    expect(subscriptionsReportDtoSchema.parse(report({ ...subscription, cadencia: "bimestral" })).items[0].cadencia).toBe("bimestral");
     expect(subscriptionsReportDtoSchema.parse(report({ ...subscription, cadencia: "anual" })).items[0].cadencia).toBe("anual");
     expect(subscriptionsReportDtoSchema.safeParse(report({ ...subscription, cadencia: "semanal" })).success).toBe(false);
     expect(subscriptionsReportDtoSchema.safeParse(report({ ...subscription, cadencia: undefined })).success).toBe(false);
+  });
+});
+
+describe("subscriptionCadenceInputSchema", () => {
+  it.each(["mensual", "bimestral", "anual"])("acepta la cadencia %s", (cadencia) => {
+    expect(subscriptionCadenceInputSchema.parse({ cadencia })).toEqual({ cadencia });
+  });
+
+  it.each([
+    ["sin cadencia", {}],
+    ["con una cadencia desconocida", { cadencia: "semanal" }],
+  ])("rechaza un body %s", (_label, body) => {
+    expect(subscriptionCadenceInputSchema.safeParse(body).success).toBe(false);
   });
 });
 

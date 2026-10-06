@@ -1,15 +1,12 @@
 import { Chip, IconButton, Table, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography } from "@mui/material";
-import EventRepeatOutlinedIcon from "@mui/icons-material/EventRepeatOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import { Link as RouterLink } from "react-router-dom";
-import type { SubscriptionDTO } from "@ledgerly/shared";
+import type { Cadencia, SubscriptionDTO } from "@ledgerly/shared";
 import { formatMoney, formatMoneyOrDash } from "../format.js";
 import {
   AMOUNT_LABEL,
   cadenceAmountCaption,
-  cadenceToggleLabel,
-  cadenceToggleTooltip,
   increaseDetail,
   increaseLabel,
   previousCurrencyLabel,
@@ -18,6 +15,7 @@ import {
   type SubscriptionListProps,
   type SubscriptionVariant,
 } from "../subscriptions.js";
+import { CadenceMenu } from "./CadenceMenu.js";
 import { MotionTableBody, MotionTableRow } from "./motion/motion.js";
 import { fadeUpItem, staggerContainer } from "./motion/variants.js";
 
@@ -25,7 +23,7 @@ interface SubscriptionRowProps {
   item: SubscriptionDTO;
   variant: SubscriptionVariant;
   onHide: (key: string) => void;
-  onToggleAnnual: (key: string, annual: boolean) => void;
+  onChangeCadence: (key: string, cadencia: Cadencia) => void;
 }
 
 const TABLE_LABEL: Record<SubscriptionVariant, string> = {
@@ -46,7 +44,7 @@ const SubscriptionRow = ({
   },
   variant,
   onHide,
-  onToggleAnnual,
+  onChangeCadence,
 }: SubscriptionRowProps) => {
   const isActive = variant === "activas";
   const amountCaption = cadenceAmountCaption(cadencia);
@@ -66,7 +64,7 @@ const SubscriptionRow = ({
     ? <Chip size="small" color="warning" label={increaseLabel(aumento)} title={increaseDetail(aumento, montoActual, moneda)} />
     : dash;
   const variationCell = isActive && <TableCell>{variation}</TableCell>;
-  const toggleAnnual = () => onToggleAnnual(key, cadencia === "mensual");
+  const changeCadence = (next: Cadencia) => onChangeCadence(key, next);
 
   return (
     <MotionTableRow variants={fadeUpItem}>
@@ -90,11 +88,7 @@ const SubscriptionRow = ({
       </TableCell>
       {variationCell}
       <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-        <Tooltip title={cadenceToggleTooltip(cadencia)} describeChild>
-          <IconButton aria-label={cadenceToggleLabel(nombre, cadencia)} onClick={toggleAnnual}>
-            <EventRepeatOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        <CadenceMenu nombre={nombre} cadencia={cadencia} onChange={changeCadence} iconSize="small" />
         <Tooltip title="Ocultar: no es una suscripción" describeChild>
           <IconButton aria-label={`Ocultar ${nombre}`} onClick={() => onHide(key)}>
             <VisibilityOffOutlinedIcon fontSize="small" />
@@ -108,10 +102,10 @@ const SubscriptionRow = ({
   );
 };
 
-export const SubscriptionsTable = ({ items, variant, onHide, onToggleAnnual }: SubscriptionListProps) => {
+export const SubscriptionsTable = ({ items, variant, onHide, onChangeCadence }: SubscriptionListProps) => {
   const variationHeader = variant === "activas" && <TableCell>Variación</TableCell>;
   const rows = items.map((item) => (
-    <SubscriptionRow key={item.key} item={item} variant={variant} onHide={onHide} onToggleAnnual={onToggleAnnual} />
+    <SubscriptionRow key={item.key} item={item} variant={variant} onHide={onHide} onChangeCadence={onChangeCadence} />
   ));
 
   return (

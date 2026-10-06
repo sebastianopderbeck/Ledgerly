@@ -10,6 +10,7 @@ import {
   ManualAssetModel,
   MortgageCouponModel,
   StatementModel,
+  SubscriptionCadenceModel,
   TransactionModel,
 } from "./models.js";
 
@@ -141,6 +142,20 @@ describe("modelos nuevos", () => {
     const hidden = await HiddenSubscriptionModel.create({ key: "STREAMFLIX COM" });
     expect((hidden as unknown as { hiddenAt: Date }).hiddenAt).toBeInstanceOf(Date);
     await expect(HiddenSubscriptionModel.create({ key: "STREAMFLIX COM" })).rejects.toThrow();
+  });
+
+  it("la cadencia de una suscripción acepta bimestral o anual, una por clave", async () => {
+    await SubscriptionCadenceModel.init();
+    await SubscriptionCadenceModel.create({ key: "CAFE ROSITA", cadencia: "bimestral" });
+    await expect(SubscriptionCadenceModel.create({ key: "CAFE ROSITA", cadencia: "anual" })).rejects.toThrow();
+    await expect(SubscriptionCadenceModel.create({ key: "STREAMBOX", cadencia: "mensual" })).rejects.toThrow();
+  });
+
+  it("una marca guardada antes de que existiera la cadencia se lee como anual", async () => {
+    await SubscriptionCadenceModel.collection.insertOne({ key: "STREAMBOX", annualAt: new Date() });
+    expect((await SubscriptionCadenceModel.find()).map(({ key, cadencia }) => ({ key, cadencia }))).toEqual([
+      { key: "STREAMBOX", cadencia: "anual" },
+    ]);
   });
 
   it("un activo manual rechaza tipos desconocidos y montos negativos", async () => {
