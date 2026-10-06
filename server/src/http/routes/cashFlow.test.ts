@@ -41,6 +41,12 @@ const recibo = (periodo: string, fechaPago: string, neto: number) => ({
   sourceHash: `recibo-${periodo}`,
 });
 
+const cuponAuto = (cuotaNro: number, vencimiento: string, valorMovil: number, totalAPagar: number) => ({
+  grupo: "1000", orden: "1", cuotaNro, plan: "X", fechaEmision: new Date(vencimiento),
+  fechaVencimiento: new Date(vencimiento), comprobante: String(cuotaNro), modelo: "AUTO DE PRUEBA", valorMovil,
+  conceptos: [], totalAPagar, sourceFileName: `auto-${cuotaNro}.pdf`, sourceHash: `auto-${cuotaNro}`,
+});
+
 const seed = async () => {
   await PayslipModel.create([recibo("2026-08", "2026-08-31", 1_000_000), recibo("2026-09", "2026-09-30", 1_100_000)]);
   const statements = await StatementModel.create([
@@ -60,11 +66,7 @@ const seed = async () => {
     seguroIncendio: 0, totalDebitado: 300_000, cuotaPuraUva: 300, cotizacionUva: 1_000, tea: 12.68, tna: 12, cft: 0,
     sourceFileName: "cupon-12.pdf", sourceHash: "cupon-12",
   });
-  await AutoCouponModel.create({
-    grupo: "1000", orden: "1", cuotaNro: 20, plan: "X", fechaEmision: new Date("2026-08-20"),
-    fechaVencimiento: new Date("2026-09-10"), comprobante: "1", modelo: "AUTO DE PRUEBA", valorMovil: 20_000_000,
-    conceptos: [], totalAPagar: 150_000, sourceFileName: "auto-20.pdf", sourceHash: "auto-20",
-  });
+  await AutoCouponModel.create(cuponAuto(20, "2026-09-10", 20_000_000, 150_000));
 };
 
 const mesDe = (flow: CashFlowDTO, mes: string) => flow.meses.find((item) => item.mes === mes);
@@ -102,5 +104,20 @@ describe("GET /api/cash-flow", () => {
     expect(mesDe(flow, "2026-12")?.tarjetas).toBe(30_000);
     expect(mesDe(flow, "2027-01")?.tarjetas).toBe(0);
     expect(mesDe(flow, "2026-11")?.estimados).toContain("Visa Signature (solo cuotas)");
+  });
+
+  it("proyecta la hipoteca con el aumento de la UVA y el auto con el de su valor móvil", async () => {
+    await seed();
+    await MacroSeriesModel.create([
+      { serie: "uva", fecha: "2026-07-03", valor: 1_000 },
+      { serie: "uva", fecha: "2026-10-03", valor: 1_061.208 },
+    ]);
+    await AutoCouponModel.create(cuponAuto(19, "2026-08-10", 16_000_000, 140_000));
+    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    expect(mesDe(flow, "2026-10")?.hipoteca).toBeCloseTo(306_000, 6);
+    expect(mesDe(flow, "2026-10")?.auto).toBeCloseTo(187_500, 6);
+    expect(mesDe(flow, "2026-10")?.estimados).toEqual(
+      expect.arrayContaining(["Hipoteca (última cuota +2,0% por mes)", "Auto (último cupón +25,0% por mes)"]),
+    );
   });
 });
