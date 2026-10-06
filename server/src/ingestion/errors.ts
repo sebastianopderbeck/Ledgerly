@@ -74,3 +74,24 @@ export class OcrFailedError extends IngestionError {
     this.name = "OcrFailedError";
   }
 }
+
+export class UnrecognizedCouponImageError extends IngestionError {
+  constructor() {
+    super("No se reconoció la captura del cupón");
+    this.name = "UnrecognizedCouponImageError";
+  }
+}
+
+export class CouponImageTotalsError extends IngestionError {
+  constructor() {
+    super("Los montos leídos no cierran con el total pagado");
+    this.name = "CouponImageTotalsError";
+  }
+}
+
+export class MissingPreviousCouponError extends IngestionError {
+  constructor() {
+    super("Importá primero un cupón PDF del préstamo");
+    this.name = "MissingPreviousCouponError";
+  }
+}
