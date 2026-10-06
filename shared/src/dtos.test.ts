@@ -116,7 +116,7 @@ import { macroRefreshDtoSchema } from "./dtos.js";
 describe("macroRefreshDtoSchema", () => {
   it("valida el resumen de una actualización", () => {
     const dto = {
-      series: { usdOficial: 232, uva: 232, tasa30: 221, inflacion: 19 },
+      series: { usdOficial: 232, uva: 232, tasa30: 221, rem12m: 21, inflacion: 19 },
       tipoCambio: {
         cupones: { updated: 12, skipped: 1 },
         auto: { updated: 8, skipped: 0 },
@@ -127,7 +127,7 @@ describe("macroRefreshDtoSchema", () => {
   });
 
   it("rechaza un resumen sin el detalle de tipo de cambio", () => {
-    const dto = { series: { usdOficial: 232, uva: 232, tasa30: 221, inflacion: 19 } };
+    const dto = { series: { usdOficial: 232, uva: 232, tasa30: 221, rem12m: 21, inflacion: 19 } };
     expect(macroRefreshDtoSchema.safeParse(dto).success).toBe(false);
   });
 });

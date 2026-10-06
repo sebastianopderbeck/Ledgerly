@@ -246,6 +246,7 @@ export const macroRefreshDtoSchema = z.object({
     usdOficial: z.number(),
     uva: z.number(),
     tasa30: z.number(),
+    rem12m: z.number(),
     inflacion: z.number(),
   }),
   tipoCambio: z.object({

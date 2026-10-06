@@ -143,7 +143,7 @@ const inflationRateSchema = new Schema({
 });
 
 const macroSeriesSchema = new Schema({
-  serie: { type: String, required: true, enum: ["usd_oficial", "uva", "tasa30"] },
+  serie: { type: String, required: true, enum: ["usd_oficial", "uva", "tasa30", "rem_12m"] },
   fecha: { type: String, required: true },
   valor: { type: Number, required: true },
 });
