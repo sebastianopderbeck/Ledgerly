@@ -6,6 +6,9 @@ import { withDb } from "../../testing/withDb.js";
 
 vi.mock("../../pdf/extract.js", () => ({ extractPdfText: vi.fn() }));
 import { extractPdfText } from "../../pdf/extract.js";
+vi.mock("../../ocr/recognizeImage.js", () => ({ recognizeImage: vi.fn() }));
+import { recognizeImage } from "../../ocr/recognizeImage.js";
+import { MortgageCouponModel } from "../../db/models.js";
 import { createApp } from "../app.js";
 import { MAX_UPLOAD_BYTES } from "./import.js";
 
@@ -17,6 +20,19 @@ const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.met
 const couponText = read("../../parsers/__fixtures__/icbc-mortgage.sample.txt");
 const statementText = read("../../parsers/__fixtures__/icbc.sample.txt");
 const autoText = read("../../parsers/__fixtures__/auto-plan.sample.txt");
+const mockedOcr = vi.mocked(recognizeImage);
+const imageObservations = read("../../parsers/__fixtures__/icbc-mortgage-image.sample.txt")
+  .trim()
+  .split("\n")
+  .map((text, index) => ({ text, x: 0.04, y: 0.1 * (index + 1), height: 0.03 }));
+const UNSUPPORTED_FILE = "Sólo se aceptan PDF o imágenes (PNG, JPG, HEIC)";
+
+const seedPreviousCoupon = () =>
+  MortgageCouponModel.create({
+    prestamoNro: "0000000001", cuotaNro: 2, fechaDebito: new Date("2025-10-17"), capital: 1, intereses: 1,
+    seguroIncendio: 1, totalDebitado: 3, cuotaPuraUva: 499.9, cotizacionUva: 2200, tea: 9.5, tna: 9.1, cft: 11.2,
+    sourceFileName: "cupon-2.pdf", sourceHash: "hash-2",
+  });
 
 describe("POST /api/import", () => {
   it("importa un cupón (kind coupon, 201)", async () => {
@@ -137,5 +153,67 @@ describe("POST /api/import (PDF con contraseña)", () => {
     const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "protegido.pdf");
     expect(res.status).toBe(422);
     expect(res.body.error).toBe("El PDF está protegido con contraseña");
+  });
+});
+
+describe("POST /api/import (captura del crédito)", () => {
+  beforeEach(() => {
+    mockedOcr.mockReset();
+    mockedOcr.mockResolvedValue(imageObservations);
+  });
+
+  it("importa un PNG como cupón del crédito (kind coupon, 201)", async () => {
+    await seedPreviousCoupon();
+    const res = await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("png"), { filename: "cuota-3.png", contentType: "image/png" });
+    expect(res.status).toBe(201);
+    expect(res.body.kind).toBe("coupon");
+    expect(res.body.coupon.cuotaNro).toBe(3);
+  });
+
+  it("acepta una captura HEIC del iPhone aunque llegue como octet-stream", async () => {
+    await seedPreviousCoupon();
+    const res = await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("heic"), { filename: "IMG_0001.HEIC", contentType: "application/octet-stream" });
+    expect(res.status).toBe(201);
+    expect(res.body.kind).toBe("coupon");
+  });
+
+  it("lee la imagen con OCR y no con el extractor de PDF", async () => {
+    await seedPreviousCoupon();
+    mocked.mockClear();
+    await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("png"), { filename: "cuota-3.png", contentType: "image/png" });
+    expect(mocked).not.toHaveBeenCalled();
+    expect(mockedOcr).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin cupón previo responde 422 con el mensaje", async () => {
+    const res = await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("png"), { filename: "cuota-3.png", contentType: "image/png" });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("Importá primero un cupón PDF del préstamo");
+  });
+
+  it("una imagen que no es la captura del crédito responde 422", async () => {
+    await seedPreviousCoupon();
+    mockedOcr.mockResolvedValue([{ text: "Mercado Pago", x: 0.04, y: 0.1, height: 0.03 }]);
+    const res = await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("png"), { filename: "otra.png", contentType: "image/png" });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("No se reconoció la captura del cupón");
+  });
+
+  it("rechaza un tipo no soportado nombrando PDF e imágenes", async () => {
+    const res = await request(app)
+      .post("/api/import")
+      .attach("file", Buffer.from("x"), { filename: "notas.txt", contentType: "text/plain" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(UNSUPPORTED_FILE);
   });
 });
