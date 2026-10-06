@@ -6,6 +6,7 @@ import { CategoryRuleForm } from "../components/CategoryRuleForm.js";
 import { CategoryRuleRow } from "../components/CategoryRuleRow.js";
 import { ConfirmDialog } from "../components/ConfirmDialog.js";
 import { RulesMobile } from "../components/RulesMobile.js";
+import { UncategorizedInbox } from "../components/UncategorizedInbox.js";
 import { MotionTableBody } from "../components/motion/motion.js";
 import { staggerContainer } from "../components/motion/variants.js";
 import { useIsMobile } from "../useIsMobile.js";
@@ -94,6 +95,10 @@ export const RulesPage = () => {
       </Stack>
 
       {apply.isSuccess && <Alert severity="success" sx={{ mb: 2 }}>{apply.data.updated} movimientos recategorizados (las reglas pisan también las categorías manuales cuando matchean)</Alert>}
+
+      <UncategorizedInbox rules={rules} />
+
+      <Typography variant="h6" sx={{ mb: 2 }}>Reglas</Typography>
 
       {rulesView}
       {applyConfirmation}
