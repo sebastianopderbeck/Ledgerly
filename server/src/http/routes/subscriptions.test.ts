@@ -4,7 +4,7 @@ import request from "supertest";
 import { subscriptionsReportDtoSchema } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
 import { createApp } from "../app.js";
-import { HiddenSubscriptionModel, StatementModel, TransactionModel } from "../../db/models.js";
+import { HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, TransactionModel } from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 
 withDb();
@@ -51,6 +51,8 @@ const streamflixAndNoise = (): TxSeed[] => MONTHS.flatMap((month, index) => [
   { date: `${month}-12`, merchant: "CAFE MARTINEZ 12", amount: 5200, category: "Comida" },
   { date: `${month}-20`, merchant: "CAFE MARTINEZ 12", amount: 6100, category: "Comida" },
 ]);
+
+const cafeRosita = (): TxSeed[] => [{ date: "2026-08-15", merchant: "CAFE ROSITA 4471", amount: 3800, category: "Comida" }];
 
 beforeEach(() => {
   vi.mocked(fetchOficialRate).mockResolvedValue(COTIZACION);
@@ -121,5 +123,15 @@ describe("ocultar suscripciones", () => {
   it("guarda la clave recortada", async () => {
     await request(app).put("/api/subscriptions/hidden/%20STREAMFLIX%20COM%20");
     expect((await HiddenSubscriptionModel.findOne().lean())?.key).toBe("STREAMFLIX COM");
+  });
+});
+
+describe("GET /api/subscriptions con marcas guardadas", () => {
+  it("un comercio marcado a mano aparece desde su primer cobro", async () => {
+    await seedVisa(cafeRosita());
+    expect((await request(app).get("/api/subscriptions")).body.items).toEqual([]);
+    await ManualSubscriptionModel.create({ key: "CAFE ROSITA" });
+    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    expect(report.items).toMatchObject([{ key: "CAFE ROSITA", cobros: 1, cadencia: "mensual", estado: "activa" }]);
   });
 });

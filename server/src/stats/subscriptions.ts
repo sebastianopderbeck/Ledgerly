@@ -22,6 +22,7 @@ export const GRACIA_DIAS = 7;
 export const VENTANA_CORTADAS_MESES = 12;
 export const DIAS_ANULACION = 15;
 export const TOLERANCIA_ANULACION = 0.01;
+export const CATEGORIA_SUSCRIPCIONES = "Suscripciones";
 
 export interface SubscriptionTx {
   date: string;
@@ -40,6 +41,8 @@ export interface SubscriptionContext {
   hoy: string;
   ultimoCierre: Partial<Record<Issuer, string>>;
   ocultas: ReadonlySet<string>;
+  manuales: ReadonlySet<string>;
+  anuales: ReadonlySet<string>;
   cotizacion: number | null;
 }
 
@@ -53,6 +56,8 @@ interface KeyedTx {
   tx: SubscriptionTx;
   rawKey: string;
 }
+
+type Marked = (marks: ReadonlySet<string>) => boolean;
 
 const LOG_PARECIDO = Math.log(1 + VARIACION_PARECIDA);
 
@@ -209,15 +214,31 @@ const monthlyArs = ({ amount, currency }: Charge, cotizacion: number | null): nu
 const previousCurrency = (run: Charge[], last: Charge): Currency | null =>
   run.find(({ currency }) => currency !== last.currency)?.currency ?? null;
 
-const isHidden = (key: string, rawKeys: ReadonlySet<string>, ocultas: ReadonlySet<string>): boolean =>
-  ocultas.has(key) || [...rawKeys].some((rawKey) => ocultas.has(rawKey));
+const hasMark = (key: string, rawKeys: ReadonlySet<string>, marks: ReadonlySet<string>): boolean =>
+  marks.has(key) || [...rawKeys].some((rawKey) => marks.has(rawKey));
 
-const subscriptionOf = (charges: Charge[], rawKeys: ReadonlySet<string>, ctx: SubscriptionContext): SubscriptionDTO | null => {
+const isForced = (charges: Charge[], marked: Marked, { manuales, anuales }: SubscriptionContext): boolean =>
+  latestCharge(charges)?.category === CATEGORIA_SUSCRIPCIONES || marked(manuales) || marked(anuales);
+
+const detectedRun = (charges: Charge[]): Charge[] | undefined => {
   const run = monthlyRuns(charges).filter(isValidRun).at(-1);
+  if (run === undefined || hasLaterSimilar(charges, run[run.length - 1])) return undefined;
+  return run;
+};
+
+const lastMonthlyRun = (charges: Charge[]): Charge[] | undefined => {
+  const latest = latestCharge(charges);
+  return monthlyRuns(charges).at(-1) ?? (latest === undefined ? undefined : [latest]);
+};
+
+const monthlyRun = (charges: Charge[], forced: boolean): Charge[] | undefined =>
+  detectedRun(charges) ?? (forced ? lastMonthlyRun(charges) : undefined);
+
+const subscriptionOf = (charges: Charge[], marked: Marked, ctx: SubscriptionContext): SubscriptionDTO | null => {
+  const run = monthlyRun(charges, isForced(charges, marked, ctx));
   if (run === undefined) return null;
   const first = run[0];
   const last = run[run.length - 1];
-  if (hasLaterSimilar(charges, last)) return null;
   const proximoCobro = addMonthsClamped(last.date, 1);
   const estado = statusOf(last, proximoCobro, ctx);
   if (estado === "cortada" && last.date < addMonthsClamped(ctx.hoy, -VENTANA_CORTADAS_MESES)) return null;
@@ -235,7 +256,7 @@ const subscriptionOf = (charges: Charge[], rawKeys: ReadonlySet<string>, ctx: Su
     proximoCobro,
     cobros: run.length,
     estado,
-    oculta: isHidden(last.key, rawKeys, ctx.ocultas),
+    oculta: marked(ctx.ocultas),
     aumento: priceIncrease(run),
     monedaAnterior: previousCurrency(run, last),
     cadencia: "mensual",
@@ -266,7 +287,8 @@ export function detectSubscriptions(txs: SubscriptionTx[], ctx: SubscriptionCont
   return [...groupBy(debits, ({ key }) => key)]
     .flatMap(([key, charges]) => {
       const rawKeys = new Set((rowsByGroup.get(key) ?? []).map(({ rawKey }) => rawKey));
-      const subscription = subscriptionOf(charges, rawKeys, ctx);
+      const marked: Marked = (marks) => hasMark(key, rawKeys, marks);
+      const subscription = subscriptionOf(charges, marked, ctx);
       return subscription ? [subscription] : [];
     })
     .sort(compareSubscriptions);

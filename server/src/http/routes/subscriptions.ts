@@ -1,7 +1,9 @@
 import { Router, type Request } from "express";
 import type { Currency, Direction, Issuer, SubscriptionsReportDTO, TxType } from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
-import { HiddenSubscriptionModel, StatementModel, TransactionModel } from "../../db/models.js";
+import {
+  AnnualSubscriptionModel, HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, TransactionModel,
+} from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import {
   detectSubscriptions,
@@ -22,10 +24,12 @@ const hiddenKeyOf = (req: Request): string => {
 
 subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
   const hoy = new Date().toISOString().slice(0, 10);
-  const [transactions, statements, hidden, cotizacion] = await Promise.all([
+  const [transactions, statements, hidden, manual, annual, cotizacion] = await Promise.all([
     TransactionModel.find({ isInstallment: false, type: { $in: ["purchase", "refund"] } }).lean(),
     StatementModel.find({}, { issuer: 1, closingDate: 1 }).lean(),
     HiddenSubscriptionModel.find().lean(),
+    ManualSubscriptionModel.find().lean(),
+    AnnualSubscriptionModel.find().lean(),
     fetchOficialRate(hoy),
   ]);
   const txs: SubscriptionTx[] = transactions.map((t) => ({
@@ -44,6 +48,8 @@ subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
     hoy,
     ultimoCierre: latestClosingByIssuer(statements.map((s) => ({ issuer: s.issuer, closingDate: s.closingDate ?? null }))),
     ocultas: new Set(hidden.map((h) => h.key)),
+    manuales: new Set(manual.map((m) => m.key)),
+    anuales: new Set(annual.map((a) => a.key)),
     cotizacion,
   });
   const report: SubscriptionsReportDTO = { cotizacionOficial: cotizacion, ...summarizeSubscriptions(items), items };
