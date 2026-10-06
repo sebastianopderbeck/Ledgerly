@@ -93,30 +93,37 @@ describe("CashFlowPage", () => {
     expect(within(listbox).getByRole("option", { name: "2026" })).toBeInTheDocument();
   });
 
-  it("el año filtra solo la historia: la proyección y los KPIs siguen", async () => {
+  it("el año filtra solo los Completos del detalle: Actual y los KPIs siguen", async () => {
     renderWithProviders(<CashFlowPage />, { route: "/flujo?year=2025" });
-    const table = await screen.findByRole("table", { name: "Detalle del flujo de caja" });
-    expect(within(table).getByText("Diciembre de 2025")).toBeInTheDocument();
-    expect(within(table).getByText("Octubre de 2026")).toBeInTheDocument();
-    expect(within(table).getByText("Noviembre de 2026")).toBeInTheDocument();
-    expect(within(table).queryByText("Agosto de 2026")).not.toBeInTheDocument();
-    expect(within(table).queryByText("Septiembre de 2026")).not.toBeInTheDocument();
+    const actual = await screen.findByRole("table", { name: "Detalle del flujo de caja" });
+    expect(within(actual).getByText("Septiembre de 2026")).toBeInTheDocument();
+    expect(within(actual).getByText("Octubre de 2026")).toBeInTheDocument();
+    expect(within(actual).getByText("Noviembre de 2026")).toBeInTheDocument();
     expect(screen.getByText("Último mes completo: Agosto de 2026")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Completos" }));
+    const completos = screen.getByRole("table", { name: "Detalle del flujo de caja" });
+    expect(within(completos).getByText("Diciembre de 2025")).toBeInTheDocument();
+    expect(within(completos).queryByText("Agosto de 2026")).not.toBeInTheDocument();
+    expect(within(completos).queryByText("Septiembre de 2026")).not.toBeInTheDocument();
   });
 
-  it("con un año sin meses cerrados el gráfico de historia queda vacío y el detalle muestra la proyección", async () => {
+  it("con un año sin meses cerrados el gráfico de historia queda vacío y Completos no tiene meses", async () => {
     renderWithProviders(<CashFlowPage />, { route: "/flujo?year=2019" });
     const table = await screen.findByRole("table", { name: "Detalle del flujo de caja" });
-    expect(within(table).getAllByRole("row")).toHaveLength(3);
+    expect(within(table).getAllByRole("row")).toHaveLength(4);
     expect(screen.getByText("Sin datos")).toBeInTheDocument();
     expect(screen.queryByText(/Los meses incompletos/)).not.toBeInTheDocument();
     expect(screen.getByText("Egresos conocidos")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Completos" }));
+    expect(screen.getByText("No hay meses para mostrar.")).toBeInTheDocument();
   });
 
   it("en mobile muestra el detalle como tarjetas, sin tabla", async () => {
     emulateMobile();
     renderWithProviders(<CashFlowPage />, { route: "/flujo?year=all" });
-    await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(5));
+    await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(3));
     expect(screen.getByRole("article", { name: "Noviembre de 2026" })).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });

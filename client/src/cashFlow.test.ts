@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { CashFlowMonthDTO } from "@ledgerly/shared";
 import {
   averageSavingsRate, cashFlowChartRows, cashFlowYears, closedMonths, closedMonthsInYears, detailRows, formatSavingsRate,
-  incompleteCaption, isNegative, lastClosedMonth, lastCompleteMonth, monthNotes, notesText, projectionMonths,
+  incompleteCaption, isNegative, lastClosedMonth, lastCompleteMonth, monthNotes, projectionMonths,
   savingsAverageLabel, shortMonth,
 } from "./cashFlow.js";
 
@@ -107,9 +107,7 @@ describe("textos", () => {
       { label: "Falta", text: "Resumen ICBC, Cupón del auto" },
       { label: "Estimado", text: "Sueldo (último neto)" },
     ]);
-    expect(notesText(mes)).toBe("Falta: Resumen ICBC, Cupón del auto · Estimado: Sueldo (último neto)");
     expect(monthNotes(month("2026-08"))).toEqual([]);
-    expect(notesText(month("2026-08"))).toBe("");
   });
 
   it("explica los meses incompletos del gráfico", () => {
@@ -128,9 +126,38 @@ describe("filas", () => {
     expect(rows[1]).toEqual({ month: "2026-09", estado: "incompleto", Egresos: 900_000 });
   });
 
-  it("el detalle va del mes más nuevo al más viejo", () => {
-    const historia = closedMonths(meses);
-    const proyeccion = projectionMonths(meses);
-    expect(detailRows(historia, proyeccion).map((item) => item.mes)).toEqual(["2026-11", "2026-10", "2026-09", "2026-08", "2026-07"]);
+});
+
+describe("detalle mes a mes", () => {
+  const conVariosIncompletos = [
+    proyectado("2026-12"),
+    incompleto("2026-06", ["Recibo de sueldo"]),
+    month("2026-08"),
+    month("2026-10", { estado: "en_curso" }),
+    incompleto("2026-09", ["Resumen ICBC"]),
+    proyectado("2026-11"),
+    month("2026-07"),
+  ];
+
+  const mesesDe = (rows: CashFlowMonthDTO[]): string[] => rows.map((item) => item.mes);
+
+  it("en Actual muestra el último incompleto, el mes en curso y los proyectados, del más viejo al más nuevo", () => {
+    const historia = closedMonths(conVariosIncompletos);
+    expect(mesesDe(detailRows(conVariosIncompletos, historia, "actual"))).toEqual(["2026-09", "2026-10", "2026-11", "2026-12"]);
+  });
+
+  it("en Actual sin meses incompletos arranca en el mes en curso", () => {
+    const sinIncompletos = [month("2026-08"), month("2026-09"), month("2026-10", { estado: "en_curso" }), proyectado("2026-11")];
+    expect(mesesDe(detailRows(sinIncompletos, closedMonths(sinIncompletos), "actual"))).toEqual(["2026-10", "2026-11"]);
+  });
+
+  it("en Completos muestra los meses cerrados recibidos, del más nuevo al más viejo", () => {
+    const historia = closedMonths(conVariosIncompletos).filter((item) => item.mes >= "2026-07");
+    expect(mesesDe(detailRows(conVariosIncompletos, historia, "completos"))).toEqual(["2026-09", "2026-08", "2026-07"]);
+  });
+
+  it("en Proyectados muestra solo los proyectados, sin el mes en curso", () => {
+    const historia = closedMonths(conVariosIncompletos);
+    expect(mesesDe(detailRows(conVariosIncompletos, historia, "proyectados"))).toEqual(["2026-11", "2026-12"]);
   });
 });

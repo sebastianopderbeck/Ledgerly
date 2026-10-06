@@ -13,6 +13,16 @@ export const ESTADO_LABEL: Record<CashFlowEstado, string> = {
   proyectado: "Proyectado",
 };
 
+export type DetalleVista = "actual" | "completos" | "proyectados";
+
+export const DETALLE_VISTAS: DetalleVista[] = ["actual", "completos", "proyectados"];
+
+export const DETALLE_VISTA_LABEL: Record<DetalleVista, string> = {
+  actual: "Actual",
+  completos: "Completos",
+  proyectados: "Proyectados",
+};
+
 export interface SavingsAverage {
   tasa: number | null;
   meses: number;
@@ -82,8 +92,17 @@ const chartRow = ({ mes, estado, ingreso, egresos, margen }: CashFlowMonthDTO): 
 
 export const cashFlowChartRows = (meses: CashFlowMonthDTO[]): BarDatum[] => meses.map(chartRow);
 
-export const detailRows = (historia: CashFlowMonthDTO[], proyeccion: CashFlowMonthDTO[]): CashFlowMonthDTO[] =>
-  [...proyeccion, ...historia].sort(byMesDesc);
+const lastIncompleteMonth = (meses: CashFlowMonthDTO[]): CashFlowMonthDTO[] =>
+  closedMonths(meses).filter((mes) => mes.estado === "incompleto").slice(-1);
+
+const projectedOnly = (meses: CashFlowMonthDTO[]): CashFlowMonthDTO[] =>
+  projectionMonths(meses).filter((mes) => mes.estado === "proyectado");
+
+export const detailRows = (meses: CashFlowMonthDTO[], historia: CashFlowMonthDTO[], vista: DetalleVista): CashFlowMonthDTO[] => {
+  if (vista === "completos") return [...historia].sort(byMesDesc);
+  if (vista === "proyectados") return projectedOnly(meses);
+  return [...lastIncompleteMonth(meses), ...projectionMonths(meses)];
+};
 
 const note = (label: MonthNoteLabel, items: string[]): MonthNote[] =>
   items.length > 0 ? [{ label, text: items.join(", ") }] : [];
@@ -92,9 +111,6 @@ export const monthNotes = ({ faltantes, estimados }: CashFlowMonthDTO): MonthNot
   ...note("Falta", faltantes),
   ...note("Estimado", estimados),
 ];
-
-export const notesText = (mes: CashFlowMonthDTO): string =>
-  monthNotes(mes).map(({ label, text }) => `${label}: ${text}`).join(" · ");
 
 export const shortMonth = (mes: string): string => `${monthLabel(mes)} ${mes.slice(0, 4)}`;
 
