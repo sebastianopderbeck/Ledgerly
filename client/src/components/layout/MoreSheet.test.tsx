@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
 import { MoreSheet } from "./MoreSheet.js";
+import { MORE_GROUPS } from "./navItems.js";
 
 afterEach(cleanup);
 
@@ -15,12 +16,17 @@ describe("MoreSheet", () => {
     expect(screen.getByRole("dialog", { name: "Más secciones" })).toBeInTheDocument();
   });
 
-  it("lista Créditos, Auto, Patrimonio, Sueldo, Vencimientos, Contexto, Flujo, Presupuestos, Suscripciones y Reglas", () => {
+  it("lista Sueldo, Vencimientos, Flujo, Suscripciones, Auto, Créditos, Patrimonio, Contexto y Reglas", () => {
     renderWithProviders(<MoreSheet open onClose={noop} />);
     const names = within(sheetNav()).getAllByRole("link").map((link) => link.textContent);
     expect(names).toEqual([
-      "Créditos", "Auto", "Patrimonio", "Sueldo", "Vencimientos", "Contexto", "Flujo", "Presupuestos", "Suscripciones", "Reglas",
+      "Sueldo", "Vencimientos", "Flujo", "Suscripciones", "Auto", "Créditos", "Patrimonio", "Contexto", "Reglas",
     ]);
+  });
+
+  it("separa los grupos con una línea", () => {
+    renderWithProviders(<MoreSheet open onClose={noop} />);
+    expect(within(sheetNav()).getAllByRole("separator")).toHaveLength(MORE_GROUPS.length - 1);
   });
 
   it("los links conservan los filtros globales y descartan los de Movimientos", () => {

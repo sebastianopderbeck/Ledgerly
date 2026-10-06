@@ -23,25 +23,58 @@ export interface NavItem {
   shortLabel?: string;
 }
 
-export const NAV_ITEMS: NavItem[] = [
-  { to: "/", label: "Dashboard", shortLabel: "Inicio", icon: SpaceDashboardOutlinedIcon, placement: "bar" },
-  { to: "/installments", label: "Cuotas", icon: CalendarMonthOutlinedIcon, placement: "bar" },
-  { to: "/credits", label: "Créditos", icon: AccountBalanceOutlinedIcon, placement: "more" },
-  { to: "/auto", label: "Auto", icon: DirectionsCarOutlinedIcon, placement: "more" },
-  { to: "/patrimonio", label: "Patrimonio", icon: AccountBalanceWalletOutlinedIcon, placement: "more" },
-  { to: "/sueldo", label: "Sueldo", icon: PaymentsOutlinedIcon, placement: "more" },
-  { to: "/vencimientos", label: "Vencimientos", icon: EventNoteOutlinedIcon, placement: "more" },
-  { to: "/contexto", label: "Contexto", icon: InsightsOutlinedIcon, placement: "more" },
-  { to: "/flujo", label: "Flujo", icon: SavingsOutlinedIcon, placement: "more" },
-  { to: "/presupuestos", label: "Presupuestos", icon: TrackChangesOutlinedIcon, placement: "more" },
-  { to: "/transactions", label: "Movimientos", icon: ReceiptLongOutlinedIcon, placement: "bar" },
-  { to: "/suscripciones", label: "Suscripciones", icon: AutorenewOutlinedIcon, placement: "more" },
-  { to: "/rules", label: "Reglas", icon: RuleOutlinedIcon, placement: "more" },
+export interface NavGroup {
+  id: string;
+  items: NavItem[];
+}
+
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    id: "inicio",
+    items: [
+      { to: "/", label: "Dashboard", shortLabel: "Inicio", icon: SpaceDashboardOutlinedIcon, placement: "bar" },
+      //{ to: "/installments", label: "Cuotas", icon: CalendarMonthOutlinedIcon, placement: "bar" },
+    ],
+  },
+  {
+    id: "dia-a-dia",
+    items: [
+      { to: "/sueldo", label: "Sueldo", icon: PaymentsOutlinedIcon, placement: "more" },
+      { to: "/vencimientos", label: "Vencimientos", icon: EventNoteOutlinedIcon, placement: "more" },
+      { to: "/flujo", label: "Flujo", icon: SavingsOutlinedIcon, placement: "more" },
+      //{ to: "/presupuestos", label: "Presupuestos", icon: TrackChangesOutlinedIcon, placement: "more" },
+      { to: "/suscripciones", label: "Suscripciones", icon: AutorenewOutlinedIcon, placement: "more" },
+      { to: "/transactions", label: "Movimientos", icon: ReceiptLongOutlinedIcon, placement: "bar" },
+    ],
+  },
+  {
+    id: "largo-plazo",
+    items: [
+      { to: "/auto", label: "Auto", icon: DirectionsCarOutlinedIcon, placement: "more" },
+      { to: "/credits", label: "Créditos", icon: AccountBalanceOutlinedIcon, placement: "more" },
+      { to: "/patrimonio", label: "Patrimonio", icon: AccountBalanceWalletOutlinedIcon, placement: "more" },
+      { to: "/contexto", label: "Contexto", icon: InsightsOutlinedIcon, placement: "more" },
+    ],
+  },
+  {
+    id: "ajustes",
+    items: [
+      { to: "/rules", label: "Reglas", icon: RuleOutlinedIcon, placement: "more" },
+    ],
+  },
 ];
+
+export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap(({ items }) => items);
+
+const isMoreItem = (item: NavItem): boolean => item.placement === "more";
 
 export const BAR_ITEMS = NAV_ITEMS.filter((item) => item.placement === "bar");
 
-export const MORE_ITEMS = NAV_ITEMS.filter((item) => item.placement === "more");
+export const MORE_GROUPS: NavGroup[] = NAV_GROUPS
+  .map(({ id, items }) => ({ id, items: items.filter(isMoreItem) }))
+  .filter(({ items }) => items.length > 0);
+
+export const MORE_ITEMS = MORE_GROUPS.flatMap(({ items }) => items);
 
 export const isMoreRoute = (pathname: string): boolean => MORE_ITEMS.some((item) => item.to === pathname);
 

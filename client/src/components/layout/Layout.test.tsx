@@ -4,11 +4,11 @@ import { Link } from "react-router-dom";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
 import { emulateDesktop, emulateMobile } from "../../testing/viewport.js";
 import { Layout } from "./Layout.js";
-import { NAV_ITEMS } from "./navItems.js";
+import { NAV_GROUPS, NAV_ITEMS } from "./navItems.js";
 
 const SECTIONS = [
-  /dashboard/i, /cuotas/i, /créditos/i, /auto/i, /patrimonio/i, /sueldo/i, /vencimientos/i, /contexto/i, /flujo/i,
-  /presupuestos/i, /movimientos/i, /suscripciones/i, /reglas/i,
+  /dashboard/i, /créditos/i, /auto/i, /patrimonio/i, /sueldo/i, /vencimientos/i, /contexto/i, /flujo/i,
+  /movimientos/i, /suscripciones/i, /reglas/i,
 ];
 
 const renderLayout = (route = "/") => renderWithProviders(<Layout><div>contenido</div></Layout>, { route });
@@ -29,6 +29,17 @@ describe("Layout", () => {
     for (const name of SECTIONS) {
       expect(within(mainNavigation()).getByRole("link", { name })).toBeInTheDocument();
     }
+  });
+
+  it("separa los grupos del menú con una línea", () => {
+    renderLayout();
+    expect(within(mainNavigation()).getAllByRole("separator")).toHaveLength(NAV_GROUPS.length - 1);
+  });
+
+  it("con la sidebar colapsada los grupos siguen separados", () => {
+    renderLayout();
+    fireEvent.click(screen.getByRole("button", { name: "colapsar menú" }));
+    expect(within(mainNavigation()).getAllByRole("separator")).toHaveLength(NAV_GROUPS.length - 1);
   });
 
   it("todos los links conservan los filtros globales y descartan los de Movimientos", () => {
@@ -116,10 +127,10 @@ describe("Layout en mobile", () => {
 
   const moreButton = () => within(mainNavigation()).getByRole("button", { name: "Más" });
 
-  it("la barra inferior muestra Inicio, Cuotas, Movimientos y Más", () => {
+  it("la barra inferior muestra Inicio, Movimientos y Más", () => {
     renderLayout();
     const links = within(mainNavigation()).getAllByRole("link").map((link) => link.textContent);
-    expect(links).toEqual(["Inicio", "Cuotas", "Movimientos"]);
+    expect(links).toEqual(["Inicio", "Movimientos"]);
     expect(moreButton()).toBeInTheDocument();
   });
 
@@ -148,7 +159,7 @@ describe("Layout en mobile", () => {
 
   it("los links de la barra conservan los filtros globales y descartan los de Movimientos", () => {
     renderLayout("/transactions?year=2025&currency=USD&category=Compras");
-    expect(within(mainNavigation()).getByRole("link", { name: "Cuotas" })).toHaveAttribute("href", "/installments?year=2025&currency=USD");
+    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).toHaveAttribute("href", "/?year=2025&currency=USD");
   });
 
   it("«Más» abre el resto de las secciones y la hoja se cierra al elegir una", async () => {
