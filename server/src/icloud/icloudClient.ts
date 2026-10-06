@@ -4,13 +4,22 @@ import {
   ImapFlow, type FetchMessageObject, type FetchQueryObject, type ImapFlowOptions, type MessageStructureObject,
 } from "imapflow";
 import type { MailClient, MailPdfPart } from "../mail/mailClient.js";
+import { fetchCertisendCouponPdf, extractCertisendCouponIds, isCertisendSender, type CertisendDeps } from "./certisend.js";
 import { ICLOUD_HOST, ICLOUD_PORT } from "./icloudConfig.js";
 import { IcloudApiError, IcloudAuthError, ICLOUD_AUTH_FAILED_MESSAGE } from "./icloudErrors.js";
 
-export interface IcloudPdfPart extends MailPdfPart {
+export interface IcloudAttachmentPart extends MailPdfPart {
+  kind: "attachment";
   mailbox: string;
   uid: number;
 }
+
+export interface IcloudCertisendPart extends MailPdfPart {
+  kind: "certisend";
+  couponId: string;
+}
+
+export type IcloudPdfPart = IcloudAttachmentPart | IcloudCertisendPart;
 
 export interface IcloudCandidate {
   id: string;
@@ -36,12 +45,14 @@ export interface IcloudClientOptions {
   mailboxes: string[];
   since: Date;
   createSession?: (options: ImapFlowOptions) => ImapSession;
+  certisend?: CertisendDeps;
 }
 
 const ROOT_PART_ID = "1";
 const PDF_MIME = "application/pdf";
 const PDF_FILE_NAME = /\.pdf$/i;
 const UNEXPECTED_ERROR = "Error inesperado";
+const HTML_MIME = "text/html";
 const FETCH_QUERY: FetchQueryObject = { uid: true, envelope: true, internalDate: true, bodyStructure: true };
 
 const messageOf = (err: unknown): string => (err instanceof Error && err.message ? err.message : UNEXPECTED_ERROR);
@@ -73,9 +84,29 @@ const toIso = (value: Date | string | undefined): string => {
   return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
 };
 
-const toCandidate = (mailbox: string, uidValidity: bigint, message: FetchMessageObject): IcloudCandidate | null => {
+const isHtmlLeaf = (node: MessageStructureObject): boolean =>
+  !node.childNodes?.length && node.type.toLowerCase() === HTML_MIME;
+
+export function collectImapHtmlPartIds(node: MessageStructureObject): string[] {
+  const own = isHtmlLeaf(node) ? [node.part ?? ROOT_PART_ID] : [];
+  return [...own, ...(node.childNodes ?? []).flatMap(collectImapHtmlPartIds)];
+}
+
+const certisendPart = (couponId: string): IcloudCertisendPart => ({
+  kind: "certisend",
+  couponId,
+  partId: `certisend:${couponId}`,
+  fileName: `certisend-${couponId.slice(0, 8)}.pdf`,
+  size: 0,
+});
+
+const toCandidate = (
+  mailbox: string, uidValidity: bigint, message: FetchMessageObject, couponIds: string[] = [],
+): IcloudCandidate | null => {
   if (!message.bodyStructure) return null;
-  const pdfParts = collectImapPdfParts(message.bodyStructure).map((part) => ({ ...part, mailbox, uid: message.uid }));
+  const attachments = collectImapPdfParts(message.bodyStructure)
+    .map((part): IcloudPdfPart => ({ ...part, kind: "attachment", mailbox, uid: message.uid }));
+  const pdfParts = [...attachments, ...couponIds.map(certisendPart)];
   if (pdfParts.length === 0) return null;
   return {
     id: imapMessageId(mailbox, uidValidity, message.uid, message.envelope?.messageId),
@@ -125,7 +156,7 @@ const connectError = (err: unknown): Error =>
     : new IcloudApiError(`No se pudo conectar con iCloud: ${messageOf(err)}`));
 
 export async function openIcloudClient({
-  user, password, mailboxes, since, createSession = createImapSession,
+  user, password, mailboxes, since, createSession = createImapSession, certisend,
 }: IcloudClientOptions): Promise<MailClient<IcloudPdfPart>> {
   const session = createSession({ host: ICLOUD_HOST, port: ICLOUD_PORT, secure: true, auth: { user, pass: password }, logger: false });
   await session.connect().catch((err: unknown) => {
@@ -144,12 +175,32 @@ export async function openIcloudClient({
     }
   };
 
+  const htmlOf = async (uid: number, partId: string): Promise<string> => {
+    const { content } = await session.download(String(uid), partId, { uid: true });
+    return content ? (await buffer(content)).toString("utf8") : "";
+  };
+
+  const couponIdsOf = async ({ uid, bodyStructure }: FetchMessageObject): Promise<string[]> => {
+    const ids: string[] = [];
+    for (const partId of bodyStructure ? collectImapHtmlPartIds(bodyStructure) : []) {
+      ids.push(...extractCertisendCouponIds(await htmlOf(uid, partId)));
+    }
+    return [...new Set(ids)];
+  };
+
   const scan = (mailbox: string): Promise<IcloudCandidate[]> => inMailbox(mailbox, async (uidValidity) => {
     try {
       const uids = await session.search({ since }, { uid: true });
       if (!uids || uids.length === 0) return [];
-      const messages = await session.fetchAll(uids, FETCH_QUERY, { uid: true });
-      return messages.map((message) => toCandidate(mailbox, uidValidity, message)).filter(isCandidate);
+      const fetched = await session.fetchAll(uids, FETCH_QUERY, { uid: true });
+      const messages = fetched;
+      const couponIds = new Map<number, string[]>();
+      for (const message of messages.filter(({ envelope }) => isCertisendSender(envelope?.from?.[0]?.address))) {
+        couponIds.set(message.uid, await couponIdsOf(message));
+      }
+      return messages
+        .map((message) => toCandidate(mailbox, uidValidity, message, couponIds.get(message.uid)))
+        .filter(isCandidate);
     } catch (err) {
       throw new IcloudApiError(`iCloud falló al revisar «${mailbox}»: ${messageOf(err)}`);
     }
@@ -171,6 +222,7 @@ export async function openIcloudClient({
     },
 
     async downloadPart(_messageId, part) {
+      if (part.kind === "certisend") return fetchCertisendCouponPdf(part.couponId, certisend);
       return inMailbox(part.mailbox, async () => {
         const { content } = await session.download(String(part.uid), part.partId, { uid: true });
         if (!content) throw new IcloudApiError(`iCloud no devolvió el adjunto ${part.fileName}.`);

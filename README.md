@@ -85,6 +85,11 @@ Diseño: `docs/superpowers/specs/2026-10-05-importacion-icloud-design.md`.
    `security add-generic-password -s ledgerly-icloud-imap -a <tu-cuenta>@icloud.com -w`
 3. En el `.env`: `ICLOUD_USER=<tu-cuenta>@icloud.com` y, si hace falta, `ICLOUD_SINCE=AAAA-MM-DD`
    (desde cuándo buscar; sin ella, los últimos 90 días) e `ICLOUD_MAILBOXES=INBOX,Otra carpeta`.
+   Los cupones del plan de auto (certisend) llegan sin adjunto, solo con un link: Ledgerly baja el
+   PDF desde el link del cupón, leído solo de los mails enviados por la plataforma certisend
+   (`@enviocertificado.com`) (únicamente `go.certisend.com/coupon/<id>` y su conversión
+   en `html2pdf.certisend.com`; los links de seguimiento nunca se abren). La carpeta donde caen
+   esos mails tiene que estar en `ICLOUD_MAILBOXES`, por ejemplo `ICLOUD_MAILBOXES=INBOX,Auto`.
 4. Reiniciar `bun run dev` → Importar → **Buscar en iCloud**.
 5. Versión publicada: copiar las líneas `ICLOUD_*` a `~/Services/ledgerly/.env`, sumar
    `MAIL_SYNC_DAYS=25-5` (y, si querés otra hora, `MAIL_SYNC_HOUR=21`; va de 0 a 23) y correr

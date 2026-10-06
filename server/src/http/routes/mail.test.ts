@@ -133,7 +133,7 @@ describe("POST /api/mail/:source/sync", () => {
     vi.mocked(extractPdfText).mockResolvedValue({ text: statementText, meta });
     vi.mocked(openIcloudClient).mockResolvedValue(fakeMailClient([{
       id: "resumen@banco.example",
-      pdfParts: [{ partId: "2", fileName: "resumen-sintetico.pdf", size: 2048, mailbox: "INBOX", uid: 11 }],
+      pdfParts: [{ kind: "attachment", partId: "2", fileName: "resumen-sintetico.pdf", size: 2048, mailbox: "INBOX", uid: 11 }],
     }]));
     const res = await request(app).post("/api/mail/icloud/sync");
     expect(res.status).toBe(200);

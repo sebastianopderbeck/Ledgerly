@@ -334,7 +334,7 @@ El README suma la sección «Importar desde iCloud» con estos pasos, y cómo re
 - El resumen de la tarjeta ICBC llega a INBOX como PDF de e-resumen, con un encabezado que lista primero las etiquetas y después los valores. El parser ya lo lee.
 - Los PDFs de la cuenta de ICBC llegan protegidos con contraseña y se omiten.
 - El banco detrás de Visa Signature envía PDFs que son solo imagen, así que ese resumen no se puede importar desde el correo.
-- Los cupones de hipotecario y de plan de auto no llegan a INBOX.
+- Los cupones del plan de auto llegan una vez por mes a una carpeta de iCloud adonde los mueve una regla de correo, como links de certisend y sin adjunto; el link se lee solo de los mails enviados por la plataforma certisend (`@enviocertificado.com`) y la búsqueda sigue solo el link directo del cupón y su link de conversión a PDF.
 - `ICLOUD_MAILBOXES` se queda en `INBOX`: Enviados contiene copias que el propio usuario se envió y no debe escanearse.
 - La detección de ICBC ahora exige "SALDO ANTERIOR", porque los vouchers de supermercado mencionan ICBC y se confundían con resúmenes.
 
