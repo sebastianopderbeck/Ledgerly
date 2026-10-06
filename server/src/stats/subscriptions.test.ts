@@ -557,6 +557,28 @@ describe("detectSubscriptions con suscripciones forzadas", () => {
     ]);
   });
 
+  it("si su último mes tiene varios cobros y antes hubo uno suelto, aparece activa desde el último mes", () => {
+    const txs = [
+      tx("2026-08-05", 4500, { merchant: "VIDEOMAX", ...SUSCRIPCION }),
+      tx("2026-09-05", 5850, { merchant: "VIDEOMAX", ...SUSCRIPCION }),
+      tx("2026-09-18", 300, { merchant: "VIDEOMAX", ...SUSCRIPCION }),
+    ];
+    expect(detectSubscriptions(txs, ctx({ ultimoCierre: CIERRE_SEPTIEMBRE }))).toMatchObject([
+      { estado: "activa", ultimoCobro: "2026-09-18", cobros: 1 },
+    ]);
+  });
+
+  it("marcada a mano con un cobro viejo suelto y varios en el último mes, se sigue listando", () => {
+    const txs = [
+      tx("2025-03-10", 4500, { merchant: "VIDEOMAX" }),
+      tx("2026-09-05", 5850, { merchant: "VIDEOMAX" }),
+      tx("2026-09-18", 300, { merchant: "VIDEOMAX" }),
+    ];
+    expect(detectSubscriptions(txs, ctx({ manuales: new Set(["VIDEOMAX"]), ultimoCierre: CIERRE_SEPTIEMBRE }))).toMatchObject([
+      { estado: "activa", ultimoCobro: "2026-09-18" },
+    ]);
+  });
+
   it("una forzada oculta llega oculta", () => {
     const txs = [tx("2026-09-15", 4500, { merchant: "VIDEOMAX", ...SUSCRIPCION })];
     expect(detectSubscriptions(txs, ctx({ ocultas: new Set(["VIDEOMAX"]) }))).toMatchObject([{ oculta: true }]);

@@ -249,7 +249,10 @@ const detectedRun = (charges: Charge[]): Charge[] | undefined => {
 
 const lastMonthlyRun = (charges: Charge[]): Charge[] | undefined => {
   const latest = latestCharge(charges);
-  return monthlyRuns(charges).at(-1) ?? (latest === undefined ? undefined : [latest]);
+  if (latest === undefined) return undefined;
+  const run = monthlyRuns(charges).at(-1);
+  const reachesLatestMonth = run !== undefined && monthOf(run[run.length - 1].date) === monthOf(latest.date);
+  return reachesLatestMonth ? run : [latest];
 };
 
 const monthlyRun = (charges: Charge[], forced: boolean): Charge[] | undefined =>
