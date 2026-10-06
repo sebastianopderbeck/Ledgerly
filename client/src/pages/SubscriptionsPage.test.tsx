@@ -11,7 +11,7 @@ const streamflix: SubscriptionDTO = {
   key: "STREAMFLIX COM", nombre: "STREAMFLIX.COM", busqueda: "STREAMFLIX", categoria: "Suscripciones",
   cardLabel: "Visa Signature", moneda: "USD", montoActual: 12.99, montoMensualArs: 19030.35,
   primerCobro: "2026-01-09", ultimoCobro: "2026-08-09", proximoCobro: "2026-09-09", cobros: 8,
-  estado: "activa", oculta: false, aumento: null, monedaAnterior: "ARS",
+  estado: "activa", oculta: false, aumento: null, monedaAnterior: "ARS", cadencia: "mensual",
 };
 
 const musicapp: SubscriptionDTO = {

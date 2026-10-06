@@ -238,6 +238,7 @@ const subscriptionOf = (charges: Charge[], rawKeys: ReadonlySet<string>, ctx: Su
     oculta: isHidden(last.key, rawKeys, ctx.ocultas),
     aumento: priceIncrease(run),
     monedaAnterior: previousCurrency(run, last),
+    cadencia: "mensual",
   };
 };
 

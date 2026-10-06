@@ -245,6 +245,7 @@ describe("detectSubscriptions", () => {
       oculta: false,
       aumento: null,
       monedaAnterior: null,
+      cadencia: "mensual",
     }]);
   });
 
@@ -445,6 +446,7 @@ describe("summarizeSubscriptions", () => {
     oculta: false,
     aumento: null,
     monedaAnterior: null,
+    cadencia: "mensual",
     ...overrides,
   });
 
