@@ -9,7 +9,7 @@ import {
   useMarkFindingsReviewed,
   useMarkSubscription,
   useNetWorth,
-  useSetSubscriptionAnnual,
+  useSetSubscriptionCadence,
   useSetSubscriptionHidden,
   useStatementReview,
 } from "./hooks.js";
@@ -52,17 +52,14 @@ describe("hooks de las features nuevas", () => {
     ]);
   });
 
-  it("useSetSubscriptionAnnual codifica la clave, usa PUT para anual y DELETE para mensual, e invalida las suscripciones", async () => {
+  it("useSetSubscriptionCadence codifica la clave, manda la cadencia por PUT e invalida las suscripciones", async () => {
     vi.stubGlobal("fetch", respond(204));
     const client = newClient();
     const invalidate = vi.spyOn(client, "invalidateQueries");
-    const { result } = renderHook(() => useSetSubscriptionAnnual(), { wrapper: wrapperFor(client) });
-    await act(() => result.current.mutateAsync({ key: "STREAMBOX PLUS", annual: true }));
-    await act(() => result.current.mutateAsync({ key: "STREAMBOX PLUS", annual: false }));
-    expect(calledUrls()).toEqual([
-      "PUT /api/subscriptions/annual/STREAMBOX%20PLUS",
-      "DELETE /api/subscriptions/annual/STREAMBOX%20PLUS",
-    ]);
+    const { result } = renderHook(() => useSetSubscriptionCadence(), { wrapper: wrapperFor(client) });
+    await act(() => result.current.mutateAsync({ key: "STREAMBOX PLUS", cadencia: "bimestral" }));
+    expect(calledUrls()).toEqual(["PUT /api/subscriptions/cadence/STREAMBOX%20PLUS"]);
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ cadencia: "bimestral" });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["subscriptions"] });
   });
 

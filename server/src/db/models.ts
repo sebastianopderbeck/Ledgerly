@@ -159,9 +159,12 @@ const manualSubscriptionSchema = new Schema(
   { timestamps: { createdAt: "markedAt", updatedAt: false } },
 );
 
-const annualSubscriptionSchema = new Schema(
-  { key: { type: String, required: true, unique: true } },
-  { timestamps: { createdAt: "annualAt", updatedAt: false } },
+const subscriptionCadenceSchema = new Schema(
+  {
+    key: { type: String, required: true, unique: true },
+    cadencia: { type: String, required: true, enum: ["bimestral", "anual"], default: "anual" },
+  },
+  { timestamps: { createdAt: "markedAt", updatedAt: false } },
 );
 
 const assetValuationSchema = new Schema(
@@ -226,7 +229,7 @@ export type InflationRateDoc = InferSchemaType<typeof inflationRateSchema>;
 export type MacroSeriesDoc = InferSchemaType<typeof macroSeriesSchema>;
 export type HiddenSubscriptionDoc = InferSchemaType<typeof hiddenSubscriptionSchema>;
 export type ManualSubscriptionDoc = InferSchemaType<typeof manualSubscriptionSchema>;
-export type AnnualSubscriptionDoc = InferSchemaType<typeof annualSubscriptionSchema>;
+export type SubscriptionCadenceDoc = InferSchemaType<typeof subscriptionCadenceSchema>;
 export type ManualAssetDoc = InferSchemaType<typeof manualAssetSchema>;
 export type BudgetDoc = InferSchemaType<typeof budgetSchema>;
 export type MailSyncRunDoc = InferSchemaType<typeof mailSyncRunSchema>;
@@ -252,8 +255,9 @@ export const HiddenSubscriptionModel: Model<HiddenSubscriptionDoc> =
   mongoose.models.HiddenSubscription ?? mongoose.model("HiddenSubscription", hiddenSubscriptionSchema);
 export const ManualSubscriptionModel: Model<ManualSubscriptionDoc> =
   mongoose.models.ManualSubscription ?? mongoose.model("ManualSubscription", manualSubscriptionSchema);
-export const AnnualSubscriptionModel: Model<AnnualSubscriptionDoc> =
-  mongoose.models.AnnualSubscription ?? mongoose.model("AnnualSubscription", annualSubscriptionSchema);
+export const SubscriptionCadenceModel: Model<SubscriptionCadenceDoc> =
+  mongoose.models.SubscriptionCadence
+  ?? mongoose.model("SubscriptionCadence", subscriptionCadenceSchema, "annualsubscriptions");
 export const ManualAssetModel: Model<ManualAssetDoc> =
   mongoose.models.ManualAsset ?? mongoose.model("ManualAsset", manualAssetSchema);
 export const BudgetModel: Model<BudgetDoc> =

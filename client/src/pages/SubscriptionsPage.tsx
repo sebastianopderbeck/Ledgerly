@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { CircularProgress, Typography } from "@mui/material";
-import { useSetSubscriptionAnnual, useSetSubscriptionHidden, useSubscriptions } from "../api/hooks.js";
+import type { Cadencia } from "@ledgerly/shared";
+import { useSetSubscriptionCadence, useSetSubscriptionHidden, useSubscriptions } from "../api/hooks.js";
 import { HiddenSubscriptions } from "../components/HiddenSubscriptions.js";
 import { SubscriptionCards } from "../components/SubscriptionCards.js";
 import { SubscriptionKpiCards } from "../components/SubscriptionKpiCards.js";
@@ -24,12 +25,12 @@ const Header = () => (
 export const SubscriptionsPage = () => {
   const { data, isLoading, isError } = useSubscriptions();
   const { mutate: setHidden } = useSetSubscriptionHidden();
-  const { mutate: setAnnual } = useSetSubscriptionAnnual();
+  const { mutate: setCadence } = useSetSubscriptionCadence();
   const isMobile = useIsMobile();
   const sections = useMemo(() => subscriptionSections(data?.items ?? []), [data]);
   const hide = useCallback((key: string) => setHidden({ key, hidden: true }), [setHidden]);
   const show = useCallback((key: string) => setHidden({ key, hidden: false }), [setHidden]);
-  const toggleAnnual = useCallback((key: string, annual: boolean) => setAnnual({ key, annual }), [setAnnual]);
+  const changeCadence = useCallback((key: string, cadencia: Cadencia) => setCadence({ key, cadencia }), [setCadence]);
 
   if (isLoading) {
     return (
@@ -61,7 +62,7 @@ export const SubscriptionsPage = () => {
   const SubscriptionList = isMobile ? SubscriptionCards : SubscriptionsTable;
   const { activas, cortadas, ocultas, conUsd } = sections;
   const activeList = activas.length > 0
-    ? <SubscriptionList items={activas} variant="activas" onHide={hide} onToggleAnnual={toggleAnnual} />
+    ? <SubscriptionList items={activas} variant="activas" onHide={hide} onChangeCadence={changeCadence} />
     : <Typography color="text.secondary">No hay cobros recurrentes activos.</Typography>;
   const rateNote = conUsd && data.cotizacionOficial !== null && (
     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
@@ -72,7 +73,7 @@ export const SubscriptionsPage = () => {
     <MotionBox variants={fadeUpItem} initial="hidden" animate="visible" sx={{ mt: 4 }}>
       <Typography variant="h6">Dejaron de cobrarse</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Sin cobro en el último resumen de la tarjeta.</Typography>
-      <SubscriptionList items={cortadas} variant="cortadas" onHide={hide} onToggleAnnual={toggleAnnual} />
+      <SubscriptionList items={cortadas} variant="cortadas" onHide={hide} onChangeCadence={changeCadence} />
     </MotionBox>
   );
   const hiddenSection = ocultas.length > 0 && <HiddenSubscriptions items={ocultas} onShow={show} />;

@@ -1,14 +1,12 @@
 import { Box, Chip, IconButton, Link } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
-import EventRepeatOutlinedIcon from "@mui/icons-material/EventRepeatOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import { Link as RouterLink } from "react-router-dom";
-import type { SubscriptionDTO } from "@ledgerly/shared";
+import type { Cadencia, SubscriptionDTO } from "@ledgerly/shared";
 import { formatMoney, formatMoneyOrDash } from "../format.js";
 import {
   AMOUNT_LABEL,
   cadenceAmountCaption,
-  cadenceToggleLabel,
   increaseShortLabel,
   increaseSinceDetail,
   previousCurrencyLabel,
@@ -17,6 +15,7 @@ import {
   type SubscriptionListProps,
   type SubscriptionVariant,
 } from "../subscriptions.js";
+import { CadenceMenu } from "./CadenceMenu.js";
 import { RecordCard, recordListSx, type RecordField } from "./RecordCard.js";
 import { MIN_TAP_SIZE, iconTapTargetSx } from "./tapTarget.js";
 
@@ -24,7 +23,7 @@ interface SubscriptionCardProps {
   item: SubscriptionDTO;
   variant: SubscriptionVariant;
   onHide: (key: string) => void;
-  onToggleAnnual: (key: string, annual: boolean) => void;
+  onChangeCadence: (key: string, cadencia: Cadencia) => void;
 }
 
 const movementsLinkSx: SxProps<Theme> = { display: "inline-flex", alignItems: "center", minHeight: MIN_TAP_SIZE };
@@ -70,15 +69,13 @@ const detailsOf = (item: SubscriptionDTO, variant: SubscriptionVariant): RecordF
   ];
 };
 
-const SubscriptionCard = ({ item, variant, onHide, onToggleAnnual }: SubscriptionCardProps) => {
+const SubscriptionCard = ({ item, variant, onHide, onChangeCadence }: SubscriptionCardProps) => {
   const badge = item.aumento ? <Chip size="small" color="warning" label={increaseShortLabel(item.aumento)} /> : undefined;
-  const toggleAnnual = () => onToggleAnnual(item.key, item.cadencia === "mensual");
+  const changeCadence = (next: Cadencia) => onChangeCadence(item.key, next);
   const hide = () => onHide(item.key);
   const action = (
     <Box sx={actionsSx}>
-      <IconButton aria-label={cadenceToggleLabel(item.nombre, item.cadencia)} onClick={toggleAnnual} sx={iconTapTargetSx}>
-        <EventRepeatOutlinedIcon />
-      </IconButton>
+      <CadenceMenu nombre={item.nombre} cadencia={item.cadencia} onChange={changeCadence} buttonSx={iconTapTargetSx} />
       <IconButton aria-label={`Ocultar ${item.nombre}`} onClick={hide} sx={iconTapTargetSx}>
         <VisibilityOffOutlinedIcon />
       </IconButton>
@@ -97,9 +94,9 @@ const SubscriptionCard = ({ item, variant, onHide, onToggleAnnual }: Subscriptio
   );
 };
 
-export const SubscriptionCards = ({ items, variant, onHide, onToggleAnnual }: SubscriptionListProps) => {
+export const SubscriptionCards = ({ items, variant, onHide, onChangeCadence }: SubscriptionListProps) => {
   const cards = items.map((item) => (
-    <SubscriptionCard key={item.key} item={item} variant={variant} onHide={onHide} onToggleAnnual={onToggleAnnual} />
+    <SubscriptionCard key={item.key} item={item} variant={variant} onHide={onHide} onChangeCadence={onChangeCadence} />
   ));
   return <Box sx={recordListSx}>{cards}</Box>;
 };

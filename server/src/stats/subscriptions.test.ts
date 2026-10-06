@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { SubscriptionDTO } from "@ledgerly/shared";
+import type { Cadencia, SubscriptionDTO } from "@ledgerly/shared";
 import { addMonths } from "./months.js";
 import {
   addMonthsClamped,
-  annualRun,
   CATEGORIA_SUSCRIPCIONES,
   detectSubscriptions,
   latestClosingByIssuer,
@@ -11,6 +10,7 @@ import {
   priceIncrease,
   removeRefunded,
   similarAmounts,
+  spacedRun,
   summarizeSubscriptions,
   type Charge,
   type SubscriptionContext,
@@ -50,7 +50,7 @@ const ctx = (overrides: Partial<SubscriptionContext> = {}): SubscriptionContext 
   ultimoCierre: {},
   ocultas: new Set<string>(),
   manuales: new Set<string>(),
-  anuales: new Set<string>(),
+  cadencias: new Map<string, Cadencia>(),
   cotizacion: 1000,
   ...overrides,
 });
@@ -172,7 +172,9 @@ describe("monthlyRuns", () => {
   });
 });
 
-describe("annualRun", () => {
+describe("spacedRun anual", () => {
+  const annualRun = (charges: Charge[]): Charge[] => spacedRun(charges, "anual");
+
   it("salta de a 12 meses hacia atrás desde el último cobro, cruzando años", () => {
     const charges = [charge("2024-01-05", 100), charge("2025-01-05", 110), charge("2026-01-05", 120)];
     expect(dates(annualRun(charges))).toEqual(["2024-01-05", "2025-01-05", "2026-01-05"]);
@@ -209,6 +211,40 @@ describe("annualRun", () => {
 
   it("devuelve la racha ordenada aunque los cobros lleguen desordenados", () => {
     expect(dates(annualRun([charge("2026-01-05", 120), charge("2025-01-05", 110)]))).toEqual(["2025-01-05", "2026-01-05"]);
+  });
+});
+
+describe("spacedRun bimestral", () => {
+  const bimonthlyRun = (charges: Charge[]): Charge[] => spacedRun(charges, "bimestral");
+
+  it("salta de a 2 meses hacia atrás desde el último cobro, cruzando años", () => {
+    const charges = [charge("2025-11-23", 30000), charge("2026-01-23", 32000), charge("2026-03-23", 32000)];
+    expect(dates(bimonthlyRun(charges))).toEqual(["2025-11-23", "2026-01-23", "2026-03-23"]);
+  });
+
+  it("deja afuera los cobros de los meses intermedios", () => {
+    const charges = [charge("2026-05-23", 32000), charge("2026-06-10", 32000), charge("2026-07-23", 32000)];
+    expect(dates(bimonthlyRun(charges))).toEqual(["2026-05-23", "2026-07-23"]);
+  });
+
+  it("solo sigue con un cobro de monto parecido, aunque sea el único del mes", () => {
+    const charges = [charge("2026-05-02", 7000), charge("2026-07-23", 36000)];
+    expect(dates(bimonthlyRun(charges))).toEqual(["2026-07-23"]);
+  });
+
+  it("en un mes con varios cobros elige el parecido más cercano", () => {
+    const charges = [
+      charge("2026-07-02", 7000),
+      charge("2026-07-23", 32000),
+      charge("2026-07-25", 33000, { currency: "USD" }),
+      charge("2026-09-23", 36000),
+    ];
+    expect(amounts(bimonthlyRun(charges))).toEqual([32000, 36000]);
+  });
+
+  it("si falta el cobro de un bimestre, la racha empieza después del hueco", () => {
+    const charges = [charge("2026-03-23", 32000), charge("2026-07-23", 32000), charge("2026-09-23", 32000)];
+    expect(dates(bimonthlyRun(charges))).toEqual(["2026-07-23", "2026-09-23"]);
   });
 });
 
@@ -585,7 +621,7 @@ describe("detectSubscriptions con suscripciones forzadas", () => {
   });
 });
 
-const ANUAL: Partial<SubscriptionContext> = { anuales: new Set(["STREAMBOX"]) };
+const ANUAL: Partial<SubscriptionContext> = { cadencias: new Map([["STREAMBOX", "anual"]]) };
 
 describe("detectSubscriptions con cadencia anual", () => {
   it("una anual cobra de nuevo en un año y suma un doceavo por mes", () => {
@@ -652,7 +688,7 @@ describe("detectSubscriptions con cadencia anual", () => {
       tx("2025-01-09", 3500, { merchant: "GOOGLE *VideoP X1y2Z3" }),
       tx("2026-01-09", 3500, { merchant: "GOOGLE *VideoPremium" }),
     ];
-    expect(detectSubscriptions(txs, ctx({ anuales: new Set(["GOOGLE VIDEOPREMIUM"]) }))).toMatchObject([
+    expect(detectSubscriptions(txs, ctx({ cadencias: new Map([["GOOGLE VIDEOPREMIUM", "anual"]]) }))).toMatchObject([
       { key: "GOOGLE VIDEOP", cadencia: "anual", cobros: 2 },
     ]);
   });
@@ -661,6 +697,70 @@ describe("detectSubscriptions con cadencia anual", () => {
     const txs = [tx("2026-01-14", 60000, { merchant: "STREAMBOX" })];
     expect(detectSubscriptions(txs, ctx({ ...ANUAL, ocultas: new Set(["STREAMBOX"]) }))).toMatchObject([
       { cadencia: "anual", oculta: true },
+    ]);
+  });
+});
+
+const BIMESTRAL: Partial<SubscriptionContext> = { cadencias: new Map([["CAFE ROSITA", "bimestral"]]) };
+
+describe("detectSubscriptions con cadencia bimestral", () => {
+  it("una bimestral cobra de nuevo en dos meses y suma la mitad por mes", () => {
+    const txs = [tx("2026-09-23", 36000, { merchant: "CAFE ROSITA 4471" })];
+    expect(detectSubscriptions(txs, ctx(BIMESTRAL))).toEqual([expect.objectContaining({
+      key: "CAFE ROSITA",
+      cadencia: "bimestral",
+      estado: "activa",
+      cobros: 1,
+      montoActual: 36000,
+      montoMensualArs: 18000,
+      ultimoCobro: "2026-09-23",
+      proximoCobro: "2026-11-23",
+    })]);
+  });
+
+  it("sigue activa aunque el último resumen no tenga cobro, si todavía no tocaba", () => {
+    const txs = [tx("2026-08-14", 36000, { merchant: "CAFE ROSITA" })];
+    expect(detectSubscriptions(txs, ctx({ ...BIMESTRAL, ultimoCierre: CIERRE_SEPTIEMBRE }))).toMatchObject([
+      { cadencia: "bimestral", estado: "activa", proximoCobro: "2026-10-14" },
+    ]);
+  });
+
+  it("queda cortada si el próximo cobro más la gracia cae antes del último cierre", () => {
+    const txs = [tx("2026-07-10", 36000, { merchant: "CAFE ROSITA" })];
+    expect(detectSubscriptions(txs, ctx({ ...BIMESTRAL, ultimoCierre: CIERRE_SEPTIEMBRE }))).toMatchObject([
+      { cadencia: "bimestral", estado: "cortada", proximoCobro: "2026-09-10" },
+    ]);
+  });
+
+  it("junta los cobros parecidos cada dos meses y deja afuera las otras compras del comercio", () => {
+    const txs = [
+      tx("2026-05-23", 32000, { merchant: "CAFE ROSITA" }),
+      tx("2026-07-02", 7000, { merchant: "CAFE ROSITA" }),
+      tx("2026-07-23", 32000, { merchant: "CAFE ROSITA" }),
+      tx("2026-09-10", 10500, { merchant: "CAFE ROSITA" }),
+      tx("2026-09-23", 36000, { merchant: "CAFE ROSITA" }),
+    ];
+    expect(detectSubscriptions(txs, ctx(BIMESTRAL))).toMatchObject([{
+      cadencia: "bimestral",
+      cobros: 3,
+      primerCobro: "2026-05-23",
+      montoActual: 36000,
+      aumento: { variacion: expect.closeTo(0.125, 6), desde: "2026-05", montoAnterior: 32000 },
+    }]);
+  });
+
+  it("una bimestral en dólares pasa a pesos y divide por 2", () => {
+    const txs = [tx("2026-09-14", 25, { merchant: "CAFE ROSITA", currency: "USD" })];
+    expect(detectSubscriptions(txs, ctx({ ...BIMESTRAL, cotizacion: 1465 }))).toMatchObject([{ montoMensualArs: 18312.5 }]);
+  });
+
+  it("la marca bimestral se busca también por la clave cruda", () => {
+    const txs = [
+      tx("2026-07-09", 3500, { merchant: "GOOGLE *VideoP X1y2Z3" }),
+      tx("2026-09-09", 3500, { merchant: "GOOGLE *VideoPremium" }),
+    ];
+    expect(detectSubscriptions(txs, ctx({ cadencias: new Map([["GOOGLE VIDEOPREMIUM", "bimestral"]]) }))).toMatchObject([
+      { key: "GOOGLE VIDEOP", cadencia: "bimestral", cobros: 2 },
     ]);
   });
 });
@@ -704,6 +804,13 @@ describe("summarizeSubscriptions", () => {
       item({ cadencia: "anual", moneda: "USD", montoActual: 120, montoMensualArs: 14650 }),
       item({ moneda: "USD", montoActual: 10, montoMensualArs: 14650 }),
     ])).toEqual({ totalMensualArs: 39300, totalMensualUsd: 20, totalAnualArs: 471600 });
+  });
+
+  it("una bimestral suma la mitad: los pesos ya vienen divididos y los dólares se dividen por 2", () => {
+    expect(summarizeSubscriptions([
+      item({ cadencia: "bimestral", montoActual: 36000, montoMensualArs: 18000 }),
+      item({ cadencia: "bimestral", moneda: "USD", montoActual: 20, montoMensualArs: 14650 }),
+    ])).toEqual({ totalMensualArs: 32650, totalMensualUsd: 10, totalAnualArs: 391800 });
   });
 
   it("sin suscripciones da totales en cero", () => {

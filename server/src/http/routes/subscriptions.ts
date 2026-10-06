@@ -1,10 +1,16 @@
 import { Router, type Request } from "express";
 import {
-  manualSubscriptionInputSchema, type Currency, type Direction, type Issuer, type SubscriptionsReportDTO, type TxType,
+  manualSubscriptionInputSchema,
+  subscriptionCadenceInputSchema,
+  type Currency,
+  type Direction,
+  type Issuer,
+  type SubscriptionsReportDTO,
+  type TxType,
 } from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
 import {
-  AnnualSubscriptionModel, HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, TransactionModel,
+  HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, SubscriptionCadenceModel, TransactionModel,
 } from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import { merchantKey } from "../../stats/merchantKey.js";
@@ -18,6 +24,7 @@ import {
 const MAX_CLAVE = 60;
 const INVALID_MERCHANT = "Comercio inválido";
 const UNRECOGNIZABLE_MERCHANT = "Este comercio no tiene un nombre reconocible";
+const INVALID_CADENCE = "Cadencia inválida";
 
 export const subscriptionsRouter = Router();
 
@@ -29,12 +36,12 @@ const keyParamOf = (req: Request): string => {
 
 subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
   const hoy = new Date().toISOString().slice(0, 10);
-  const [transactions, statements, hidden, manual, annual, cotizacion] = await Promise.all([
+  const [transactions, statements, hidden, manual, cadences, cotizacion] = await Promise.all([
     TransactionModel.find({ isInstallment: false, type: { $in: ["purchase", "refund"] } }).lean(),
     StatementModel.find({}, { issuer: 1, closingDate: 1 }).lean(),
     HiddenSubscriptionModel.find().lean(),
     ManualSubscriptionModel.find().lean(),
-    AnnualSubscriptionModel.find().lean(),
+    SubscriptionCadenceModel.find(),
     fetchOficialRate(hoy),
   ]);
   const txs: SubscriptionTx[] = transactions.map((t) => ({
@@ -54,7 +61,7 @@ subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
     ultimoCierre: latestClosingByIssuer(statements.map((s) => ({ issuer: s.issuer, closingDate: s.closingDate ?? null }))),
     ocultas: new Set(hidden.map((h) => h.key)),
     manuales: new Set(manual.map((m) => m.key)),
-    anuales: new Set(annual.map((a) => a.key)),
+    cadencias: new Map(cadences.map(({ key, cadencia }) => [key, cadencia])),
     cotizacion,
   });
   const report: SubscriptionsReportDTO = { cotizacionOficial: cotizacion, ...summarizeSubscriptions(items), items };
@@ -85,14 +92,12 @@ subscriptionsRouter.post("/manual", asyncHandler(async (req, res) => {
   res.status(204).end();
 }));
 
-subscriptionsRouter.put("/annual/:key", asyncHandler(async (req, res) => {
+subscriptionsRouter.put("/cadence/:key", asyncHandler(async (req, res) => {
   const key = keyParamOf(req);
-  await AnnualSubscriptionModel.updateOne({ key }, { $setOnInsert: { key } }, { upsert: true });
-  res.status(204).end();
-}));
-
-subscriptionsRouter.delete("/annual/:key", asyncHandler(async (req, res) => {
-  const key = keyParamOf(req);
-  await AnnualSubscriptionModel.deleteOne({ key });
+  const parsed = subscriptionCadenceInputSchema.safeParse(req.body);
+  if (!parsed.success) throw new HttpError(400, INVALID_CADENCE);
+  const { cadencia } = parsed.data;
+  if (cadencia === "mensual") await SubscriptionCadenceModel.deleteOne({ key });
+  else await SubscriptionCadenceModel.updateOne({ key }, { $set: { cadencia } }, { upsert: true });
   res.status(204).end();
 }));

@@ -5,7 +5,7 @@ import type {
   ImportedFileDTO, InboxRuleResultDTO, InflationRateDTO, InstallmentPurchaseDTO, MacroRefreshDTO, MacroSeriesDTO,
   ManualAssetCreateDTO, ManualAssetDTO, ManualAssetUpdateDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO,
   NetWorthDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, StatementReviewDTO, StatementReviewKeysDTO,
-  SubscriptionsReportDTO, SummaryStat, TransactionDTO, UncategorizedInboxDTO,
+  SubscriptionCadenceInput, SubscriptionsReportDTO, SummaryStat, TransactionDTO, UncategorizedInboxDTO,
 } from "@ledgerly/shared";
 import { applyReviewedDelta } from "../statementReview.js";
 import { apiFetch } from "./client.js";
@@ -246,11 +246,14 @@ export function useSetSubscriptionHidden() {
   });
 }
 
-export function useSetSubscriptionAnnual() {
+export function useSetSubscriptionCadence() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, annual }: { key: string; annual: boolean }) =>
-      apiFetch<void>(`/subscriptions/annual/${encodeURIComponent(key)}`, { method: annual ? "PUT" : "DELETE" }),
+    mutationFn: ({ key, cadencia }: { key: string } & SubscriptionCadenceInput) =>
+      apiFetch<void>(`/subscriptions/cadence/${encodeURIComponent(key)}`, {
+        method: "PUT",
+        body: JSON.stringify({ cadencia }),
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
   });
 }

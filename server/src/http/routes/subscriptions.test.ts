@@ -5,7 +5,7 @@ import { subscriptionsReportDtoSchema } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
 import { createApp } from "../app.js";
 import {
-  AnnualSubscriptionModel, HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, TransactionModel,
+  HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, SubscriptionCadenceModel, TransactionModel,
 } from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 
@@ -183,12 +183,14 @@ describe("marcar suscripciones a mano", () => {
   });
 });
 
-describe("marcar suscripciones anuales", () => {
-  it("PUT la pasa a anual, es idempotente y divide por 12", async () => {
+const setCadence = (key: string, body: object) => request(app).put(`/api/subscriptions/cadence/${key}`).send(body);
+
+describe("cambiar la cadencia de una suscripción", () => {
+  it("PUT anual la pasa a anual, es idempotente y divide por 12", async () => {
     await seedVisa(streamflixAndNoise());
-    expect((await request(app).put("/api/subscriptions/annual/STREAMFLIX%20COM")).status).toBe(204);
-    expect((await request(app).put("/api/subscriptions/annual/STREAMFLIX%20COM")).status).toBe(204);
-    expect(await AnnualSubscriptionModel.countDocuments()).toBe(1);
+    expect((await setCadence("STREAMFLIX%20COM", { cadencia: "anual" })).status).toBe(204);
+    expect((await setCadence("STREAMFLIX%20COM", { cadencia: "anual" })).status).toBe(204);
+    expect(await SubscriptionCadenceModel.countDocuments()).toBe(1);
     const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
     expect(report.items).toMatchObject([{
       key: "STREAMFLIX COM", cadencia: "anual", cobros: 1, proximoCobro: "2027-08-09", montoMensualArs: 1585.86,
@@ -196,24 +198,57 @@ describe("marcar suscripciones anuales", () => {
     expect(report).toMatchObject({ totalMensualArs: 1585.86, totalMensualUsd: 1.08 });
   });
 
-  it("DELETE la vuelve mensual y también es idempotente", async () => {
+  it("PUT bimestral la pasa a bimestral y divide por 2", async () => {
+    await seedVisa(cafeRosita());
+    await ManualSubscriptionModel.create({ key: "CAFE ROSITA" });
+    expect((await setCadence("CAFE%20ROSITA", { cadencia: "bimestral" })).status).toBe(204);
+    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    expect(report.items).toMatchObject([{
+      key: "CAFE ROSITA", cadencia: "bimestral", cobros: 1, proximoCobro: "2026-10-15", montoMensualArs: 1900,
+    }]);
+  });
+
+  it("PUT pasa de anual a bimestral sin duplicar la marca", async () => {
+    await seedVisa(cafeRosita());
+    await setCadence("CAFE%20ROSITA", { cadencia: "anual" });
+    await setCadence("CAFE%20ROSITA", { cadencia: "bimestral" });
+    expect(await SubscriptionCadenceModel.find().lean()).toMatchObject([{ key: "CAFE ROSITA", cadencia: "bimestral" }]);
+  });
+
+  it("PUT mensual borra la marca y también es idempotente", async () => {
     await seedVisa(streamflixAndNoise());
-    await request(app).put("/api/subscriptions/annual/STREAMFLIX%20COM");
-    expect((await request(app).delete("/api/subscriptions/annual/STREAMFLIX%20COM")).status).toBe(204);
-    expect((await request(app).delete("/api/subscriptions/annual/STREAMFLIX%20COM")).status).toBe(204);
+    await setCadence("STREAMFLIX%20COM", { cadencia: "anual" });
+    expect((await setCadence("STREAMFLIX%20COM", { cadencia: "mensual" })).status).toBe(204);
+    expect((await setCadence("STREAMFLIX%20COM", { cadencia: "mensual" })).status).toBe(204);
+    expect(await SubscriptionCadenceModel.countDocuments()).toBe(0);
     const res = await request(app).get("/api/subscriptions");
     expect(res.body.items).toMatchObject([{ cadencia: "mensual", cobros: 4 }]);
     expect(res.body.totalMensualUsd).toBe(12.99);
   });
 
+  it("una marca anual guardada antes de que existiera la cadencia sigue siendo anual", async () => {
+    await seedVisa(streamflixAndNoise());
+    await SubscriptionCadenceModel.collection.insertOne({ key: "STREAMFLIX COM", annualAt: new Date() });
+    const res = await request(app).get("/api/subscriptions");
+    expect(res.body.items).toMatchObject([{ key: "STREAMFLIX COM", cadencia: "anual" }]);
+  });
+
   it.each([
-    ["PUT", "en blanco", "%20%20"],
-    ["PUT", "de más de 60 caracteres", "A".repeat(61)],
-    ["DELETE", "en blanco", "%20%20"],
-  ])("%s /annual con una clave %s responde 400", async (method, _label, key) => {
-    const url = `/api/subscriptions/annual/${key}`;
-    const res = method === "PUT" ? await request(app).put(url) : await request(app).delete(url);
+    ["en blanco", "%20%20"],
+    ["de más de 60 caracteres", "A".repeat(61)],
+  ])("PUT /cadence con una clave %s responde 400", async (_label, key) => {
+    const res = await setCadence(key, { cadencia: "anual" });
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: "Clave inválida" });
+  });
+
+  it.each([
+    ["sin cadencia", {}],
+    ["con una cadencia desconocida", { cadencia: "semanal" }],
+  ])("PUT /cadence %s responde 400 y no guarda nada", async (_label, body) => {
+    const res = await setCadence("STREAMFLIX%20COM", body);
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "Cadencia inválida" });
+    expect(await SubscriptionCadenceModel.countDocuments()).toBe(0);
   });
 });
