@@ -3,15 +3,13 @@ import { CircularProgress, Typography } from "@mui/material";
 import { useCashFlow } from "../api/hooks.js";
 import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { CashFlowKpiCards } from "../components/CashFlowKpiCards.js";
-import { CashFlowTable } from "../components/CashFlowTable.js";
-import { CashFlowCards } from "../components/CashFlowCards.js";
+import { CashFlowDetailSection } from "../components/CashFlowDetailSection.js";
 import { MotionBox } from "../components/motion/motion.js";
 import { staggerContainer } from "../components/motion/variants.js";
 import { ChartCard } from "../components/charts/ChartCard.js";
 import { CashFlowChart } from "../components/charts/CashFlowChart.js";
-import { cashFlowYears, closedMonthsInYears, detailRows, incompleteCaption, projectionMonths } from "../cashFlow.js";
+import { cashFlowYears, closedMonthsInYears, incompleteCaption, projectionMonths } from "../cashFlow.js";
 import { useGlobalFilters } from "../filters/useGlobalFilters.js";
-import { useIsMobile } from "../useIsMobile.js";
 
 interface ChartCaptionProps {
   text: string;
@@ -41,11 +39,9 @@ const ChartCaption = ({ text }: ChartCaptionProps) => (
 export const CashFlowPage = () => {
   const { data, isLoading, isError } = useCashFlow();
   const { yearSelection } = useGlobalFilters();
-  const isMobile = useIsMobile();
   const meses = useMemo(() => data?.meses ?? [], [data]);
   const historia = useMemo(() => closedMonthsInYears(meses, yearSelection), [meses, yearSelection]);
   const proyeccion = useMemo(() => projectionMonths(meses), [meses]);
-  const detalle = useMemo(() => detailRows(historia, proyeccion), [historia, proyeccion]);
   const yearOptions = useMemo(() => cashFlowYears(meses), [meses]);
   const monthOnly = yearSelection.kind === "years" && yearSelection.years.length === 1;
 
@@ -77,7 +73,6 @@ export const CashFlowPage = () => {
   }
 
   const historiaCaption = incompleteCaption(historia);
-  const detail = isMobile ? <CashFlowCards meses={detalle} /> : <CashFlowTable meses={detalle} />;
 
   return (
     <>
@@ -99,8 +94,7 @@ export const CashFlowPage = () => {
           <ChartCaption text={PROJECTION_CAPTION} />
         </ChartCard>
       </MotionBox>
-      <Typography variant="h6" sx={{ mb: 1 }}>Detalle mes a mes</Typography>
-      {detail}
+      <CashFlowDetailSection meses={meses} historia={historia} />
     </>
   );
 };

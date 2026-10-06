@@ -211,10 +211,10 @@ describe("ImportPage en mobile", () => {
     mockFetch((url) => (url.includes("/imports") ? imported : {}));
   });
 
-  it("ofrece «Elegir PDF» y lista los archivos importados como tarjetas, sin grilla", async () => {
+  it("ofrece «Elegir archivo» y lista los archivos importados como tarjetas, sin grilla", async () => {
     renderWithProviders(<ImportPage />);
-    expect(screen.getByRole("button", { name: "Elegir PDF" })).toBeInTheDocument();
-    expect(screen.queryByText(/arrastrá el pdf/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Elegir archivo" })).toBeInTheDocument();
+    expect(screen.queryByText(/arrastrá/i)).not.toBeInTheDocument();
     const visa = await screen.findByRole("article", { name: "visa-julio.pdf" });
     expect(within(visa).getByText("Tarjeta")).toBeInTheDocument();
     expect(within(visa).getByText("revisar")).toBeInTheDocument();

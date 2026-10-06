@@ -60,3 +60,45 @@ export class EncryptedPdfError extends IngestionError {
     this.name = "EncryptedPdfError";
   }
 }
+
+export class OcrUnavailableError extends IngestionError {
+  constructor() {
+    super("La lectura de imágenes sólo funciona en macOS");
+    this.name = "OcrUnavailableError";
+  }
+}
+
+export class OcrFailedError extends IngestionError {
+  constructor() {
+    super("No se pudo leer el texto de la imagen");
+    this.name = "OcrFailedError";
+  }
+}
+
+export class UnrecognizedCouponImageError extends IngestionError {
+  constructor() {
+    super("No se reconoció la captura del cupón");
+    this.name = "UnrecognizedCouponImageError";
+  }
+}
+
+export class CouponImageTotalsError extends IngestionError {
+  constructor() {
+    super("Los montos leídos no cierran con el total pagado");
+    this.name = "CouponImageTotalsError";
+  }
+}
+
+export class MissingPreviousCouponError extends IngestionError {
+  constructor() {
+    super("Importá primero un cupón PDF del préstamo");
+    this.name = "MissingPreviousCouponError";
+  }
+}
+
+export class CouponImageMismatchError extends IngestionError {
+  constructor() {
+    super("La cuota, el vencimiento o el total en UVA no coinciden con los cupones anteriores");
+    this.name = "CouponImageMismatchError";
+  }
+}

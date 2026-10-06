@@ -1,7 +1,7 @@
 import { Chip, Table, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
 import type { CashFlowMonthDTO } from "@ledgerly/shared";
 import { formatMoneyOrDash, formatMonthLabel } from "../format.js";
-import { formatSavingsRate, isNegative, notesText } from "../cashFlow.js";
+import { formatSavingsRate, isNegative } from "../cashFlow.js";
 import { CashFlowStatusChip } from "./CashFlowStatusChip.js";
 import { MotionTableBody, MotionTableRow } from "./motion/motion.js";
 import { fadeUpItem, staggerContainer } from "./motion/variants.js";
@@ -34,7 +34,6 @@ const CashFlowTableRow = ({ mes }: CashFlowTableRowProps) => {
       <TableCell align="right" sx={NO_WRAP}>{money(mes.egresos)}</TableCell>
       <TableCell align="right" sx={{ ...NO_WRAP, color: margenColor }}>{money(mes.margen)}</TableCell>
       <TableCell align="right" sx={NO_WRAP}>{formatSavingsRate(mes.tasaAhorro)}</TableCell>
-      <TableCell sx={{ minWidth: 220 }}>{notesText(mes)}</TableCell>
     </MotionTableRow>
   );
 };
@@ -53,7 +52,6 @@ export const CashFlowTable = ({ meses }: CashFlowTableProps) => {
             <TableCell>Mes</TableCell>
             <TableCell>Estado</TableCell>
             {amountHeaders}
-            <TableCell>Notas</TableCell>
           </TableRow>
         </TableHead>
         <MotionTableBody variants={staggerContainer} initial="hidden" animate="visible">

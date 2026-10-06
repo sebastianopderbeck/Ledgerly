@@ -5,8 +5,11 @@ import { useIsMobile } from "../useIsMobile.js";
 
 interface FileDropzoneProps { onFile: (file: File) => void; disabled?: boolean; }
 
-const isPdf = (file: File): boolean =>
-  file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+const ACCEPTED_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/heic"];
+const ACCEPTED_EXTENSIONS = /\.(pdf|png|jpe?g|heic)$/i;
+
+const isAccepted = (file: File): boolean =>
+  ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.test(file.name);
 
 export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) => {
   const isMobile = useIsMobile();
@@ -15,7 +18,7 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
   const [rejected, setRejected] = useState(false);
 
   const handleFile = (file: File) => {
-    if (!isPdf(file)) {
+    if (!isAccepted(file)) {
       setRejected(true);
       return;
     }
@@ -30,8 +33,6 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
     if (file) handleFile(file);
   };
 
-  const buttonLabel = isMobile ? "Elegir PDF" : "Elegir archivo";
-
   return (
     <Box
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -44,7 +45,7 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
       }}
     >
       <UploadFileIcon fontSize="large" color="action" />
-      {!isMobile && <Typography sx={{ my: 1 }}>Arrastrá el PDF del resumen o</Typography>}
+      {!isMobile && <Typography sx={{ my: 1 }}>Arrastrá el PDF o la captura del crédito</Typography>}
       <Button
         variant="contained"
         disabled={disabled}
@@ -52,17 +53,17 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
         onClick={() => inputRef.current?.click()}
         sx={{ mt: { xs: 1, md: 0 } }}
       >
-        {buttonLabel}
+        Elegir archivo
       </Button>
       {rejected && (
         <Typography color="error" variant="body2" sx={{ mt: 2 }}>
-          Sólo se aceptan archivos PDF
+          Sólo se aceptan PDF o imágenes (PNG, JPG, HEIC)
         </Typography>
       )}
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf"
+        accept={ACCEPTED_TYPES.join(",")}
         hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
       />
