@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { BAR_ITEMS, MORE_ITEMS, NAV_ITEMS, isMoreRoute } from "./navItems.js";
 
 describe("secciones en mobile", () => {
-  it("la barra lleva Dashboard, Cuotas, Movimientos e Importar, en ese orden", () => {
-    expect(BAR_ITEMS.map((item) => item.to)).toEqual(["/", "/installments", "/transactions", "/import"]);
+  it("la barra lleva Dashboard, Cuotas y Movimientos, en ese orden", () => {
+    expect(BAR_ITEMS.map((item) => item.to)).toEqual(["/", "/installments", "/transactions"]);
   });
 
   it("Dashboard se muestra como Inicio en la barra", () => {
@@ -19,7 +19,7 @@ describe("secciones en mobile", () => {
   it("en la sidebar, Suscripciones va después de Movimientos y las demás secciones nuevas antes", () => {
     expect(NAV_ITEMS.map((item) => item.to)).toEqual([
       "/", "/installments", "/credits", "/auto", "/patrimonio", "/sueldo", "/vencimientos", "/contexto", "/flujo",
-      "/presupuestos", "/transactions", "/suscripciones", "/rules", "/import",
+      "/presupuestos", "/transactions", "/suscripciones", "/rules",
     ]);
   });
 
@@ -38,5 +38,6 @@ describe("secciones en mobile", () => {
     expect(isMoreRoute("/")).toBe(false);
     expect(isMoreRoute("/transactions")).toBe(false);
     expect(isMoreRoute("/creditsx")).toBe(false);
+    expect(isMoreRoute("/import")).toBe(false);
   });
 });

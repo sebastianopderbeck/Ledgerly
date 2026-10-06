@@ -7,7 +7,6 @@ import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import RuleOutlinedIcon from "@mui/icons-material/RuleOutlined";
-import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
 import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
@@ -38,7 +37,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/transactions", label: "Movimientos", icon: ReceiptLongOutlinedIcon, placement: "bar" },
   { to: "/suscripciones", label: "Suscripciones", icon: AutorenewOutlinedIcon, placement: "more" },
   { to: "/rules", label: "Reglas", icon: RuleOutlinedIcon, placement: "more" },
-  { to: "/import", label: "Importar", icon: UploadFileOutlinedIcon, placement: "bar" },
 ];
 
 export const BAR_ITEMS = NAV_ITEMS.filter((item) => item.placement === "bar");

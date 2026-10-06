@@ -1,12 +1,16 @@
+import { NavLink } from "react-router-dom";
 import { Box, IconButton, Tooltip } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
+import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import { useColorMode } from "../../theme.js";
 import { RefreshDataButton } from "../RefreshDataButton.js";
+import { useNavSearch } from "./useNavSearch.js";
 
 export const TopActionsPill = () => {
   const { mode, toggle } = useColorMode();
+  const search = useNavSearch();
   const themeLabel = mode === "light" ? "Modo oscuro" : "Modo claro";
   const ThemeIcon = mode === "light" ? DarkModeIcon : LightModeIcon;
 
@@ -33,6 +37,17 @@ export const TopActionsPill = () => {
         boxShadow: (theme) => `0 12px 32px -16px ${alpha(theme.palette.common.black, 0.55)}`,
       }}
     >
+      <Tooltip title="Importar">
+        <IconButton
+          component={NavLink}
+          to={{ pathname: "/import", search }}
+          color="inherit"
+          aria-label="importar"
+          sx={{ "&[aria-current='page']": { color: "primary.main" } }}
+        >
+          <UploadFileOutlinedIcon />
+        </IconButton>
+      </Tooltip>
       <RefreshDataButton />
       <Tooltip title={themeLabel}>
         <IconButton color="inherit" onClick={toggle} aria-label="cambiar tema">
