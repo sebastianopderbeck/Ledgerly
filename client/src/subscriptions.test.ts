@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SubscriptionDTO, SubscriptionIncrease } from "@ledgerly/shared";
+import type { SubscriptionDTO, SubscriptionIncrease, TransactionDTO } from "@ledgerly/shared";
 import { formatMoney } from "./format.js";
 import {
   AMOUNT_LABEL,
@@ -7,6 +7,7 @@ import {
   cadenceAmountCaption,
   cadenceToggleLabel,
   cadenceToggleTooltip,
+  canMarkAsSubscription,
   increaseDetail,
   increaseLabel,
   increaseShortLabel,
@@ -137,5 +138,31 @@ describe("textos de cadencia", () => {
   it("cadenceAmountCaption aclara solo las anuales", () => {
     expect(cadenceAmountCaption("anual")).toBe("por año");
     expect(cadenceAmountCaption("mensual")).toBeNull();
+  });
+});
+
+describe("canMarkAsSubscription", () => {
+  const purchase: TransactionDTO = {
+    id: "t1", statementId: "s", issuer: "icbc", cardLabel: "ICBC", date: "2026-09-15",
+    descriptionRaw: "VIDEOMAX 99123", merchant: "VIDEOMAX 99123", category: "Entretenimiento", categorySource: "rule",
+    amount: 4500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
+    installmentCurrent: null, installmentTotal: null, comprobante: null,
+  };
+
+  const NOT_ELIGIBLE: [string, Partial<TransactionDTO>][] = [
+    ["una cuota", { isInstallment: true, installmentCurrent: 3, installmentTotal: 12 }],
+    ["un crédito", { direction: "credit" }],
+    ["un pago", { type: "payment", direction: "credit" }],
+    ["un impuesto", { type: "tax" }],
+    ["un monto en cero", { amount: 0 }],
+  ];
+
+  it("acepta un consumo en un pago, en pesos o en dólares", () => {
+    expect(canMarkAsSubscription(purchase)).toBe(true);
+    expect(canMarkAsSubscription({ ...purchase, currency: "USD" })).toBe(true);
+  });
+
+  it.each(NOT_ELIGIBLE)("rechaza %s", (_label, overrides) => {
+    expect(canMarkAsSubscription({ ...purchase, ...overrides })).toBe(false);
   });
 });

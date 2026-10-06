@@ -24,8 +24,11 @@ afterEach(cleanup);
 
 const setup = () => {
   const onDelete = vi.fn();
-  renderWithProviders(<TransactionsTable rows={rows} onCategoryChange={() => undefined} onDelete={onDelete} />);
-  return onDelete;
+  const onMarkSubscription = vi.fn();
+  renderWithProviders(
+    <TransactionsTable rows={rows} onCategoryChange={() => undefined} onDelete={onDelete} onMarkSubscription={onMarkSubscription} />,
+  );
+  return { onDelete, onMarkSubscription };
 };
 
 describe("TransactionsTable borrado", () => {
@@ -35,7 +38,7 @@ describe("TransactionsTable borrado", () => {
   });
 
   it("selección + borrar seleccionados + confirmar llama onDelete con los ids", async () => {
-    const onDelete = setup();
+    const { onDelete } = setup();
     const checkboxes = screen.getAllByRole("checkbox");
     await userEvent.click(checkboxes[1]);
     await userEvent.click(screen.getByRole("button", { name: /borrar seleccionados \(1\)/i }));
@@ -44,7 +47,7 @@ describe("TransactionsTable borrado", () => {
   });
 
   it("cancelar no llama onDelete", async () => {
-    const onDelete = setup();
+    const { onDelete } = setup();
     const checkboxes = screen.getAllByRole("checkbox");
     await userEvent.click(checkboxes[1]);
     await userEvent.click(screen.getByRole("button", { name: /borrar seleccionados \(1\)/i }));
@@ -62,5 +65,21 @@ describe("TransactionsTable columna Cuota", () => {
   it("no muestra fracción en un movimiento que no es cuota", () => {
     setup();
     expect(screen.queryByText("1/1")).not.toBeInTheDocument();
+  });
+});
+
+describe("TransactionsTable marcar como suscripción", () => {
+  it("ofrece el botón solo en los consumos en un pago", () => {
+    setup();
+    expect(screen.getByRole("button", { name: "Marcar MERCADOLIBRE como suscripción" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Marcar SU PAGO como suscripción" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Marcar NOTEBOOK como suscripción" })).not.toBeInTheDocument();
+  });
+
+  it("al tocarlo manda el comercio y no selecciona la fila", async () => {
+    const { onMarkSubscription } = setup();
+    await userEvent.click(screen.getByRole("button", { name: "Marcar MERCADOLIBRE como suscripción" }));
+    expect(onMarkSubscription).toHaveBeenCalledWith("MERCADOLIBRE");
+    expect(screen.queryByRole("button", { name: /borrar seleccionados/i })).not.toBeInTheDocument();
   });
 });

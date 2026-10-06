@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { motion } from "framer-motion";
 import { Box, Button, Chip, IconButton } from "@mui/material";
+import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
   DataGrid,
@@ -8,15 +9,35 @@ import {
 } from "@mui/x-data-grid";
 import type { TransactionDTO } from "@ledgerly/shared";
 import { formatMoney } from "../format.js";
+import { canMarkAsSubscription } from "../subscriptions.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 
 interface TransactionsTableProps {
   rows: TransactionDTO[];
   onCategoryChange: (id: string, category: string) => void;
   onDelete: (ids: string[]) => void;
+  onMarkSubscription: (merchant: string) => void;
 }
 
-export const TransactionsTable = ({ rows, onCategoryChange, onDelete }: TransactionsTableProps) => {
+interface MarkSubscriptionButtonProps {
+  merchant: string;
+  onMark: (merchant: string) => void;
+}
+
+const MarkSubscriptionButton = ({ merchant, onMark }: MarkSubscriptionButtonProps) => {
+  const mark = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onMark(merchant);
+  };
+
+  return (
+    <IconButton size="small" aria-label={`Marcar ${merchant} como suscripción`} onClick={mark}>
+      <AutorenewOutlinedIcon fontSize="small" />
+    </IconButton>
+  );
+};
+
+export const TransactionsTable = ({ rows, onCategoryChange, onDelete, onMarkSubscription }: TransactionsTableProps) => {
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
   const [pendingIds, setPendingIds] = useState<string[] | null>(null);
 
@@ -41,7 +62,12 @@ export const TransactionsTable = ({ rows, onCategoryChange, onDelete }: Transact
         return <Chip size="small" variant="outlined" label={label} />;
       },
     },
-  ], []);
+    {
+      field: "subscription", headerName: "", width: 64, sortable: false, filterable: false, disableColumnMenu: true,
+      renderCell: ({ row }: GridRenderCellParams<TransactionDTO>) =>
+        (canMarkAsSubscription(row) ? <MarkSubscriptionButton merchant={row.merchant} onMark={onMarkSubscription} /> : null),
+    },
+  ], [onMarkSubscription]);
 
   const processRowUpdate = (next: GridRowModel<TransactionDTO>, prev: GridRowModel<TransactionDTO>) => {
     if (next.category !== prev.category) onCategoryChange(next.id, next.category);

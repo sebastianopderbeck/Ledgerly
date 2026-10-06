@@ -11,15 +11,23 @@ const tx = {
   installmentCurrent: null, installmentTotal: null, comprobante: "1",
 };
 
-beforeEach(() => {
+const json = (body: unknown, status = 200): Response =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+const accepted = (): Response => new Response(null, { status: 204 });
+
+const stubApi = (markResponse: () => Response = accepted): void => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    if (url.includes("/subscriptions/manual")) return markResponse();
     const body = url.includes("/stats/monthly") ? [{ month: "2025-11", total: 1, count: 1 }, { month: "2026-05", total: 1, count: 1 }]
       : url.includes("/transactions/categories") ? ["Compras", "Salud"]
       : url.includes("/transactions") ? { items: [tx], total: 1, page: 1, pageSize: 50 }
       : {};
-    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    return json(body);
   }));
-});
+};
+
+beforeEach(() => stubApi());
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -84,6 +92,26 @@ describe("TransactionsPage", () => {
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument();
   });
+
+  it("marcar un consumo como suscripción manda el POST con el comercio y avisa", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    await userEvent.click(await screen.findByRole("button", { name: "Marcar MERCADOLIBRE como suscripción" }));
+    expect(await screen.findByText("Agregado a Suscripciones")).toBeInTheDocument();
+    const call = vi.mocked(fetch).mock.calls.find((c) => String(c[0]).includes("/subscriptions/manual"));
+    expect((call?.[1] as RequestInit | undefined)?.method).toBe("POST");
+    expect(JSON.parse(String((call?.[1] as RequestInit | undefined)?.body))).toEqual({ merchant: "MERCADOLIBRE" });
+    expect(screen.queryByRole("button", { name: /borrar seleccionados/i })).not.toBeInTheDocument();
+  });
+
+  it("si el server no lo acepta avisa que no pudo marcarlo", async () => {
+    stubApi(() => json({ error: "Este comercio no tiene un nombre reconocible" }, 400));
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    await userEvent.click(await screen.findByRole("button", { name: "Marcar MERCADOLIBRE como suscripción" }));
+    expect(await screen.findByText("No pudimos marcarlo como suscripción")).toBeInTheDocument();
+    expect(screen.queryByText("Agregado a Suscripciones")).not.toBeInTheDocument();
+  });
 });
 
 describe("TransactionsPage en mobile", () => {
@@ -127,5 +155,14 @@ describe("TransactionsPage en mobile", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(document.querySelector(".MuiBackdrop-root")).not.toBeInTheDocument();
     expect(document.body.style.overflow).not.toBe("hidden");
+  });
+
+  it("«Es una suscripción» desde la hoja manda el POST y avisa", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Es una suscripción" }));
+    expect(await screen.findByText("Agregado a Suscripciones")).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes("/subscriptions/manual"))).toBe(true);
   });
 });

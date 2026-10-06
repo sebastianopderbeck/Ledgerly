@@ -255,6 +255,15 @@ export function useSetSubscriptionAnnual() {
   });
 }
 
+export function useMarkSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (merchant: string) =>
+      apiFetch<void>("/subscriptions/manual", { method: "POST", body: JSON.stringify({ merchant }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
+  });
+}
+
 export const statementReviewKey = (id: string | null) => ["statement-review", id] as const;
 
 const fetchStatementReview = (id: string) => apiFetch<StatementReviewDTO>(`/statements/${id}/review`);

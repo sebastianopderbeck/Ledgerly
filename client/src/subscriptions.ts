@@ -1,4 +1,4 @@
-import type { Cadencia, Currency, SubscriptionDTO, SubscriptionIncrease } from "@ledgerly/shared";
+import type { Cadencia, Currency, SubscriptionDTO, SubscriptionIncrease, TransactionDTO } from "@ledgerly/shared";
 import { ALL_YEARS } from "./filters/globalFilters.js";
 import { transactionsLink } from "./filters/transactionsLink.js";
 import { formatMoney, formatMonthLabel, formatPercent, formatSignedPercent } from "./format.js";
@@ -92,4 +92,8 @@ export function cadenceToggleTooltip(cadencia: Cadencia): string {
 
 export function cadenceAmountCaption(cadencia: Cadencia): string | null {
   return cadencia === "anual" ? "por año" : null;
+}
+
+export function canMarkAsSubscription({ type, direction, isInstallment, amount }: TransactionDTO): boolean {
+  return type === "purchase" && direction === "debit" && !isInstallment && amount > 0;
 }

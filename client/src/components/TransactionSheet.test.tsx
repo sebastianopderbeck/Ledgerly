@@ -12,6 +12,11 @@ const notebook: TransactionDTO = {
   installmentCurrent: 3, installmentTotal: 12, comprobante: "3",
 };
 
+const musicapp: TransactionDTO = {
+  ...notebook, id: "4", descriptionRaw: "MUSICAPP 7731", merchant: "MUSICAPP 7731", category: "Entretenimiento",
+  amount: 5490, isInstallment: false, installmentCurrent: null, installmentTotal: null, comprobante: "4",
+};
+
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () =>
     new Response(JSON.stringify(["Compras", "Salud", "Tecnología"]), { status: 200, headers: { "Content-Type": "application/json" } })));
@@ -22,13 +27,26 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const setup = () => {
+const setup = (transaction: TransactionDTO = notebook) => {
   const onSave = vi.fn();
   const onDelete = vi.fn();
   const onClose = vi.fn();
-  renderWithProviders(<TransactionSheet transaction={notebook} open onClose={onClose} onSave={onSave} onDelete={onDelete} />);
-  const sheet = screen.getByRole("dialog", { name: "NOTEBOOK" });
-  return { onSave, onDelete, onClose, sheet, category: within(sheet).getByRole("combobox", { name: "Categoría" }) };
+  const onMarkSubscription = vi.fn();
+  renderWithProviders(
+    <TransactionSheet
+      transaction={transaction}
+      open
+      onClose={onClose}
+      onSave={onSave}
+      onDelete={onDelete}
+      onMarkSubscription={onMarkSubscription}
+    />,
+  );
+  const sheet = screen.getByRole("dialog", { name: transaction.merchant });
+  return {
+    onSave, onDelete, onClose, onMarkSubscription, sheet,
+    category: within(sheet).getByRole("combobox", { name: "Categoría" }),
+  };
 };
 
 describe("TransactionSheet", () => {
@@ -67,6 +85,19 @@ describe("TransactionSheet", () => {
     const { sheet, onSave, onDelete } = setup();
     await userEvent.click(within(sheet).getByRole("button", { name: "Borrar" }));
     expect(onDelete).toHaveBeenCalledWith(notebook);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("un consumo en cuotas no ofrece marcarlo como suscripción", () => {
+    const { sheet } = setup();
+    expect(within(sheet).queryByRole("button", { name: "Es una suscripción" })).not.toBeInTheDocument();
+  });
+
+  it("«Es una suscripción» manda el comercio y cierra la hoja", async () => {
+    const { sheet, onMarkSubscription, onClose, onSave } = setup(musicapp);
+    await userEvent.click(within(sheet).getByRole("button", { name: "Es una suscripción" }));
+    expect(onMarkSubscription).toHaveBeenCalledWith("MUSICAPP 7731");
+    expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
   });
 });
