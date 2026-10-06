@@ -4,7 +4,7 @@ import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { RefreshDataButton } from "./RefreshDataButton.js";
 
 const summary = {
-  series: { usdOficial: 232, uva: 232, tasa30: 221, inflacion: 19 },
+  series: { usdOficial: 232, uva: 232, tasa30: 221, rem12m: 21, inflacion: 19 },
   tipoCambio: {
     cupones: { updated: 12, skipped: 0 },
     auto: { updated: 8, skipped: 0 },
@@ -73,7 +73,7 @@ describe("RefreshDataButton", () => {
     settle(jsonResponse(summary));
 
     await waitFor(() => expect(
-      screen.getByText("Datos actualizados · 704 puntos de series · 26 tipos de cambio"),
+      screen.getByText("Datos actualizados · 725 puntos de series · 26 tipos de cambio"),
     ).toBeInTheDocument());
   });
 

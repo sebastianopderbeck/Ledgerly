@@ -19,7 +19,7 @@ const CASH_FLOW_FIELDS: FilterField[] = ["year"];
 const ERROR_TEXT = "No se pudo calcular el flujo de caja. Probá de nuevo en un rato.";
 const EMPTY_TEXT = "Para ver el flujo de caja importá tus recibos de sueldo y al menos un resumen de tarjeta desde la página Importar.";
 const PROJECTION_CAPTION =
-  "Sueldo con el último neto (y la mitad en junio y diciembre por el SAC), hipoteca y auto con la última cuota más su aumento mensual reciente (la UVA de los últimos 3 meses y el valor del auto de los últimos 6 cupones), y tarjetas con los resúmenes ya emitidos y, después, solo las cuotas que ya compraste. El margen es lo que te queda para consumos nuevos y gastos fuera de la tarjeta.";
+  "Sueldo con el último neto más los aumentos de enero, mayo y septiembre por el IPC de los 4 meses anteriores (con la inflación esperada del REM del BCRA para los meses sin publicar), y la mitad en junio y diciembre por el SAC; hipoteca y auto con la última cuota más su aumento mensual reciente (la UVA de los últimos 3 meses y el valor del auto de los últimos 6 cupones), y tarjetas con los resúmenes ya emitidos y, después, solo las cuotas que ya compraste. El margen es lo que te queda para consumos nuevos y gastos fuera de la tarjeta.";
 
 const Header = () => (
   <>

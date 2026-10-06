@@ -12,7 +12,7 @@ const mockedRates = vi.mocked(refreshAllRates);
 
 describe("refreshMacroData", () => {
   it("combina las series macro con el refresco de tipos de cambio", async () => {
-    mockedMacro.mockResolvedValue({ usd_oficial: 232, uva: 232, tasa30: 221, inflacion: 19 });
+    mockedMacro.mockResolvedValue({ usd_oficial: 232, uva: 232, tasa30: 221, rem_12m: 21, inflacion: 19 });
     mockedRates.mockResolvedValue({
       cupones: { updated: 12, skipped: 1 },
       auto: { updated: 8, skipped: 0 },
@@ -20,7 +20,7 @@ describe("refreshMacroData", () => {
     });
 
     expect(await refreshMacroData()).toEqual({
-      series: { usdOficial: 232, uva: 232, tasa30: 221, inflacion: 19 },
+      series: { usdOficial: 232, uva: 232, tasa30: 221, rem12m: 21, inflacion: 19 },
       tipoCambio: {
         cupones: { updated: 12, skipped: 1 },
         auto: { updated: 8, skipped: 0 },
@@ -33,7 +33,7 @@ describe("refreshMacroData", () => {
     const order: string[] = [];
     mockedMacro.mockImplementation(async () => {
       order.push("series");
-      return { usd_oficial: 0, uva: 0, tasa30: 0, inflacion: 0 };
+      return { usd_oficial: 0, uva: 0, tasa30: 0, rem_12m: 0, inflacion: 0 };
     });
     mockedRates.mockImplementation(async () => {
       order.push("tipoCambio");

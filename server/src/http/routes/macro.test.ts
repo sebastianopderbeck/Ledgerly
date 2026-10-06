@@ -7,11 +7,12 @@ vi.mock("../../fx/macroSources.js", () => ({
   fetchOficialSeries: vi.fn(),
   fetchUvaSeries: vi.fn(),
   fetchTasa30Series: vi.fn(),
+  fetchRem12mSeries: vi.fn(),
 }));
 vi.mock("../../fx/inflationRate.js", () => ({ fetchInflationSeries: vi.fn() }));
 vi.mock("../../fx/dollarRate.js", () => ({ fetchOficialRate: vi.fn() }));
 
-import { fetchOficialSeries, fetchTasa30Series, fetchUvaSeries } from "../../fx/macroSources.js";
+import { fetchOficialSeries, fetchRem12mSeries, fetchTasa30Series, fetchUvaSeries } from "../../fx/macroSources.js";
 import { fetchInflationSeries } from "../../fx/inflationRate.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import { InflationRateModel, MacroSeriesModel, MortgageCouponModel } from "../../db/models.js";
@@ -23,6 +24,7 @@ const app = createApp();
 const mockedUsd = vi.mocked(fetchOficialSeries);
 const mockedUva = vi.mocked(fetchUvaSeries);
 const mockedTasa = vi.mocked(fetchTasa30Series);
+const mockedRem = vi.mocked(fetchRem12mSeries);
 const mockedInflacion = vi.mocked(fetchInflationSeries);
 const mockedRate = vi.mocked(fetchOficialRate);
 
@@ -62,6 +64,7 @@ describe("POST /api/macro/refresh", () => {
     mockedUsd.mockResolvedValue([{ fecha: "2025-01-02", valor: 1010 }, { fecha: "2025-01-03", valor: 1015 }]);
     mockedUva.mockResolvedValue([{ fecha: "2025-01-02", valor: 1250.3 }]);
     mockedTasa.mockResolvedValue([{ fecha: "2025-01-02", valor: 29.1 }]);
+    mockedRem.mockResolvedValue([{ fecha: "2025-01-31", valor: 25 }]);
     mockedInflacion.mockResolvedValue([{ periodo: "2025-01", variacionMensual: 2.2 }]);
     mockedRate.mockResolvedValue(1350);
   });
@@ -76,7 +79,7 @@ describe("POST /api/macro/refresh", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
-      series: { usdOficial: 2, uva: 1, tasa30: 1, inflacion: 1 },
+      series: { usdOficial: 2, uva: 1, tasa30: 1, rem12m: 1, inflacion: 1 },
       tipoCambio: {
         cupones: { updated: 1, skipped: 0 },
         auto: { updated: 0, skipped: 0 },
@@ -90,7 +93,7 @@ describe("POST /api/macro/refresh", () => {
 
     await request(app).post("/api/macro/refresh");
 
-    expect(await MacroSeriesModel.countDocuments()).toBe(4);
+    expect(await MacroSeriesModel.countDocuments()).toBe(5);
     expect(await InflationRateModel.countDocuments()).toBe(1);
     const cupon = await MortgageCouponModel.findOne({ cuotaNro: 1 });
     expect(cupon?.tipoCambioUsd).toBe(1350);
@@ -101,6 +104,6 @@ describe("POST /api/macro/refresh", () => {
     await request(app).post("/api/macro/refresh");
     await request(app).post("/api/macro/refresh");
 
-    expect(await MacroSeriesModel.countDocuments()).toBe(4);
+    expect(await MacroSeriesModel.countDocuments()).toBe(5);
   });
 });

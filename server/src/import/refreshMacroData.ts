@@ -10,6 +10,7 @@ export async function refreshMacroData(): Promise<MacroRefreshDTO> {
       usdOficial: series.usd_oficial,
       uva: series.uva,
       tasa30: series.tasa30,
+      rem12m: series.rem_12m,
       inflacion: series.inflacion,
     },
     tipoCambio,

@@ -4,6 +4,7 @@ const SERIE_LABELS: Array<[keyof MacroRefreshDTO["series"], string]> = [
   ["usdOficial", "dólar"],
   ["uva", "UVA"],
   ["tasa30", "tasa"],
+  ["rem12m", "REM"],
   ["inflacion", "inflación"],
 ];
 

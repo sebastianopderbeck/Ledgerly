@@ -402,6 +402,43 @@ describe("buildCashFlow: proyección", () => {
     ]);
   });
 
+  it("proyecta el sueldo con el aumento de enero por IPC, con el REM para lo no publicado, y lo anota", () => {
+    const flow = buildCashFlow({
+      ...ejemplo(),
+      inflacion: { publicada: [{ periodo: "2026-08", variacion: 0.017 }, { periodo: "2026-09", variacion: 0.02 }], esperadaMensual: 0.01 },
+    });
+    const aumento = 1.02 * 1.01 ** 3;
+    expect(mesDe(flow, "2026-11")?.ingreso).toBe(1_100_000);
+    expect(mesDe(flow, "2026-12")?.ingreso).toBe(1_650_000);
+    expect(mesDe(flow, "2026-12")?.estimados.slice(0, 2)).toEqual([ESTIMADO_SUELDO, ESTIMADO_SAC]);
+    expect(mesDe(flow, "2027-01")?.ingreso).toBeCloseTo(1_100_000 * aumento, 6);
+    expect(mesDe(flow, "2027-03")?.ingreso).toBeCloseTo(1_100_000 * aumento, 6);
+    expect(mesDe(flow, "2027-01")?.margen).toBeCloseTo(1_100_000 * aumento - 480_000, 6);
+    expect(mesDe(flow, "2027-01")?.estimados[0]).toBe("Sueldo (último neto +5,1% por aumento de enero · IPC esperado del REM)");
+  });
+
+  it("si falta el recibo del mes de aumento lo proyecta con el IPC publicado", () => {
+    const meses = ["2026-05", "2026-06", "2026-07", "2026-08"];
+    const flow = buildCashFlow({
+      ...ejemplo(),
+      today: "2026-09-10",
+      payslips: [payslip("2026-08-31", 1_000_000)],
+      inflacion: { publicada: meses.map((periodo) => ({ periodo, variacion: 0.02 })), esperadaMensual: 0.01 },
+    });
+    expect(mesDe(flow, "2026-09")?.ingreso).toBeCloseTo(1_000_000 * 1.02 ** 4, 6);
+    expect(mesDe(flow, "2026-09")?.estimados[0]).toBe("Sueldo (último neto +8,2% por aumento de septiembre)");
+  });
+
+  it("el SAC estimado es la mitad del sueldo con los aumentos de enero y mayo", () => {
+    const flow = buildCashFlow({ ...ejemplo(), horizon: 9, inflacion: { publicada: [], esperadaMensual: 0.01 } });
+    const sueldo = 1_100_000 * 1.01 ** 8;
+    expect(mesDe(flow, "2027-06")?.ingreso).toBeCloseTo(sueldo * 1.5, 6);
+    expect(mesDe(flow, "2027-06")?.estimados.slice(0, 2)).toEqual([
+      "Sueldo (último neto +8,3% por aumentos de enero y mayo · IPC esperado del REM)",
+      "SAC (½ del sueldo estimado)",
+    ]);
+  });
+
   it("anota qué parte de cada mes es estimada", () => {
     const flow = buildCashFlow(ejemplo());
     expect(mesDe(flow, "2026-10")).toMatchObject({

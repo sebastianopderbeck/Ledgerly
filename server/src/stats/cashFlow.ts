@@ -1,6 +1,7 @@
 import type { CashFlowDTO, CashFlowMonthDTO, PayslipTipo } from "@ledgerly/shared";
 import { addMonths, monthOf, monthRange, monthsBetween } from "./months.js";
 import { rateOnDate, type RatePoint } from "./rateOnDate.js";
+import { raiseFactor, raisesBetween, type SalaryInflation, type SalaryRaise } from "./salaryRaise.js";
 import { statementDueDate } from "./statementDueDate.js";
 
 export const HORIZONTE_MESES = 6;
@@ -13,6 +14,7 @@ export const FALTA_COTIZACION = "Cotización del dólar";
 export const faltaResumen = (cardLabel: string): string => `Resumen ${cardLabel}`;
 export const ESTIMADO_SUELDO = "Sueldo (último neto)";
 export const ESTIMADO_SAC = "SAC (½ del último neto)";
+export const ESTIMADO_SAC_CON_AUMENTO = "SAC (½ del sueldo estimado)";
 export const estimadoTarjeta = (cardLabel: string): string => `${cardLabel} (solo cuotas)`;
 
 const AUMENTO_MENSUAL = new Intl.NumberFormat("es-AR", {
@@ -21,6 +23,24 @@ const AUMENTO_MENSUAL = new Intl.NumberFormat("es-AR", {
 
 const detalleAumento = (aumentoMensual: number): string =>
   aumentoMensual === 0 ? "" : ` ${AUMENTO_MENSUAL.format(aumentoMensual)} por mes`;
+
+const MES_LARGO = new Intl.DateTimeFormat("es-AR", { month: "long", timeZone: "UTC" });
+const LISTA = new Intl.ListFormat("es", { type: "conjunction" });
+
+const nombreMes = (mes: string): string => {
+  const [year, monthNumber] = mes.split("-").map(Number);
+  return MES_LARGO.format(new Date(Date.UTC(year, monthNumber - 1, 1)));
+};
+
+export const estimadoSueldo = (raises: SalaryRaise[]): string => {
+  if (raises.length === 0) return ESTIMADO_SUELDO;
+  const aumento = AUMENTO_MENSUAL.format(raiseFactor(raises) - 1);
+  const cuales = `${raises.length === 1 ? "aumento" : "aumentos"} de ${LISTA.format(raises.map((raise) => nombreMes(raise.mes)))}`;
+  const rem = raises.some((raise) => raise.conRem) ? " · IPC esperado del REM" : "";
+  return `Sueldo (último neto ${aumento} por ${cuales}${rem})`;
+};
+
+export const estimadoSac = (raises: SalaryRaise[]): string => (raises.length === 0 ? ESTIMADO_SAC : ESTIMADO_SAC_CON_AUMENTO);
 
 export const estimadoHipoteca = (aumentoMensual: number): string => `Hipoteca (última cuota${detalleAumento(aumentoMensual)})`;
 export const estimadoAuto = (aumentoMensual: number): string => `Auto (último cupón${detalleAumento(aumentoMensual)})`;
@@ -79,6 +99,7 @@ export interface CashFlowInput {
   mortgage: CashFlowPlan;
   auto: CashFlowPlan;
   usdRates: RatePoint[];
+  inflacion?: SalaryInflation;
   horizon?: number;
 }
 
@@ -167,6 +188,8 @@ interface FlowContext {
   mortgage: CashFlowPlan;
   auto: CashFlowPlan;
   ultimoNeto: number;
+  mesUltimoRecibo: string | null;
+  inflacion: SalaryInflation | null;
 }
 
 const NO_PLAN_MONTH: ClosedPlanMonth = { monto: 0, falta: false };
@@ -298,14 +321,19 @@ function projectedPlanMonth(plan: CashFlowPlan, mes: string): ProjectedPlanMonth
   return { monto, estimado: monto > 0 };
 }
 
+const salaryRaises = ({ inflacion, mesUltimoRecibo }: FlowContext, mes: string): SalaryRaise[] =>
+  inflacion && mesUltimoRecibo ? raisesBetween(mesUltimoRecibo, mes, inflacion) : [];
+
 function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
   const recibos = ctx.recibosPorMes.get(mes) ?? [];
   const mensuales = recibos.filter(isMensual);
   const sacs = recibos.filter(isSac);
   const sueldoEstimado = mensuales.length === 0;
   const sacEstimado = isSacMonth(mes) && sacs.length === 0;
-  const sueldo = sueldoEstimado ? ctx.ultimoNeto : netos(mensuales);
-  const sac = sacEstimado ? ctx.ultimoNeto / 2 : netos(sacs);
+  const raises = salaryRaises(ctx, mes);
+  const sueldoProyectado = ctx.ultimoNeto * raiseFactor(raises);
+  const sueldo = sueldoEstimado ? sueldoProyectado : netos(mensuales);
+  const sac = sacEstimado ? sueldoProyectado / 2 : netos(sacs);
   const tracks = trackMonths(ctx, mes);
   const reales = tracks.flatMap((trackMonth) => trackMonth.totals);
   const estimadas = tracks.filter((trackMonth) => trackMonth.totals.length === 0);
@@ -329,8 +357,8 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
     tasaAhorro: savingsRate(margen, ingreso),
     faltantes: onlyIf(reales.some((total) => total.sinCotizacion), FALTA_COTIZACION),
     estimados: [
-      ...onlyIf(sueldoEstimado, ESTIMADO_SUELDO),
-      ...onlyIf(sacEstimado, ESTIMADO_SAC),
+      ...onlyIf(sueldoEstimado, estimadoSueldo(raises)),
+      ...onlyIf(sacEstimado, estimadoSac(raises)),
       ...estimadas.map(({ track }) => estimadoTarjeta(track.cardLabel)),
       ...onlyIf(hipoteca.estimado, estimadoHipoteca(ctx.mortgage.aumentoMensual)),
       ...onlyIf(auto.estimado, estimadoAuto(ctx.auto.aumentoMensual)),
@@ -338,11 +366,10 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
   };
 }
 
-const latestMonthlyNet = (payslips: CashFlowPayslip[]): number =>
+const latestMonthlyPayslip = (payslips: CashFlowPayslip[]): CashFlowPayslip | null =>
   payslips
     .filter(isMensual)
-    .reduce<CashFlowPayslip | null>((latest, payslip) => (!latest || payslip.fechaPago > latest.fechaPago ? payslip : latest), null)
-    ?.neto ?? 0;
+    .reduce<CashFlowPayslip | null>((latest, payslip) => (!latest || payslip.fechaPago > latest.fechaPago ? payslip : latest), null);
 
 export function buildCashFlow(input: CashFlowInput): CashFlowDTO {
   const mesActual = monthOf(input.today);
@@ -350,6 +377,7 @@ export function buildCashFlow(input: CashFlowInput): CashFlowDTO {
   if (input.payslips.length === 0 || statements.length === 0) return { mesActual, meses: [] };
 
   const recibosPorMes = incomeByMonth(input.payslips);
+  const ultimoRecibo = latestMonthlyPayslip(input.payslips);
   const ctx: FlowContext = {
     today: input.today,
     mesActual,
@@ -358,7 +386,9 @@ export function buildCashFlow(input: CashFlowInput): CashFlowDTO {
     tracks: cardTracks(statements, input.cards),
     mortgage: input.mortgage,
     auto: input.auto,
-    ultimoNeto: latestMonthlyNet(input.payslips),
+    ultimoNeto: ultimoRecibo?.neto ?? 0,
+    mesUltimoRecibo: ultimoRecibo ? monthOf(ultimoRecibo.fechaPago) : null,
+    inflacion: input.inflacion ?? null,
   };
   const desde = later(earliest([...recibosPorMes.keys()]), statements[0].mes);
   const historia = monthRange(desde, addMonths(mesActual, -1));

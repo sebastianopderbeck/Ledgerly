@@ -2,13 +2,14 @@ import { Router } from "express";
 import type { Types } from "mongoose";
 import { asyncHandler } from "../errors.js";
 import {
-  AutoCouponModel, MacroSeriesModel, MortgageCouponModel, PayslipModel, StatementModel, TransactionModel,
+  AutoCouponModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel, PayslipModel, StatementModel, TransactionModel,
 } from "../../db/models.js";
 import { latestStatementIdsPerIssuer, type StatementRecency } from "../../stats/lastStatement.js";
 import { computeCreditProgress, type CouponInput } from "../../stats/amortization.js";
 import { AUTO_CUOTAS_TOTALES } from "../../stats/autoProgress.js";
 import { autoMonthlyGrowth, mortgageMonthlyGrowth } from "../../stats/planGrowth.js";
 import type { RatePoint } from "../../stats/rateOnDate.js";
+import { expectedMonthlyInflation, type MonthlyInflation, type SalaryInflation } from "../../stats/salaryRaise.js";
 import {
   buildCashFlow, toCashFlowCard,
   type CashFlowCard, type CashFlowCoupon, type CashFlowPayslip, type CashFlowStatement, type InstallmentTxInput,
@@ -99,17 +100,31 @@ const latestCards = (statements: StatementRow[], latestIds: Types.ObjectId[], tx
     });
 };
 
+interface InflationRow {
+  periodo: string;
+  variacionMensual: number;
+}
+
+const toMonthlyInflation = ({ periodo, variacionMensual }: InflationRow): MonthlyInflation => ({ periodo, variacion: variacionMensual / 100 });
+
+const salaryInflation = (rows: InflationRow[], rem12m: number | null): SalaryInflation => {
+  const publicada = rows.map(toMonthlyInflation);
+  return { publicada, esperadaMensual: expectedMonthlyInflation(rem12m, publicada) };
+};
+
 export const cashFlowRouter = Router();
 
 cashFlowRouter.get("/", asyncHandler(async (_req, res) => {
   const today = new Date().toISOString().slice(0, 10);
-  const [payslips, statements, mortgageCoupons, autoCoupons, usdPoints, uvaPoints] = await Promise.all([
+  const [payslips, statements, mortgageCoupons, autoCoupons, usdPoints, uvaPoints, inflationRows, lastRem] = await Promise.all([
     PayslipModel.find().lean(),
     StatementModel.find().lean(),
     MortgageCouponModel.find().sort({ cuotaNro: 1 }).lean(),
     AutoCouponModel.find().sort({ cuotaNro: 1 }).lean(),
     MacroSeriesModel.find({ serie: "usd_oficial" }).sort({ fecha: 1 }).lean(),
     MacroSeriesModel.find({ serie: "uva" }).sort({ fecha: 1 }).lean(),
+    InflationRateModel.find().lean(),
+    MacroSeriesModel.findOne({ serie: "rem_12m" }).sort({ fecha: -1 }).lean(),
   ]);
   const latestIds = latestStatementIdsPerIssuer(statements.map(toRecency));
   const installmentTxs = await TransactionModel.find({
@@ -135,5 +150,6 @@ cashFlowRouter.get("/", asyncHandler(async (_req, res) => {
       aumentoMensual: autoMonthlyGrowth(autoCoupons.map((coupon) => ({ cuotaNro: coupon.cuotaNro, valor: coupon.valorMovil }))),
     },
     usdRates: usdPoints.map(toRatePoint),
+    inflacion: salaryInflation(inflationRows, lastRem?.valor ?? null),
   }));
 }));
