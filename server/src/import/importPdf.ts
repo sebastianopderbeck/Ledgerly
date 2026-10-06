@@ -11,6 +11,7 @@ import { importAutoCoupon } from "./importAutoCoupon.js";
 import { importCoupon } from "./importCoupon.js";
 import { importPayslip } from "./importPayslip.js";
 import { importStatement } from "./importStatement.js";
+import type { SaveCouponResult } from "./saveCoupon.js";
 
 export const MAX_PDF_BYTES = 15 * 1024 * 1024;
 const MIN_TEXT_LENGTH = 20;
@@ -61,14 +62,15 @@ const importStatementPdf: KindImporter = async (input) => {
   };
 };
 
-const importMortgageCouponPdf: KindImporter = async (input) => {
-  const { status, couponId } = await importCoupon(input);
+export const mortgageCouponOutcome = async ({ status, couponId }: SaveCouponResult): Promise<ImportPdfOutcome> => {
   const doc = found(await MortgageCouponModel.findById(couponId));
   return {
     result: { kind: "coupon", status, coupon: toMortgageCouponDTO(doc) },
     file: mortgageCouponToImportedFileDTO(doc),
   };
 };
+
+const importMortgageCouponPdf: KindImporter = async (input) => mortgageCouponOutcome(await importCoupon(input));
 
 const importAutoCouponPdf: KindImporter = async (input) => {
   const { status, couponId } = await importAutoCoupon(input);
