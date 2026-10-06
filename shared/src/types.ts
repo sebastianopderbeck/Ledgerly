@@ -38,6 +38,23 @@ export interface MortgageCouponParser {
   parse(text: string, meta: PdfMeta): ParsedCoupon;
 }
 
+export interface ParsedCouponImage {
+  cuotaNro: number;
+  cuotasTotales: number;
+  fechaDebito: string;
+  capital: number;
+  intereses: number;
+  iva: number;
+  seguros: number;
+  totalPagado: number;
+  totalUva: number;
+}
+
+export interface MortgageCouponImageParser {
+  detect(text: string): boolean;
+  parse(text: string): ParsedCouponImage;
+}
+
 export interface ParsedAutoConcept {
   label: string;
   amount: number;
