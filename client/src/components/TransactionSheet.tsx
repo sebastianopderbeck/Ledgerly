@@ -16,7 +16,7 @@ interface TransactionSheetProps {
   onClose: () => void;
   onSave: (id: string, category: string) => void;
   onDelete: (transaction: TransactionDTO) => void;
-  onMarkSubscription: (merchant: string) => void;
+  onMarkSubscription: (transactionId: string) => void;
 }
 
 interface TransactionFormProps {
@@ -24,7 +24,7 @@ interface TransactionFormProps {
   onClose: () => void;
   onSave: (id: string, category: string) => void;
   onDelete: (transaction: TransactionDTO) => void;
-  onMarkSubscription: (merchant: string) => void;
+  onMarkSubscription: (transactionId: string) => void;
 }
 
 const NO_CATEGORIES: string[] = [];
@@ -57,7 +57,7 @@ const TransactionForm = ({ transaction, onClose, onSave, onDelete, onMarkSubscri
   const remove = () => onDelete(transaction);
 
   const markSubscription = () => {
-    onMarkSubscription(transaction.merchant);
+    onMarkSubscription(transaction.id);
     onClose();
   };
 

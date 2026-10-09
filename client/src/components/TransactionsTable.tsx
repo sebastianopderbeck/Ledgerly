@@ -16,18 +16,18 @@ interface TransactionsTableProps {
   rows: TransactionDTO[];
   onCategoryChange: (id: string, category: string) => void;
   onDelete: (ids: string[]) => void;
-  onMarkSubscription: (merchant: string) => void;
+  onMarkSubscription: (transactionId: string) => void;
 }
 
 interface MarkSubscriptionButtonProps {
-  merchant: string;
-  onMark: (merchant: string) => void;
+  transaction: TransactionDTO;
+  onMark: (transactionId: string) => void;
 }
 
-const MarkSubscriptionButton = ({ merchant, onMark }: MarkSubscriptionButtonProps) => {
+const MarkSubscriptionButton = ({ transaction: { id, merchant }, onMark }: MarkSubscriptionButtonProps) => {
   const mark = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    onMark(merchant);
+    onMark(id);
   };
 
   return (
@@ -65,7 +65,7 @@ export const TransactionsTable = ({ rows, onCategoryChange, onDelete, onMarkSubs
     {
       field: "subscription", headerName: "", width: 64, sortable: false, filterable: false, disableColumnMenu: true,
       renderCell: ({ row }: GridRenderCellParams<TransactionDTO>) =>
-        (canMarkAsSubscription(row) ? <MarkSubscriptionButton merchant={row.merchant} onMark={onMarkSubscription} /> : null),
+        (canMarkAsSubscription(row) ? <MarkSubscriptionButton transaction={row} onMark={onMarkSubscription} /> : null),
     },
   ], [onMarkSubscription]);
 

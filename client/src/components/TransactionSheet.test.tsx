@@ -93,10 +93,10 @@ describe("TransactionSheet", () => {
     expect(within(sheet).queryByRole("button", { name: "Es una suscripción" })).not.toBeInTheDocument();
   });
 
-  it("«Es una suscripción» manda el comercio y cierra la hoja", async () => {
+  it("«Es una suscripción» manda el movimiento y cierra la hoja", async () => {
     const { sheet, onMarkSubscription, onClose, onSave } = setup(musicapp);
     await userEvent.click(within(sheet).getByRole("button", { name: "Es una suscripción" }));
-    expect(onMarkSubscription).toHaveBeenCalledWith("MUSICAPP 7731");
+    expect(onMarkSubscription).toHaveBeenCalledWith("4");
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
   });

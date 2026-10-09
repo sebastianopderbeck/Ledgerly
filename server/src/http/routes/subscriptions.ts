@@ -1,4 +1,5 @@
 import { Router, type Request } from "express";
+import { isValidObjectId } from "mongoose";
 import {
   manualSubscriptionInputSchema,
   subscriptionCadenceInputSchema,
@@ -22,11 +23,14 @@ import {
 } from "../../stats/subscriptions.js";
 
 const MAX_CLAVE = 60;
-const INVALID_MERCHANT = "Comercio inválido";
+const INVALID_TRANSACTION = "Movimiento inválido";
+const TRANSACTION_NOT_FOUND = "Movimiento no encontrado";
 const UNRECOGNIZABLE_MERCHANT = "Este comercio no tiene un nombre reconocible";
 const INVALID_CADENCE = "Cadencia inválida";
 
 export const subscriptionsRouter = Router();
+
+const isoDay = (date: Date): string => date.toISOString().slice(0, 10);
 
 const keyParamOf = (req: Request): string => {
   const key = String(req.params.key ?? "").trim();
@@ -35,7 +39,7 @@ const keyParamOf = (req: Request): string => {
 };
 
 subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = isoDay(new Date());
   const [transactions, statements, hidden, manual, cadences, cotizacion] = await Promise.all([
     TransactionModel.find({ isInstallment: false, type: { $in: ["purchase", "refund"] } }).lean(),
     StatementModel.find({}, { issuer: 1, closingDate: 1 }).lean(),
@@ -45,7 +49,7 @@ subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
     fetchOficialRate(hoy),
   ]);
   const txs: SubscriptionTx[] = transactions.map((t) => ({
-    date: t.date.toISOString().slice(0, 10),
+    date: isoDay(t.date),
     merchant: t.merchant,
     amount: t.amount,
     currency: t.currency as Currency,
@@ -61,6 +65,10 @@ subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
     ultimoCierre: latestClosingByIssuer(statements.map((s) => ({ issuer: s.issuer, closingDate: s.closingDate ?? null }))),
     ocultas: new Set(hidden.map((h) => h.key)),
     manuales: new Set(manual.map((m) => m.key)),
+    cobrosMarcados: new Map(manual.map(({ key, cobros = [] }) => [
+      key,
+      cobros.map(({ date, amount, currency }) => ({ date, amount, currency: currency as Currency })),
+    ])),
     cadencias: new Map(cadences.map(({ key, cadencia }) => [key, cadencia])),
     cotizacion,
   });
@@ -82,11 +90,15 @@ subscriptionsRouter.delete("/hidden/:key", asyncHandler(async (req, res) => {
 
 subscriptionsRouter.post("/manual", asyncHandler(async (req, res) => {
   const parsed = manualSubscriptionInputSchema.safeParse(req.body);
-  if (!parsed.success) throw new HttpError(400, INVALID_MERCHANT);
-  const key = merchantKey(parsed.data.merchant);
+  if (!parsed.success) throw new HttpError(400, INVALID_TRANSACTION);
+  const { transactionId } = parsed.data;
+  const transaction = isValidObjectId(transactionId) ? await TransactionModel.findById(transactionId).lean() : null;
+  if (!transaction) throw new HttpError(404, TRANSACTION_NOT_FOUND);
+  const key = merchantKey(transaction.merchant);
   if (key === "") throw new HttpError(400, UNRECOGNIZABLE_MERCHANT);
+  const cobro = { date: isoDay(transaction.date), amount: transaction.amount, currency: transaction.currency };
   await Promise.all([
-    ManualSubscriptionModel.updateOne({ key }, { $setOnInsert: { key } }, { upsert: true }),
+    ManualSubscriptionModel.updateOne({ key }, { $setOnInsert: { key }, $addToSet: { cobros: cobro } }, { upsert: true }),
     HiddenSubscriptionModel.deleteOne({ key }),
   ]);
   res.status(204).end();
