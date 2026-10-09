@@ -154,8 +154,20 @@ const hiddenSubscriptionSchema = new Schema(
   { timestamps: { createdAt: "hiddenAt", updatedAt: false } },
 );
 
+const markedChargeSchema = new Schema(
+  {
+    date: { type: String, required: true },
+    amount: { type: Number, required: true },
+    currency: { type: String, required: true, enum: ["ARS", "USD"] },
+  },
+  { _id: false },
+);
+
 const manualSubscriptionSchema = new Schema(
-  { key: { type: String, required: true, unique: true } },
+  {
+    key: { type: String, required: true, unique: true },
+    cobros: { type: [markedChargeSchema], default: [] },
+  },
   { timestamps: { createdAt: "markedAt", updatedAt: false } },
 );
 

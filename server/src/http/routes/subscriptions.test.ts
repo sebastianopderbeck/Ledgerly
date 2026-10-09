@@ -136,38 +136,95 @@ describe("GET /api/subscriptions con marcas guardadas", () => {
     const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
     expect(report.items).toMatchObject([{ key: "CAFE ROSITA", cobros: 1, cadencia: "mensual", estado: "activa" }]);
   });
+
+  it("una marca manual guardada antes de que existieran los cobros marcados sigue forzando el comercio", async () => {
+    await seedVisa(cafeRosita());
+    await ManualSubscriptionModel.collection.insertOne({ key: "CAFE ROSITA", markedAt: new Date() });
+    const res = await request(app).get("/api/subscriptions");
+    expect(res.status).toBe(200);
+    expect(res.body.items).toMatchObject([{ key: "CAFE ROSITA", cobros: 1 }]);
+  });
 });
 
+const idOf = async (merchant: string, date: string): Promise<string> => {
+  const doc = await TransactionModel.findOne({ merchant, date: new Date(date) }).lean();
+  return String(doc?._id);
+};
+
+const markTransaction = (body: object) => request(app).post("/api/subscriptions/manual").send(body);
+
+const ridesAndMembership = (): TxSeed[] => [
+  { date: "2026-07-04", merchant: "RIDEGO 7001", amount: 3100, category: "Transporte" },
+  { date: "2026-07-17", merchant: "RIDEGO 7001", amount: 8200, category: "Transporte" },
+  { date: "2026-08-02", merchant: "RIDEGO 7001", amount: 9900, category: "Transporte" },
+  { date: "2026-08-04", merchant: "RIDEGO 7001", amount: 3100, category: "Transporte" },
+  { date: "2026-08-17", merchant: "RIDEGO 7001", amount: 8200, category: "Transporte" },
+];
+
 describe("marcar suscripciones a mano", () => {
-  it("POST /manual responde 204 y el comercio aparece con un solo cobro", async () => {
+  it("POST /manual responde 204 y el comercio aparece con ese movimiento", async () => {
     await seedVisa(cafeRosita());
-    const res = await request(app).post("/api/subscriptions/manual").send({ merchant: "CAFE ROSITA 4471" });
+    const res = await markTransaction({ transactionId: await idOf("CAFE ROSITA 4471", "2026-08-15") });
     expect(res.status).toBe(204);
     const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
     expect(report.items).toMatchObject([
-      { key: "CAFE ROSITA", cobros: 1, cadencia: "mensual", estado: "activa", oculta: false },
+      { key: "CAFE ROSITA", cobros: 1, ultimoCobro: "2026-08-15", cadencia: "mensual", estado: "activa", oculta: false },
     ]);
   });
 
-  it("guarda la clave cruda del comercio y marcar dos veces deja una sola marca", async () => {
-    expect((await request(app).post("/api/subscriptions/manual").send({ merchant: "  GOOGLE *VideoPremium  " })).status).toBe(204);
-    expect((await request(app).post("/api/subscriptions/manual").send({ merchant: "GOOGLE *VideoPremium" })).status).toBe(204);
+  it("en un comercio con otros gastos, la suscripción sale del movimiento marcado", async () => {
+    await seedVisa(ridesAndMembership());
+    await markTransaction({ transactionId: await idOf("RIDEGO 7001", "2026-08-02") });
+    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    expect(report.items).toMatchObject([
+      { key: "RIDEGO", montoActual: 9900, primerCobro: "2026-08-02", ultimoCobro: "2026-08-02", cobros: 1 },
+    ]);
+  });
+
+  it("guarda la clave cruda con el cobro marcado y marcar dos veces deja una sola marca", async () => {
+    await seedVisa([{ date: "2026-08-09", merchant: "GOOGLE *VideoPremium", amount: 3500 }]);
+    const transactionId = await idOf("GOOGLE *VideoPremium", "2026-08-09");
+    expect((await markTransaction({ transactionId: `  ${transactionId}  ` })).status).toBe(204);
+    expect((await markTransaction({ transactionId })).status).toBe(204);
     const docs = await ManualSubscriptionModel.find().lean();
-    expect(docs.map(({ key }) => key)).toEqual(["GOOGLE VIDEOPREMIUM"]);
+    expect(docs.map(({ key, cobros }) => ({ key, cobros }))).toEqual([
+      { key: "GOOGLE VIDEOPREMIUM", cobros: [{ date: "2026-08-09", amount: 3500, currency: "ARS" }] },
+    ]);
+  });
+
+  it("marcar otro movimiento del mismo comercio suma su cobro a la marca", async () => {
+    await seedVisa(ridesAndMembership());
+    await markTransaction({ transactionId: await idOf("RIDEGO 7001", "2026-07-17") });
+    await markTransaction({ transactionId: await idOf("RIDEGO 7001", "2026-08-02") });
+    const docs = await ManualSubscriptionModel.find().lean();
+    expect(docs.map(({ key, cobros }) => ({ key, fechas: cobros.map(({ date }) => date) }))).toEqual([
+      { key: "RIDEGO", fechas: ["2026-07-17", "2026-08-02"] },
+    ]);
   });
 
   it.each([
-    ["sin comercio", {}],
-    ["con el comercio en blanco", { merchant: "   " }],
-    ["con un comercio de más de 200 caracteres", { merchant: "A".repeat(201) }],
+    ["sin movimiento", {}],
+    ["con el movimiento en blanco", { transactionId: "   " }],
+    ["con un movimiento que no es texto", { transactionId: 42 }],
   ])("POST /manual %s responde 400", async (_label, body) => {
-    const res = await request(app).post("/api/subscriptions/manual").send(body);
+    const res = await markTransaction(body);
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: "Comercio inválido" });
+    expect(res.body).toEqual({ error: "Movimiento inválido" });
+  });
+
+  it.each([
+    ["un id mal formado", "no-es-un-id"],
+    ["un id que no existe", "64b7f0c2a1b2c3d4e5f60718"],
+  ])("POST /manual con %s responde 404 y no guarda nada", async (_label, transactionId) => {
+    const res = await markTransaction({ transactionId });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: "Movimiento no encontrado" });
+    expect(await ManualSubscriptionModel.countDocuments()).toBe(0);
   });
 
   it("POST /manual con un comercio sin palabras responde 400 y no guarda nada", async () => {
-    const res = await request(app).post("/api/subscriptions/manual").send({ merchant: "123456 7890" });
+    await seedVisa([{ date: "2026-08-09", merchant: "123456 7890", amount: 3500 }]);
+    const res = await markTransaction({ transactionId: await idOf("123456 7890", "2026-08-09") });
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: "Este comercio no tiene un nombre reconocible" });
     expect(await ManualSubscriptionModel.countDocuments()).toBe(0);
@@ -176,7 +233,7 @@ describe("marcar suscripciones a mano", () => {
   it("marcar un comercio oculto lo vuelve a mostrar", async () => {
     await seedVisa(cafeRosita());
     await request(app).put("/api/subscriptions/hidden/CAFE%20ROSITA");
-    await request(app).post("/api/subscriptions/manual").send({ merchant: "CAFE ROSITA 4471" });
+    await markTransaction({ transactionId: await idOf("CAFE ROSITA 4471", "2026-08-15") });
     expect(await HiddenSubscriptionModel.countDocuments()).toBe(0);
     const res = await request(app).get("/api/subscriptions");
     expect(res.body.items).toMatchObject([{ key: "CAFE ROSITA", oculta: false }]);

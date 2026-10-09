@@ -39,11 +39,14 @@ export interface SubscriptionTx {
   cardLabel: string;
 }
 
+export type MarkedCharge = Pick<SubscriptionTx, "date" | "amount" | "currency">;
+
 export interface SubscriptionContext {
   hoy: string;
   ultimoCierre: Partial<Record<Issuer, string>>;
   ocultas: ReadonlySet<string>;
   manuales: ReadonlySet<string>;
+  cobrosMarcados: ReadonlyMap<string, readonly MarkedCharge[]>;
   cadencias: ReadonlyMap<string, Cadencia>;
   cotizacion: number | null;
 }
@@ -254,6 +257,19 @@ const hasMark = (key: string, rawKeys: ReadonlySet<string>, marks: ReadonlySet<s
 const markedCadence = (key: string, rawKeys: ReadonlySet<string>, cadencias: ReadonlyMap<string, Cadencia>): Cadencia =>
   [key, ...rawKeys].map((candidate) => cadencias.get(candidate)).find((cadencia) => cadencia !== undefined) ?? "mensual";
 
+const markedChargesOf = (
+  key: string,
+  rawKeys: ReadonlySet<string>,
+  cobrosMarcados: ReadonlyMap<string, readonly MarkedCharge[]>,
+): MarkedCharge[] => [key, ...rawKeys].flatMap((candidate) => cobrosMarcados.get(candidate) ?? []);
+
+const isMarkedCharge = (charge: Charge, marcados: readonly MarkedCharge[]): boolean =>
+  marcados.some(({ date, amount, currency }) =>
+    date === charge.date && amount === charge.amount && currency === charge.currency);
+
+const isPointedOut = (charge: Charge, marcados: readonly MarkedCharge[]): boolean =>
+  charge.category === CATEGORIA_SUSCRIPCIONES || isMarkedCharge(charge, marcados);
+
 const isForced = (charges: Charge[], marked: Marked, cadencia: Cadencia, { manuales }: SubscriptionContext): boolean =>
   latestCharge(charges)?.category === CATEGORIA_SUSCRIPCIONES || marked(manuales) || cadencia !== "mensual";
 
@@ -277,6 +293,23 @@ const monthlyRun = (charges: Charge[], forced: boolean): Charge[] | undefined =>
 const runFor = (charges: Charge[], cadencia: Cadencia, forced: boolean): Charge[] | undefined =>
   cadencia === "mensual" ? monthlyRun(charges, forced) : spacedRun(charges, cadencia);
 
+const forcedRun = (charges: Charge[], cadencia: Cadencia, marcados: readonly MarkedCharge[]): Charge[] | undefined => {
+  const run = runFor(charges, cadencia, true);
+  const pointedOut = charges.filter((charge) => isPointedOut(charge, marcados));
+  const latestPointedOut = latestCharge(pointedOut);
+  if (latestPointedOut === undefined || run?.includes(latestPointedOut)) return run;
+  return runFor(pointedOut, cadencia, true);
+};
+
+const subscriptionRun = (
+  charges: Charge[],
+  cadencia: Cadencia,
+  marked: Marked,
+  marcados: readonly MarkedCharge[],
+  ctx: SubscriptionContext,
+): Charge[] | undefined =>
+  (isForced(charges, marked, cadencia, ctx) ? forcedRun(charges, cadencia, marcados) : runFor(charges, cadencia, false));
+
 const tooOldToList = (cadencia: Cadencia, last: Charge, proximoCobro: string, hoy: string): boolean =>
   (cadencia === "anual" ? proximoCobro : last.date) < addMonthsClamped(hoy, -VENTANA_CORTADAS_MESES);
 
@@ -284,9 +317,10 @@ const subscriptionOf = (
   charges: Charge[],
   cadencia: Cadencia,
   marked: Marked,
+  marcados: readonly MarkedCharge[],
   ctx: SubscriptionContext,
 ): SubscriptionDTO | null => {
-  const run = runFor(charges, cadencia, isForced(charges, marked, cadencia, ctx));
+  const run = subscriptionRun(charges, cadencia, marked, marcados, ctx);
   if (run === undefined) return null;
   const first = run[0];
   const last = run[run.length - 1];
@@ -340,7 +374,9 @@ export function detectSubscriptions(txs: SubscriptionTx[], ctx: SubscriptionCont
     .flatMap(([key, charges]) => {
       const rawKeys = new Set((rowsByGroup.get(key) ?? []).map(({ rawKey }) => rawKey));
       const marked: Marked = (marks) => hasMark(key, rawKeys, marks);
-      const subscription = subscriptionOf(charges, markedCadence(key, rawKeys, ctx.cadencias), marked, ctx);
+      const cadencia = markedCadence(key, rawKeys, ctx.cadencias);
+      const marcados = markedChargesOf(key, rawKeys, ctx.cobrosMarcados);
+      const subscription = subscriptionOf(charges, cadencia, marked, marcados, ctx);
       return subscription ? [subscription] : [];
     })
     .sort(compareSubscriptions);

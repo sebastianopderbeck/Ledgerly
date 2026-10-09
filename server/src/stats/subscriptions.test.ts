@@ -13,6 +13,7 @@ import {
   spacedRun,
   summarizeSubscriptions,
   type Charge,
+  type MarkedCharge,
   type SubscriptionContext,
   type SubscriptionTx,
 } from "./subscriptions.js";
@@ -50,6 +51,7 @@ const ctx = (overrides: Partial<SubscriptionContext> = {}): SubscriptionContext 
   ultimoCierre: {},
   ocultas: new Set<string>(),
   manuales: new Set<string>(),
+  cobrosMarcados: new Map<string, MarkedCharge[]>(),
   cadencias: new Map<string, Cadencia>(),
   cotizacion: 1000,
   ...overrides,
@@ -618,6 +620,87 @@ describe("detectSubscriptions con suscripciones forzadas", () => {
   it("una forzada oculta llega oculta", () => {
     const txs = [tx("2026-09-15", 4500, { merchant: "VIDEOMAX", ...SUSCRIPCION })];
     expect(detectSubscriptions(txs, ctx({ ocultas: new Set(["VIDEOMAX"]) }))).toMatchObject([{ oculta: true }]);
+  });
+});
+
+const RIDEGO = "RIDEGO 7001";
+const MEMBRESIA: MarkedCharge = { date: "2026-06-02", amount: 9900, currency: "ARS" };
+const MARCADA_RIDEGO: Partial<SubscriptionContext> = {
+  manuales: new Set(["RIDEGO"]),
+  cobrosMarcados: new Map([["RIDEGO", [MEMBRESIA]]]),
+};
+
+const ridesAndMembership = (membership: Partial<SubscriptionTx> = {}): SubscriptionTx[] => [
+  ...["2026-06", "2026-07", "2026-08", "2026-09"].flatMap((month) => [
+    tx(`${month}-04`, 3100, { merchant: RIDEGO, category: "Transporte" }),
+    tx(`${month}-17`, 8200, { merchant: RIDEGO, category: "Transporte" }),
+  ]),
+  tx(MEMBRESIA.date, MEMBRESIA.amount, { merchant: RIDEGO, category: "Transporte", ...membership }),
+];
+
+describe("detectSubscriptions con cobros marcados en un comercio con otros gastos", () => {
+  it("arma la suscripción solo con el cobro marcado, no con el último gasto del comercio", () => {
+    expect(detectSubscriptions(ridesAndMembership(), ctx(MARCADA_RIDEGO))).toEqual([expect.objectContaining({
+      key: "RIDEGO",
+      montoActual: 9900,
+      primerCobro: "2026-06-02",
+      ultimoCobro: "2026-06-02",
+      cobros: 1,
+      categoria: "Transporte",
+    })]);
+  });
+
+  it("con la cadencia anual, el cobro marcado cobra de nuevo en un año", () => {
+    const anual = ctx({ ...MARCADA_RIDEGO, cadencias: new Map([["RIDEGO", "anual"]]), ultimoCierre: CIERRE_SEPTIEMBRE });
+    expect(detectSubscriptions(ridesAndMembership(), anual)).toMatchObject([{
+      montoActual: 9900, montoMensualArs: 825, ultimoCobro: "2026-06-02", proximoCobro: "2027-06-02", estado: "activa",
+    }]);
+  });
+
+  it("en un comercio marcado, el cobro con la categoría Suscripciones cuenta como marcado", () => {
+    const marcada = ctx({ manuales: new Set(["RIDEGO"]) });
+    expect(detectSubscriptions(ridesAndMembership(SUSCRIPCION), marcada)).toMatchObject([
+      { montoActual: 9900, ultimoCobro: "2026-06-02", cobros: 1, categoria: CATEGORIA_SUSCRIPCIONES },
+    ]);
+  });
+
+  it("con varios cobros marcados toma el último", () => {
+    const renovacion: MarkedCharge = { date: "2026-09-02", amount: 9900, currency: "ARS" };
+    const txs = [...ridesAndMembership(), tx(renovacion.date, renovacion.amount, { merchant: RIDEGO })];
+    const marcada = ctx({ ...MARCADA_RIDEGO, cobrosMarcados: new Map([["RIDEGO", [MEMBRESIA, renovacion]]]) });
+    expect(detectSubscriptions(txs, marcada)).toMatchObject([{ ultimoCobro: "2026-09-02", montoActual: 9900 }]);
+  });
+
+  it("el cobro marcado se reconoce por fecha, monto y moneda", () => {
+    const otraMoneda = ctx({ ...MARCADA_RIDEGO, cobrosMarcados: new Map([["RIDEGO", [{ ...MEMBRESIA, currency: "USD" }]]]) });
+    expect(detectSubscriptions(ridesAndMembership(), otraMoneda)).toMatchObject([{ ultimoCobro: "2026-09-17" }]);
+  });
+
+  it("el cobro marcado se busca también por la clave cruda", () => {
+    const txs = [
+      tx("2026-08-09", 3500, { merchant: "GOOGLE *VideoP X1y2Z3" }),
+      tx("2026-09-04", 1200, { merchant: "GOOGLE *VideoPremium" }),
+      tx("2026-09-20", 900, { merchant: "GOOGLE *VideoPremium" }),
+    ];
+    const marcada = ctx({
+      manuales: new Set(["GOOGLE VIDEOPREMIUM"]),
+      cobrosMarcados: new Map([["GOOGLE VIDEOPREMIUM", [{ date: "2026-09-04", amount: 1200, currency: "ARS" }]]]),
+    });
+    expect(detectSubscriptions(txs, marcada)).toMatchObject([{ key: "GOOGLE VIDEOP", ultimoCobro: "2026-09-04" }]);
+  });
+
+  it("si la racha detectada ya incluye el cobro marcado, se queda con la racha entera", () => {
+    const marcada = ctx({
+      manuales: new Set(["STREAMFLIX COM"]),
+      cobrosMarcados: new Map([["STREAMFLIX COM", [{ date: "2026-02-09", amount: 100, currency: "ARS" }]]]),
+    });
+    expect(detectSubscriptions(monthly([100, 100, 100]), marcada)).toMatchObject([
+      { primerCobro: "2026-01-09", ultimoCobro: "2026-03-09", cobros: 3 },
+    ]);
+  });
+
+  it("sin forzar el comercio, un cobro viejo con la categoría Suscripciones sigue sin alcanzar", () => {
+    expect(detectSubscriptions(ridesAndMembership(SUSCRIPCION), ctx())).toEqual([]);
   });
 });
 

@@ -358,7 +358,7 @@ export const subscriptionsReportDtoSchema = z.object({
 });
 
 export const manualSubscriptionInputSchema = z.object({
-  merchant: z.string().trim().min(1).max(200),
+  transactionId: z.string().trim().min(1),
 });
 
 export const subscriptionCadenceInputSchema = z.object({

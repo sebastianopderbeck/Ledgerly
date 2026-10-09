@@ -48,7 +48,7 @@ export const TransactionsPage = () => {
     [patchTransaction],
   );
   const deleteRows = useCallback((ids: string[]) => deleteTransactions(ids), [deleteTransactions]);
-  const markAsSubscription = useCallback((merchant: string) => markSubscription(merchant, {
+  const markAsSubscription = useCallback((transactionId: string) => markSubscription(transactionId, {
     onSuccess: () => setFeedback(MARKED),
     onError: () => setFeedback(MARK_FAILED),
   }), [markSubscription]);

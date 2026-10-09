@@ -261,8 +261,8 @@ export function useSetSubscriptionCadence() {
 export function useMarkSubscription() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (merchant: string) =>
-      apiFetch<void>("/subscriptions/manual", { method: "POST", body: JSON.stringify({ merchant }) }),
+    mutationFn: (transactionId: string) =>
+      apiFetch<void>("/subscriptions/manual", { method: "POST", body: JSON.stringify({ transactionId }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
   });
 }

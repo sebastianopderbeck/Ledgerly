@@ -93,14 +93,14 @@ describe("TransactionsPage", () => {
     expect(screen.getByText("MERCADOLIBRE")).toBeInTheDocument();
   });
 
-  it("marcar un consumo como suscripción manda el POST con el comercio y avisa", async () => {
+  it("marcar un consumo como suscripción manda el POST con el movimiento y avisa", async () => {
     const { default: userEvent } = await import("@testing-library/user-event");
     renderWithProviders(<TransactionsPage />, { route: "/transactions" });
     await userEvent.click(await screen.findByRole("button", { name: "Marcar MERCADOLIBRE como suscripción" }));
     expect(await screen.findByText("Agregado a Suscripciones")).toBeInTheDocument();
     const call = vi.mocked(fetch).mock.calls.find((c) => String(c[0]).includes("/subscriptions/manual"));
     expect((call?.[1] as RequestInit | undefined)?.method).toBe("POST");
-    expect(JSON.parse(String((call?.[1] as RequestInit | undefined)?.body))).toEqual({ merchant: "MERCADOLIBRE" });
+    expect(JSON.parse(String((call?.[1] as RequestInit | undefined)?.body))).toEqual({ transactionId: "1" });
     expect(screen.queryByRole("button", { name: /borrar seleccionados/i })).not.toBeInTheDocument();
   });
 
@@ -163,6 +163,7 @@ describe("TransactionsPage en mobile", () => {
     const sheet = await openSheet();
     await userEvent.click(within(sheet).getByRole("button", { name: "Es una suscripción" }));
     expect(await screen.findByText("Agregado a Suscripciones")).toBeInTheDocument();
-    expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes("/subscriptions/manual"))).toBe(true);
+    const call = vi.mocked(fetch).mock.calls.find((c) => String(c[0]).includes("/subscriptions/manual"));
+    expect(JSON.parse(String((call?.[1] as RequestInit | undefined)?.body))).toEqual({ transactionId: "1" });
   });
 });

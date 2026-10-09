@@ -225,15 +225,15 @@ describe("subscriptionCadenceInputSchema", () => {
 });
 
 describe("manualSubscriptionInputSchema", () => {
-  it("recorta el comercio", () => {
-    expect(manualSubscriptionInputSchema.parse({ merchant: "  VIDEOMAX 99123  " })).toEqual({ merchant: "VIDEOMAX 99123" });
+  it("recorta el id del movimiento", () => {
+    expect(manualSubscriptionInputSchema.parse({ transactionId: "  64b7f0c2a1b2c3d4e5f60718  " }))
+      .toEqual({ transactionId: "64b7f0c2a1b2c3d4e5f60718" });
   });
 
   it.each([
-    ["sin comercio", {}],
-    ["con el comercio en blanco", { merchant: "   " }],
-    ["con más de 200 caracteres", { merchant: "A".repeat(201) }],
-    ["con un comercio que no es texto", { merchant: 42 }],
+    ["sin movimiento", {}],
+    ["con el movimiento en blanco", { transactionId: "   " }],
+    ["con un movimiento que no es texto", { transactionId: 42 }],
   ])("rechaza un body %s", (_label, body) => {
     expect(manualSubscriptionInputSchema.safeParse(body).success).toBe(false);
   });

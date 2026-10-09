@@ -15,7 +15,7 @@ interface TransactionsListProps {
   rows: TransactionDTO[];
   onCategoryChange: (id: string, category: string) => void;
   onDelete: (ids: string[]) => void;
-  onMarkSubscription: (merchant: string) => void;
+  onMarkSubscription: (transactionId: string) => void;
 }
 
 interface TransactionRowProps {

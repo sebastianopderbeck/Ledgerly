@@ -63,14 +63,14 @@ describe("hooks de las features nuevas", () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["subscriptions"] });
   });
 
-  it("useMarkSubscription manda el comercio por POST e invalida las suscripciones", async () => {
+  it("useMarkSubscription manda el movimiento por POST e invalida las suscripciones", async () => {
     vi.stubGlobal("fetch", respond(204));
     const client = newClient();
     const invalidate = vi.spyOn(client, "invalidateQueries");
     const { result } = renderHook(() => useMarkSubscription(), { wrapper: wrapperFor(client) });
-    await act(() => result.current.mutateAsync("VIDEOMAX 99123"));
+    await act(() => result.current.mutateAsync("tx-4"));
     expect(calledUrls()).toEqual(["POST /api/subscriptions/manual"]);
-    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ merchant: "VIDEOMAX 99123" });
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ transactionId: "tx-4" });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["subscriptions"] });
   });
 

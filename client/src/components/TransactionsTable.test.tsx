@@ -76,10 +76,10 @@ describe("TransactionsTable marcar como suscripción", () => {
     expect(screen.queryByRole("button", { name: "Marcar NOTEBOOK como suscripción" })).not.toBeInTheDocument();
   });
 
-  it("al tocarlo manda el comercio y no selecciona la fila", async () => {
+  it("al tocarlo manda el movimiento y no selecciona la fila", async () => {
     const { onMarkSubscription } = setup();
     await userEvent.click(screen.getByRole("button", { name: "Marcar MERCADOLIBRE como suscripción" }));
-    expect(onMarkSubscription).toHaveBeenCalledWith("MERCADOLIBRE");
+    expect(onMarkSubscription).toHaveBeenCalledWith("1");
     expect(screen.queryByRole("button", { name: /borrar seleccionados/i })).not.toBeInTheDocument();
   });
 });
