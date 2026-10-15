@@ -2,7 +2,7 @@ import {
   MESES_SERVICIO,
   type Cadencia, type CashFlowDTO, type CashFlowMonthDTO, type Currency, type FixedServiceCadencia, type PayslipTipo,
 } from "@ledgerly/shared";
-import { addDays, addMonths, addMonthsClamped, monthOf, monthRange, monthsBetween } from "./months.js";
+import { addDays, addMonths, monthOf, monthRange, monthsBetween } from "./months.js";
 import { rateOnDate, type RatePoint } from "./rateOnDate.js";
 import { raiseFactor, raisesBetween, type SalaryInflation, type SalaryRaise } from "./salaryRaise.js";
 import { DIAS_CIERRE_A_VENCIMIENTO, statementDueDate } from "./statementDueDate.js";
@@ -177,21 +177,19 @@ export function projectServiceAmount({ monto, montoDesde }: CashFlowService, mes
   return monto * (1 + aumentoMensual) ** Math.max(0, monthsBetween(montoDesde, mes));
 }
 
-const statementOffset = (closingDate: string, cobro: string): number => {
-  let offset = 1;
-  while (addMonthsClamped(closingDate, offset) < cobro) offset += 1;
-  return offset;
-};
+const dayOfMonth = (iso: string): number => Number(iso.slice(8, 10));
 
 export function subscriptionPaymentMonths(
   card: Pick<CashFlowCard, "baseMonth" | "closingDate">,
   { proximoCobro, cadencia }: Pick<CashFlowSubscription, "proximoCobro" | "cadencia">,
   ultimoMes: string,
 ): string[] {
-  const cobro = (index: number): string => addMonthsClamped(proximoCobro, index * MESES_CADENCIA[cadencia]);
-  const mesDePago = (index: number): string => addMonths(card.baseMonth, statementOffset(card.closingDate, cobro(index)));
+  const despuesDelCierre = dayOfMonth(proximoCobro) > dayOfMonth(card.closingDate) ? 1 : 0;
+  const statementOffset = (index: number): number =>
+    monthsBetween(card.closingDate, addMonths(proximoCobro, index * MESES_CADENCIA[cadencia])) + despuesDelCierre;
+  const mesDePago = (index: number): string => addMonths(card.baseMonth, statementOffset(index));
   let index = 0;
-  while (cobro(index) <= card.closingDate) index += 1;
+  while (statementOffset(index) < 1) index += 1;
   const meses: string[] = [];
   for (let mes = mesDePago(index); mes <= ultimoMes; mes = mesDePago(index)) {
     meses.push(mes);

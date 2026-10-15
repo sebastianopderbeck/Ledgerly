@@ -645,6 +645,23 @@ describe("subscriptionPaymentMonths", () => {
       .toEqual(["2026-11", "2027-01", "2027-03"]);
   });
 
+  it("con cierre a fin de mes y cobro el 31 cae uno por mes", () => {
+    const card = { baseMonth: "2026-10", closingDate: "2026-09-30" };
+    expect(subscriptionPaymentMonths(card, suscripcion({ proximoCobro: "2026-10-31" }), "2027-03"))
+      .toEqual(["2026-12", "2027-01", "2027-02", "2027-03"]);
+  });
+
+  it("con cierre el 28 y cobro el 30 no duplica ni saltea meses alrededor de febrero", () => {
+    const card = { baseMonth: "2026-11", closingDate: "2026-10-28" };
+    expect(subscriptionPaymentMonths(card, suscripcion({ proximoCobro: "2026-11-30" }), "2027-06"))
+      .toEqual(["2027-01", "2027-02", "2027-03", "2027-04", "2027-05", "2027-06"]);
+  });
+
+  it("un cobro el mismo día del cierre entra en ese resumen", () => {
+    expect(subscriptionPaymentMonths(visaCard, suscripcion({ proximoCobro: "2026-11-02" }), "2027-03"))
+      .toEqual(["2026-11", "2026-12", "2027-01", "2027-02", "2027-03"]);
+  });
+
   it("con un próximo cobro muy viejo arranca después del cierre, uno por mes", () => {
     expect(subscriptionPaymentMonths(visaCard, suscripcion({ proximoCobro: "2025-01-09" }), "2027-03"))
       .toEqual(["2026-11", "2026-12", "2027-01", "2027-02", "2027-03"]);

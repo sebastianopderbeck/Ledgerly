@@ -199,11 +199,14 @@ Los servicios no agregan faltantes y no cambian el estado de un mes cerrado.
 Para cada tarjeta con `CashFlowCard` (último cierre `C`, mes de vencimiento del último resumen `B`) y cada
 suscripción del mismo `issuer`:
 
-1. Los cobros futuros son `D_j = addMonthsClamped(proximoCobro, j × MESES_CADENCIA[cadencia])`, con
+1. Los cobros futuros caen en los meses `addMonths(proximoCobro, j × MESES_CADENCIA[cadencia])`, con
    `j = 0, 1, 2…`.
-2. Un cobro con `D_j ≤ C` se saltea: debería estar en un resumen ya importado.
-3. Un cobro con `D_j > C` va al resumen `k`: el menor `k ≥ 1` con `addMonthsClamped(C, k) ≥ D_j`. Se paga
-   en el mes `addMonths(B, k)`.
+2. Cada cobro va al resumen `k = monthsBetween(C, mes del cobro) + (día(proximoCobro) > día(C) ? 1 : 0)` y
+   se paga en el mes `addMonths(B, k)`. Se comparan los días nominales del mes, sin recortar fechas: con
+   un cierre el 28–30 y un cobro a fin de mes, comparar fechas recortadas en los meses cortos duplicaba un
+   cobro en un mes y vaciaba el siguiente.
+3. Un cobro con `k < 1` se saltea: es del día del cierre o anterior, así que debería estar en un resumen ya
+   importado.
 4. Se generan cobros hasta pasar el último mes de la proyección.
 
 En cada mes proyectado, el piso de una tarjeta estimada pasa a ser
