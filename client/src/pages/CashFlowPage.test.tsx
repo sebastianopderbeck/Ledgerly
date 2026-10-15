@@ -68,6 +68,11 @@ describe("CashFlowPage", () => {
     expect(screen.getByText("Ingreso, egresos y margen por mes")).toBeInTheDocument();
     expect(screen.getByText("Próximos 2 meses (estimado)")).toBeInTheDocument();
     expect(screen.getByText(/más los aumentos de enero, mayo y septiembre por el IPC de los 4 meses anteriores/)).toBeInTheDocument();
+    expect(screen.getByText("Lo que entra por sueldo menos lo que sale sí o sí: tarjetas, hipoteca, auto y servicios.")).toBeInTheDocument();
+    expect(screen.getByText("tarjetas, hipoteca, auto y servicios")).toBeInTheDocument();
+    expect(screen.getByText(/después, las cuotas que ya compraste y tus suscripciones/)).toBeInTheDocument();
+    expect(screen.getByText(/servicios con el último monto más la inflación esperada del REM/)).toBeInTheDocument();
+    expect(screen.getByText(/gastos que no cargaste en Servicios\./)).toBeInTheDocument();
     expect(screen.getByText(/Los meses incompletos se ven atenuados y sin margen: Sep 2026/)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Detalle del flujo de caja" });
     expect(within(table).getByText("Proyectado")).toBeInTheDocument();

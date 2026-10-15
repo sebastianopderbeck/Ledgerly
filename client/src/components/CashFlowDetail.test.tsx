@@ -22,8 +22,8 @@ const completo: CashFlowMonthDTO = {
   tarjetas: 500_000,
   hipoteca: 300_000,
   auto: 100_000,
-  servicios: 0,
-  egresos: 900_000,
+  servicios: 45_000,
+  egresos: 945_000,
   margen: 100_000,
   tasaAhorro: 0.1,
   faltantes: [],
@@ -70,6 +70,15 @@ describe("CashFlowTable", () => {
     expect(within(diciembre).getByText("Proyectado")).toBeInTheDocument();
   });
 
+  it("muestra los servicios entre el auto y los egresos", () => {
+    renderWithProviders(<CashFlowTable meses={meses} />);
+    const table = screen.getByRole("table", { name: "Detalle del flujo de caja" });
+    const headers = within(table).getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers.slice(headers.indexOf("Auto"), headers.indexOf("Egresos") + 1)).toEqual(["Auto", "Servicios", "Egresos"]);
+    const agosto = within(table).getByRole("row", { name: /Agosto de 2026/ });
+    expect(within(agosto).getByText(money(45_000))).toBeInTheDocument();
+  });
+
   it("sin meses no muestra la tabla", () => {
     renderWithProviders(<CashFlowTable meses={[]} />);
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
@@ -100,6 +109,14 @@ describe("CashFlowCards", () => {
     expect(within(diciembre).getByText(`${money(1_500_000)} · con SAC`)).toBeInTheDocument();
     expect(within(diciembre).getByText("Estimado")).toBeInTheDocument();
     expect(within(diciembre).getByText("Sueldo (último neto), SAC (½ del último neto)")).toBeInTheDocument();
+  });
+
+  it("en el detalle muestra los servicios", async () => {
+    renderWithProviders(<CashFlowCards meses={meses} />);
+    const agosto = screen.getByRole("article", { name: "Agosto de 2026" });
+    await userEvent.click(within(agosto).getByRole("button", { name: "Ver detalle" }));
+    expect(within(agosto).getByText("Servicios")).toBeInTheDocument();
+    expect(within(agosto).getByText(money(45_000))).toBeInTheDocument();
   });
 
   it("pinta el margen negativo en rojo", () => {
