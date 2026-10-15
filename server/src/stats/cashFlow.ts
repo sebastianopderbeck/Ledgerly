@@ -1,8 +1,12 @@
-import { MESES_SERVICIO, type CashFlowDTO, type CashFlowMonthDTO, type FixedServiceCadencia, type PayslipTipo } from "@ledgerly/shared";
-import { addMonths, monthOf, monthRange, monthsBetween } from "./months.js";
+import {
+  MESES_SERVICIO,
+  type Cadencia, type CashFlowDTO, type CashFlowMonthDTO, type Currency, type FixedServiceCadencia, type PayslipTipo,
+} from "@ledgerly/shared";
+import { addDays, addMonths, addMonthsClamped, monthOf, monthRange, monthsBetween } from "./months.js";
 import { rateOnDate, type RatePoint } from "./rateOnDate.js";
 import { raiseFactor, raisesBetween, type SalaryInflation, type SalaryRaise } from "./salaryRaise.js";
-import { statementDueDate } from "./statementDueDate.js";
+import { DIAS_CIERRE_A_VENCIMIENTO, statementDueDate } from "./statementDueDate.js";
+import { MESES_CADENCIA } from "./subscriptions.js";
 
 export const HORIZONTE_MESES = 6;
 
@@ -16,6 +20,7 @@ export const ESTIMADO_SUELDO = "Sueldo (último neto)";
 export const ESTIMADO_SAC = "SAC (½ del último neto)";
 export const ESTIMADO_SAC_CON_AUMENTO = "SAC (½ del sueldo estimado)";
 export const estimadoTarjeta = (cardLabel: string): string => `${cardLabel} (solo cuotas)`;
+export const estimadoTarjetaConSuscripciones = (cardLabel: string): string => `${cardLabel} (cuotas y suscripciones)`;
 
 const AUMENTO_MENSUAL = new Intl.NumberFormat("es-AR", {
   style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: "exceptZero",
@@ -71,6 +76,7 @@ export interface CashFlowCard {
   issuer: string;
   cardLabel: string;
   baseMonth: string;
+  closingDate: string;
   installments: PendingInstallment[];
 }
 
@@ -94,6 +100,14 @@ export interface CashFlowService {
   montoDesde: string;
 }
 
+export interface CashFlowSubscription {
+  issuer: string;
+  moneda: Currency;
+  monto: number;
+  cadencia: Cadencia;
+  proximoCobro: string;
+}
+
 export interface InstallmentTxInput {
   amount: number;
   installmentCurrent: number | null;
@@ -110,6 +124,7 @@ export interface CashFlowInput {
   usdRates: RatePoint[];
   inflacion?: SalaryInflation;
   services?: CashFlowService[];
+  subscriptions?: CashFlowSubscription[];
   horizon?: number;
 }
 
@@ -128,10 +143,11 @@ const remainingOf = ({ installmentCurrent, installmentTotal }: InstallmentTxInpu
 export function toCashFlowCard(statement: CashFlowStatement, txs: InstallmentTxInput[]): CashFlowCard | null {
   const dueDate = statementDueDate(statement);
   if (!dueDate) return null;
+  const closingDate = statement.closingDate ?? addDays(dueDate, -DIAS_CIERRE_A_VENCIMIENTO);
   const installments = txs
     .map((tx) => ({ amount: tx.amount, remaining: remainingOf(tx) }))
     .filter((installment) => installment.remaining > 0);
-  return { issuer: statement.issuer, cardLabel: statement.cardLabel, baseMonth: monthOf(dueDate), installments };
+  return { issuer: statement.issuer, cardLabel: statement.cardLabel, baseMonth: monthOf(dueDate), closingDate, installments };
 }
 
 export function installmentFloor(card: CashFlowCard, month: string): number {
@@ -159,6 +175,29 @@ export function servicePays({ cadencia, desde, hasta }: CashFlowService, mes: st
 
 export function projectServiceAmount({ monto, montoDesde }: CashFlowService, mes: string, aumentoMensual: number): number {
   return monto * (1 + aumentoMensual) ** Math.max(0, monthsBetween(montoDesde, mes));
+}
+
+const statementOffset = (closingDate: string, cobro: string): number => {
+  let offset = 1;
+  while (addMonthsClamped(closingDate, offset) < cobro) offset += 1;
+  return offset;
+};
+
+export function subscriptionPaymentMonths(
+  card: Pick<CashFlowCard, "baseMonth" | "closingDate">,
+  { proximoCobro, cadencia }: Pick<CashFlowSubscription, "proximoCobro" | "cadencia">,
+  ultimoMes: string,
+): string[] {
+  const cobro = (index: number): string => addMonthsClamped(proximoCobro, index * MESES_CADENCIA[cadencia]);
+  const mesDePago = (index: number): string => addMonths(card.baseMonth, statementOffset(card.closingDate, cobro(index)));
+  let index = 0;
+  while (cobro(index) <= card.closingDate) index += 1;
+  const meses: string[] = [];
+  for (let mes = mesDePago(index); mes <= ultimoMes; mes = mesDePago(index)) {
+    meses.push(mes);
+    index += 1;
+  }
+  return meses;
 }
 
 export function incomeByMonth(payslips: CashFlowPayslip[]): Map<string, CashFlowPayslip[]> {
@@ -198,6 +237,20 @@ interface ClosedPlanMonth {
   falta: boolean;
 }
 
+interface SubscriptionCharge {
+  issuer: string;
+  mes: string;
+  moneda: Currency;
+  monto: number;
+}
+
+interface EstimatedCard {
+  cardLabel: string;
+  monto: number;
+  conSuscripciones: boolean;
+  sinCotizacion: boolean;
+}
+
 interface FlowContext {
   today: string;
   mesActual: string;
@@ -210,6 +263,8 @@ interface FlowContext {
   mesUltimoRecibo: string | null;
   inflacion: SalaryInflation | null;
   services: CashFlowService[];
+  charges: SubscriptionCharge[];
+  cotizacionHoy: number | null;
 }
 
 const NO_PLAN_MONTH: ClosedPlanMonth = { monto: 0, falta: false };
@@ -351,6 +406,35 @@ function projectedPlanMonth(plan: CashFlowPlan, mes: string): ProjectedPlanMonth
 const salaryRaises = ({ inflacion, mesUltimoRecibo }: FlowContext, mes: string): SalaryRaise[] =>
   inflacion && mesUltimoRecibo ? raisesBetween(mesUltimoRecibo, mes, inflacion) : [];
 
+function subscriptionCharges(cards: CashFlowCard[], subscriptions: CashFlowSubscription[], ultimoMes: string): SubscriptionCharge[] {
+  return cards.flatMap((card) => subscriptions
+    .filter((subscription) => subscription.issuer === card.issuer)
+    .flatMap((subscription) => subscriptionPaymentMonths(card, subscription, ultimoMes)
+      .map((mes) => ({ issuer: card.issuer, mes, moneda: subscription.moneda, monto: subscription.monto }))));
+}
+
+const chargeArs = ({ moneda, monto }: SubscriptionCharge, cotizacion: number | null): number | null => {
+  if (moneda === "ARS") return monto;
+  return cotizacion === null ? null : monto * cotizacion;
+};
+
+function estimatedCard(ctx: FlowContext, { cardLabel, card }: CardTrack, mes: string): EstimatedCard {
+  if (!card) return { cardLabel, monto: 0, conSuscripciones: false, sinCotizacion: false };
+  const montos = ctx.charges
+    .filter((charge) => charge.issuer === card.issuer && charge.mes === mes)
+    .map((charge) => chargeArs(charge, ctx.cotizacionHoy));
+  const convertidos = montos.filter((monto): monto is number => monto !== null);
+  return {
+    cardLabel,
+    monto: installmentFloor(card, mes) + sum(convertidos),
+    conSuscripciones: montos.length > 0,
+    sinCotizacion: convertidos.length < montos.length,
+  };
+}
+
+const estimatedCardNote = ({ cardLabel, conSuscripciones }: EstimatedCard): string =>
+  (conSuscripciones ? estimadoTarjetaConSuscripciones(cardLabel) : estimadoTarjeta(cardLabel));
+
 function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
   const recibos = ctx.recibosPorMes.get(mes) ?? [];
   const mensuales = recibos.filter(isMensual);
@@ -363,9 +447,11 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
   const sac = sacEstimado ? sueldoProyectado / 2 : netos(sacs);
   const tracks = trackMonths(ctx, mes);
   const reales = tracks.flatMap((trackMonth) => trackMonth.totals);
-  const estimadas = tracks.filter((trackMonth) => trackMonth.totals.length === 0);
-  const pisos = estimadas.map(({ track }) => (track.card ? installmentFloor(track.card, mes) : 0));
-  const tarjetas = sum(reales.map((total) => total.monto)) + sum(pisos);
+  const estimadas = tracks
+    .filter((trackMonth) => trackMonth.totals.length === 0)
+    .map(({ track }) => estimatedCard(ctx, track, mes));
+  const tarjetas = sum(reales.map((total) => total.monto)) + sum(estimadas.map((estimada) => estimada.monto));
+  const sinCotizacion = reales.some((total) => total.sinCotizacion) || estimadas.some((estimada) => estimada.sinCotizacion);
   const hipoteca = projectedPlanMonth(ctx.mortgage, mes);
   const auto = projectedPlanMonth(ctx.auto, mes);
   const ingreso = sueldo + sac;
@@ -385,11 +471,11 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
     egresos,
     margen,
     tasaAhorro: savingsRate(margen, ingreso),
-    faltantes: onlyIf(reales.some((total) => total.sinCotizacion), FALTA_COTIZACION),
+    faltantes: onlyIf(sinCotizacion, FALTA_COTIZACION),
     estimados: [
       ...onlyIf(sueldoEstimado, estimadoSueldo(raises)),
       ...onlyIf(sacEstimado, estimadoSac(raises)),
-      ...estimadas.map(({ track }) => estimadoTarjeta(track.cardLabel)),
+      ...estimadas.map(estimatedCardNote),
       ...onlyIf(hipoteca.estimado, estimadoHipoteca(ctx.mortgage.aumentoMensual)),
       ...onlyIf(auto.estimado, estimadoAuto(ctx.auto.aumentoMensual)),
       ...onlyIf(servicios > 0, estimadoServicios(aumentoServicios)),
@@ -409,6 +495,7 @@ export function buildCashFlow(input: CashFlowInput): CashFlowDTO {
 
   const recibosPorMes = incomeByMonth(input.payslips);
   const ultimoRecibo = latestMonthlyPayslip(input.payslips);
+  const ultimoMes = addMonths(mesActual, (input.horizon ?? HORIZONTE_MESES) - 1);
   const ctx: FlowContext = {
     today: input.today,
     mesActual,
@@ -421,10 +508,12 @@ export function buildCashFlow(input: CashFlowInput): CashFlowDTO {
     mesUltimoRecibo: ultimoRecibo ? monthOf(ultimoRecibo.fechaPago) : null,
     inflacion: input.inflacion ?? null,
     services: input.services ?? [],
+    charges: subscriptionCharges(input.cards, input.subscriptions ?? [], ultimoMes),
+    cotizacionHoy: rateOnDate(input.today, input.usdRates),
   };
   const desde = later(earliest([...recibosPorMes.keys()]), statements[0].mes);
   const historia = monthRange(desde, addMonths(mesActual, -1));
-  const proyeccion = monthRange(mesActual, addMonths(mesActual, (input.horizon ?? HORIZONTE_MESES) - 1));
+  const proyeccion = monthRange(mesActual, ultimoMes);
   return {
     mesActual,
     meses: [...historia.map((mes) => closedMonth(ctx, mes)), ...proyeccion.map((mes) => projectedMonth(ctx, mes))],

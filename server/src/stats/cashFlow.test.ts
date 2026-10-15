@@ -3,8 +3,10 @@ import type { CashFlowDTO, CashFlowMonthDTO, PayslipTipo } from "@ledgerly/share
 import {
   buildCashFlow, incomeByMonth, installmentFloor, projectPlanPayment, projectServiceAmount, servicePays, statementAmountArs,
   toCashFlowCard, ESTIMADO_SAC, ESTIMADO_SUELDO, FALTA_AUTO, FALTA_COTIZACION, FALTA_HIPOTECA,
-  FALTA_RECIBO, FALTA_SAC, estimadoAuto, estimadoHipoteca, estimadoServicios, estimadoTarjeta, faltaResumen,
+  FALTA_RECIBO, FALTA_SAC, estimadoAuto, estimadoHipoteca, estimadoServicios, estimadoTarjeta,
+  estimadoTarjetaConSuscripciones, faltaResumen, subscriptionPaymentMonths,
   type CashFlowCard, type CashFlowInput, type CashFlowPayslip, type CashFlowPlan, type CashFlowService, type CashFlowStatement,
+  type CashFlowSubscription,
 } from "./cashFlow.js";
 
 const statement = (overrides: Partial<CashFlowStatement> = {}): CashFlowStatement => ({
@@ -52,9 +54,13 @@ const ejemplo = (): CashFlowInput => input({
       issuer: "visa_signature",
       cardLabel: "Visa Signature",
       baseMonth: "2026-10",
+      closingDate: "2026-10-02",
       installments: [{ amount: 30_000, remaining: 3 }, { amount: 20_000, remaining: 1 }],
     },
-    { issuer: "icbc", cardLabel: "ICBC", baseMonth: "2026-09", installments: [{ amount: 10_000, remaining: 2 }] },
+    {
+      issuer: "icbc", cardLabel: "ICBC", baseMonth: "2026-09", closingDate: "2026-08-27",
+      installments: [{ amount: 10_000, remaining: 2 }],
+    },
   ],
   mortgage: { coupons: [{ fecha: "2026-09-17", cuotaNro: 12, monto: 300_000 }], cuotasTotales: 240, aumentoMensual: 0 },
   auto: { coupons: [{ fecha: "2026-09-10", cuotaNro: 20, monto: 150_000 }], cuotasTotales: 120, aumentoMensual: 0 },
@@ -96,8 +102,13 @@ describe("toCashFlowCard", () => {
       issuer: "visa_signature",
       cardLabel: "Visa Signature",
       baseMonth: "2026-10",
+      closingDate: "2026-10-02",
       installments: [{ amount: 30_000, remaining: 3 }],
     });
+  });
+
+  it("sin cierre toma el vencimiento menos 12 días", () => {
+    expect(toCashFlowCard(statement({ closingDate: null, dueDate: "2026-10-13" }), [])?.closingDate).toBe("2026-10-01");
   });
 
   it("sin vencimiento usa el cierre + 12 días: un cierre el 25/9 vence en octubre", () => {
@@ -114,6 +125,7 @@ describe("installmentFloor", () => {
     issuer: "visa_signature",
     cardLabel: "Visa Signature",
     baseMonth: "2026-10",
+    closingDate: "2026-10-02",
     installments: [{ amount: 30_000, remaining: 3 }, { amount: 20_000, remaining: 1 }],
   };
 
@@ -598,5 +610,94 @@ describe("buildCashFlow: servicios", () => {
     const flow = buildCashFlow({ ...ejemplo(), services: [servicio({ hasta: "2026-11" })] });
     expect(mesDe(flow, "2026-11")?.servicios).toBe(30_000);
     expect(mesDe(flow, "2026-12")?.servicios).toBe(0);
+  });
+});
+
+const visaCard = { baseMonth: "2026-10", closingDate: "2026-10-02" };
+
+const suscripcion = (overrides: Partial<CashFlowSubscription> = {}): CashFlowSubscription => ({
+  issuer: "visa_signature", moneda: "ARS", monto: 5_000, cadencia: "mensual", proximoCobro: "2026-10-09", ...overrides,
+});
+
+describe("subscriptionPaymentMonths", () => {
+  it("un cobro mensual va al resumen que cierra después y se paga en su vencimiento", () => {
+    expect(subscriptionPaymentMonths(visaCard, suscripcion(), "2027-03"))
+      .toEqual(["2026-11", "2026-12", "2027-01", "2027-02", "2027-03"]);
+  });
+
+  it("saltea el cobro con fecha anterior o igual al último cierre", () => {
+    expect(subscriptionPaymentMonths(visaCard, suscripcion({ proximoCobro: "2026-09-28" }), "2027-03"))
+      .toEqual(["2026-11", "2026-12", "2027-01", "2027-02", "2027-03"]);
+  });
+
+  it("un cobro posterior al cierre del mes siguiente se paga un mes después", () => {
+    expect(subscriptionPaymentMonths(visaCard, suscripcion({ proximoCobro: "2026-11-03" }), "2027-03"))
+      .toEqual(["2026-12", "2027-01", "2027-02", "2027-03"]);
+  });
+
+  it("un anual cae solo en el mes en que se paga", () => {
+    expect(subscriptionPaymentMonths(visaCard, suscripcion({ cadencia: "anual", proximoCobro: "2027-01-15" }), "2027-03"))
+      .toEqual(["2027-02"]);
+  });
+
+  it("un bimestral cae cada 2 meses", () => {
+    expect(subscriptionPaymentMonths(visaCard, suscripcion({ cadencia: "bimestral", proximoCobro: "2026-10-20" }), "2027-03"))
+      .toEqual(["2026-11", "2027-01", "2027-03"]);
+  });
+
+  it("con un próximo cobro muy viejo arranca después del cierre, uno por mes", () => {
+    expect(subscriptionPaymentMonths(visaCard, suscripcion({ proximoCobro: "2025-01-09" }), "2027-03"))
+      .toEqual(["2026-11", "2026-12", "2027-01", "2027-02", "2027-03"]);
+  });
+});
+
+describe("buildCashFlow: suscripciones", () => {
+  const sinSuscripciones = buildCashFlow(ejemplo());
+  const tarjetasDe = (flow: CashFlowDTO, mes: string): number => mesDe(flow, mes)?.tarjetas ?? 0;
+
+  it("suma la suscripción a la tarjeta estimada y cambia la nota", () => {
+    const flow = buildCashFlow({ ...ejemplo(), subscriptions: [suscripcion()] });
+    expect(tarjetasDe(flow, "2026-11")).toBe(tarjetasDe(sinSuscripciones, "2026-11") + 5_000);
+    expect(mesDe(flow, "2026-11")?.egresos).toBe((mesDe(sinSuscripciones, "2026-11")?.egresos ?? 0) + 5_000);
+    expect(mesDe(flow, "2026-11")?.estimados).toContain(estimadoTarjetaConSuscripciones("Visa Signature"));
+    expect(mesDe(flow, "2026-11")?.estimados).not.toContain(estimadoTarjeta("Visa Signature"));
+    expect(mesDe(flow, "2026-11")?.estimados).toContain(estimadoTarjeta("ICBC"));
+    expect(estimadoTarjetaConSuscripciones("Visa Signature")).toBe("Visa Signature (cuotas y suscripciones)");
+  });
+
+  it("no toca el mes que ya tiene el resumen real de esa tarjeta", () => {
+    const flow = buildCashFlow({ ...ejemplo(), subscriptions: [suscripcion()] });
+    expect(mesDe(flow, "2026-10")).toEqual(mesDe(sinSuscripciones, "2026-10"));
+  });
+
+  it("en el mes en curso suma a la tarjeta que todavía no tiene resumen", () => {
+    const flow = buildCashFlow({ ...ejemplo(), subscriptions: [suscripcion({ issuer: "icbc", proximoCobro: "2026-09-12" })] });
+    expect(tarjetasDe(flow, "2026-10")).toBe(tarjetasDe(sinSuscripciones, "2026-10") + 5_000);
+    expect(mesDe(flow, "2026-10")?.estimados).toContain(estimadoTarjetaConSuscripciones("ICBC"));
+  });
+
+  it("no suma una suscripción a la tarjeta de otro emisor ni a un emisor sin tarjeta", () => {
+    const flow = buildCashFlow({ ...ejemplo(), subscriptions: [suscripcion({ issuer: "otra" })] });
+    expect(flow).toEqual(sinSuscripciones);
+  });
+
+  it("no toca los meses cerrados", () => {
+    const flow = buildCashFlow({ ...ejemplo(), subscriptions: [suscripcion({ proximoCobro: "2026-08-09" })] });
+    expect(mesDe(flow, "2026-09")).toEqual(mesDe(sinSuscripciones, "2026-09"));
+  });
+
+  it("pasa los dólares a pesos con la cotización de hoy", () => {
+    const flow = buildCashFlow({ ...ejemplo(), subscriptions: [suscripcion({ moneda: "USD", monto: 10 })] });
+    expect(tarjetasDe(flow, "2026-11")).toBe(tarjetasDe(sinSuscripciones, "2026-11") + 10 * 1_450);
+  });
+
+  it("sin cotización no suma los dólares y lista el faltante una sola vez", () => {
+    const base = { ...ejemplo(), usdRates: [] };
+    const flow = buildCashFlow({
+      ...base,
+      subscriptions: [suscripcion({ moneda: "USD", monto: 10 }), suscripcion({ moneda: "USD", monto: 7 }), suscripcion()],
+    });
+    expect(tarjetasDe(flow, "2026-11")).toBe(tarjetasDe(buildCashFlow(base), "2026-11") + 5_000);
+    expect(mesDe(flow, "2026-11")?.faltantes).toEqual([FALTA_COTIZACION]);
   });
 });
