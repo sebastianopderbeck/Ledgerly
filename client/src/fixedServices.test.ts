@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { FixedServiceDTO } from "@ledgerly/shared";
 import {
-  fixedServiceDraftFrom, fixedServiceRequest, fixedServiceSections, isActiveService, monthlyEquivalent, monthlyTotal,
+  fixedServiceDraftFrom, fixedServiceRequest, fixedServiceSections, monthlyEquivalent, monthlyTotal,
   serviceMonth, type FixedServiceDraft,
 } from "./fixedServices.js";
 
@@ -23,13 +23,7 @@ describe("monthlyEquivalent y monthlyTotal", () => {
   });
 });
 
-describe("isActiveService y fixedServiceSections", () => {
-  it("está activo sin hasta o con hasta desde el mes actual", () => {
-    expect(isActiveService({ hasta: null }, MES)).toBe(true);
-    expect(isActiveService({ hasta: MES }, MES)).toBe(true);
-    expect(isActiveService({ hasta: "2026-09" }, MES)).toBe(false);
-  });
-
+describe("fixedServiceSections", () => {
   it("separa activos y dados de baja", () => {
     const cable = servicio({ id: "f-cable", nombre: "Cable", hasta: "2026-08" });
     expect(fixedServiceSections([servicio(), cable], MES)).toEqual({ activos: [servicio()], deBaja: [cable] });

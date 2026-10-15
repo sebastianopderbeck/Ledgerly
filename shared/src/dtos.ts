@@ -503,6 +503,9 @@ export const fixedServiceUpdateSchema = z.object({
   hasta: isoMonthSchema.nullable().optional(),
 }).strict();
 
+export const isActiveFixedService = ({ hasta }: Pick<FixedServiceDTO, "hasta">, mes: string): boolean =>
+  hasta === null || hasta >= mes;
+
 export const netWorthItemDtoSchema = z.object({
   id: z.string(),
   lado: z.enum(["activo", "pasivo"]),

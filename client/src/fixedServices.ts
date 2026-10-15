@@ -1,5 +1,5 @@
 import {
-  MESES_SERVICIO, isoMonthSchema,
+  MESES_SERVICIO, isActiveFixedService, isoMonthSchema,
   type FixedServiceCadencia, type FixedServiceCreateDTO, type FixedServiceDTO, type FixedServiceUpdateDTO,
 } from "@ledgerly/shared";
 import { formatMoneyInput, parseMoneyInput } from "./moneyInput.js";
@@ -51,12 +51,9 @@ export const monthlyEquivalent = ({ monto, cadencia }: Pick<FixedServiceDTO, "mo
 export const monthlyTotal = (services: FixedServiceDTO[]): number =>
   services.reduce((total, service) => total + monthlyEquivalent(service), 0);
 
-export const isActiveService = ({ hasta }: Pick<FixedServiceDTO, "hasta">, mesActual: string): boolean =>
-  hasta === null || hasta >= mesActual;
-
 export const fixedServiceSections = (services: FixedServiceDTO[], mesActual: string): FixedServiceSections => ({
-  activos: services.filter((service) => isActiveService(service, mesActual)),
-  deBaja: services.filter((service) => !isActiveService(service, mesActual)),
+  activos: services.filter((service) => isActiveFixedService(service, mesActual)),
+  deBaja: services.filter((service) => !isActiveFixedService(service, mesActual)),
 });
 
 export const serviceMonth = (variant: FixedServiceVariant, { desde, hasta }: Pick<FixedServiceDTO, "desde" | "hasta">): string =>

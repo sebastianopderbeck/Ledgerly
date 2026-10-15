@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { isValidObjectId } from "mongoose";
-import { fixedServiceCreateSchema, fixedServiceUpdateSchema, type FixedServiceDTO } from "@ledgerly/shared";
+import {
+  fixedServiceCreateSchema, fixedServiceUpdateSchema, isActiveFixedService, type FixedServiceDTO,
+} from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
 import { FixedServiceModel } from "../../db/models.js";
 import { toFixedServiceDTO } from "../mappers.js";
@@ -12,10 +14,8 @@ const SERVICE_NOT_FOUND = "Servicio no encontrado";
 
 const currentMonth = (): string => new Date().toISOString().slice(0, 7);
 
-const isActive = ({ hasta }: FixedServiceDTO, mes: string): boolean => hasta === null || hasta >= mes;
-
 const byActiveThenName = (mes: string) => (a: FixedServiceDTO, b: FixedServiceDTO): number =>
-  Number(isActive(b, mes)) - Number(isActive(a, mes)) || a.nombre.localeCompare(b.nombre);
+  Number(isActiveFixedService(b, mes)) - Number(isActiveFixedService(a, mes)) || a.nombre.localeCompare(b.nombre);
 
 const findService = async (id: string) => {
   const doc = isValidObjectId(id) ? await FixedServiceModel.findById(id) : null;

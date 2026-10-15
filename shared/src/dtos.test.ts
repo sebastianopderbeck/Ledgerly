@@ -446,7 +446,7 @@ describe("mailSyncRunDtoSchema", () => {
 });
 
 import {
-  MESES_SERVICIO, fixedServiceCreateSchema, fixedServiceDtoSchema, fixedServiceUpdateSchema, isoMonthSchema,
+  MESES_SERVICIO, fixedServiceCreateSchema, fixedServiceDtoSchema, fixedServiceUpdateSchema, isActiveFixedService, isoMonthSchema,
 } from "./dtos.js";
 
 describe("isoMonthSchema", () => {
@@ -470,6 +470,12 @@ describe("schemas de servicios", () => {
 
   it("el bimestral se paga cada 2 meses", () => {
     expect(MESES_SERVICIO).toEqual({ mensual: 1, bimestral: 2 });
+  });
+
+  it("un servicio está activo sin hasta o con hasta desde el mes dado", () => {
+    expect(isActiveFixedService({ hasta: null }, "2026-10")).toBe(true);
+    expect(isActiveFixedService({ hasta: "2026-10" }, "2026-10")).toBe(true);
+    expect(isActiveFixedService({ hasta: "2026-09" }, "2026-10")).toBe(false);
   });
 
   it("el alta recorta el nombre y acepta cadencia y desde", () => {
