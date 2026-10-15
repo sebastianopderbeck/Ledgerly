@@ -1,8 +1,8 @@
 import type {
-  AutoCouponDTO, BudgetDTO, CategoryRuleDTO, ImportedFileDTO, InflationRateDTO, ManualAssetDTO, MortgageCouponDTO, PayslipDTO, StatementDTO, TransactionDTO,
+  AutoCouponDTO, BudgetDTO, CategoryRuleDTO, FixedServiceCadencia, FixedServiceDTO, ImportedFileDTO, InflationRateDTO, ManualAssetDTO, MortgageCouponDTO, PayslipDTO, StatementDTO, TransactionDTO,
 } from "@ledgerly/shared";
 import type {
-  AutoCouponDoc, BudgetDoc, CategoryRuleDoc, InflationRateDoc, ManualAssetDoc, MortgageCouponDoc, PayslipDoc, StatementDoc, TransactionDoc,
+  AutoCouponDoc, BudgetDoc, CategoryRuleDoc, FixedServiceDoc, InflationRateDoc, ManualAssetDoc, MortgageCouponDoc, PayslipDoc, StatementDoc, TransactionDoc,
 } from "../db/models.js";
 import type { HydratedDocument } from "mongoose";
 
@@ -185,6 +185,18 @@ export function toManualAssetDTO(doc: HydratedDocument<ManualAssetDoc>): ManualA
     tipo: doc.tipo as ManualAssetDTO["tipo"],
     moneda: doc.moneda as ManualAssetDTO["moneda"],
     valuaciones: doc.valuaciones.map((valuacion) => ({ fecha: valuacion.fecha, monto: valuacion.monto })),
+  };
+}
+
+export function toFixedServiceDTO(doc: HydratedDocument<FixedServiceDoc>): FixedServiceDTO {
+  return {
+    id: doc._id.toString(),
+    nombre: doc.nombre,
+    monto: doc.monto,
+    cadencia: doc.cadencia as FixedServiceCadencia,
+    desde: doc.desde,
+    hasta: doc.hasta ?? null,
+    montoDesde: doc.montoDesde,
   };
 }
 
