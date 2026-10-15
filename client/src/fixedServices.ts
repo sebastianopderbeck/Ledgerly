@@ -1,0 +1,101 @@
+import {
+  MESES_SERVICIO, isoMonthSchema,
+  type FixedServiceCadencia, type FixedServiceCreateDTO, type FixedServiceDTO, type FixedServiceUpdateDTO,
+} from "@ledgerly/shared";
+import { formatMoneyInput, parseMoneyInput } from "./moneyInput.js";
+
+export type FixedServiceVariant = "activos" | "deBaja";
+
+export interface FixedServiceListProps {
+  items: FixedServiceDTO[];
+  variant: FixedServiceVariant;
+  onEdit: (id: string) => void;
+}
+
+export interface FixedServiceDraft {
+  nombre: string;
+  monto: string;
+  cadencia: FixedServiceCadencia;
+  desde: string;
+  hasta: string;
+}
+
+export type FixedServiceRequest =
+  | { kind: "create"; body: FixedServiceCreateDTO }
+  | { kind: "update"; id: string; body: FixedServiceUpdateDTO };
+
+export interface FixedServiceSections {
+  activos: FixedServiceDTO[];
+  deBaja: FixedServiceDTO[];
+}
+
+export const SERVICE_NAME_MAX_LENGTH = 60;
+
+export const FIXED_SERVICE_CADENCIAS: FixedServiceCadencia[] = ["mensual", "bimestral"];
+
+export const CADENCIA_SERVICIO_LABEL: Record<FixedServiceCadencia, string> = { mensual: "Mensual", bimestral: "Bimestral" };
+
+export const SERVICE_LIST_LABEL: Record<FixedServiceVariant, string> = {
+  activos: "Servicios activos",
+  deBaja: "Servicios dados de baja",
+};
+
+export const SERVICE_MONTH_LABEL: Record<FixedServiceVariant, string> = { activos: "Desde", deBaja: "Hasta" };
+
+export const isFixedServiceCadencia = (value: unknown): value is FixedServiceCadencia =>
+  FIXED_SERVICE_CADENCIAS.some((cadencia) => cadencia === value);
+
+export const monthlyEquivalent = ({ monto, cadencia }: Pick<FixedServiceDTO, "monto" | "cadencia">): number =>
+  monto / MESES_SERVICIO[cadencia];
+
+export const monthlyTotal = (services: FixedServiceDTO[]): number =>
+  services.reduce((total, service) => total + monthlyEquivalent(service), 0);
+
+export const isActiveService = ({ hasta }: Pick<FixedServiceDTO, "hasta">, mesActual: string): boolean =>
+  hasta === null || hasta >= mesActual;
+
+export const fixedServiceSections = (services: FixedServiceDTO[], mesActual: string): FixedServiceSections => ({
+  activos: services.filter((service) => isActiveService(service, mesActual)),
+  deBaja: services.filter((service) => !isActiveService(service, mesActual)),
+});
+
+export const serviceMonth = (variant: FixedServiceVariant, { desde, hasta }: Pick<FixedServiceDTO, "desde" | "hasta">): string =>
+  (variant === "deBaja" && hasta !== null ? hasta : desde);
+
+export function fixedServiceDraftFrom(service: FixedServiceDTO | null, mesActual: string): FixedServiceDraft {
+  if (!service) return { nombre: "", monto: "", cadencia: "mensual", desde: mesActual, hasta: "" };
+  return {
+    nombre: service.nombre,
+    monto: formatMoneyInput(service.monto),
+    cadencia: service.cadencia,
+    desde: service.desde,
+    hasta: service.hasta ?? "",
+  };
+}
+
+const isValidName = (nombre: string): boolean => nombre !== "" && nombre.length <= SERVICE_NAME_MAX_LENGTH;
+
+const isMonth = (mes: string): boolean => isoMonthSchema.safeParse(mes).success;
+
+const isValidRange = ({ desde, hasta }: FixedServiceDraft): boolean =>
+  isMonth(desde) && (hasta === "" || (isMonth(hasta) && hasta >= desde));
+
+const updateBody = (draft: FixedServiceDraft, service: FixedServiceDTO, nombre: string, monto: number): FixedServiceUpdateDTO => {
+  const hasta = draft.hasta === "" ? null : draft.hasta;
+  return {
+    ...(nombre !== service.nombre ? { nombre } : {}),
+    ...(monto !== service.monto ? { monto } : {}),
+    ...(draft.cadencia !== service.cadencia ? { cadencia: draft.cadencia } : {}),
+    ...(draft.desde !== service.desde ? { desde: draft.desde } : {}),
+    ...(hasta !== service.hasta ? { hasta } : {}),
+  };
+};
+
+export function fixedServiceRequest(draft: FixedServiceDraft, service: FixedServiceDTO | null): FixedServiceRequest | null {
+  const nombre = draft.nombre.trim();
+  const monto = parseMoneyInput(draft.monto);
+  if (!isValidName(nombre) || monto === null || monto <= 0 || !isValidRange(draft)) return null;
+  if (!service) return { kind: "create", body: { nombre, monto, cadencia: draft.cadencia, desde: draft.desde } };
+  const body = updateBody(draft, service, nombre, monto);
+  return Object.keys(body).length > 0 ? { kind: "update", id: service.id, body } : null;
+}

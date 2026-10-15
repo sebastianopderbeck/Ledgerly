@@ -1,7 +1,7 @@
-import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, BudgetDTO, BudgetInput, BudgetPatch, BudgetSpendingDTO, CashFlowDTO, CategoryRuleDTO, CategoryStat,
-  CreditSummaryDTO, FutureInstallmentStat, FutureInstallmentMonth, MailSource, MailSourceStatusDTO, MailSyncRunDTO, ImportResultUnionDTO,
+  CreditSummaryDTO, FixedServiceCreateDTO, FixedServiceDTO, FixedServiceUpdateDTO, FutureInstallmentStat, FutureInstallmentMonth, MailSource, MailSourceStatusDTO, MailSyncRunDTO, ImportResultUnionDTO,
   ImportedFileDTO, InboxRuleResultDTO, InflationRateDTO, InstallmentPurchaseDTO, MacroRefreshDTO, MacroSeriesDTO,
   ManualAssetCreateDTO, ManualAssetDTO, ManualAssetUpdateDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO,
   NetWorthDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, StatementReviewDTO, StatementReviewKeysDTO,
@@ -349,6 +349,41 @@ export function useDeleteAssetValuation() {
     mutationFn: ({ id, fecha }: { id: string; fecha: string }) =>
       apiFetch<ManualAssetDTO>(`/net-worth/assets/${id}/valuations/${fecha}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["net-worth"] }),
+  });
+}
+
+const invalidateFixedServices = (qc: QueryClient) => Promise.all([
+  qc.invalidateQueries({ queryKey: ["fixed-services"] }),
+  qc.invalidateQueries({ queryKey: ["cash-flow"] }),
+]);
+
+export function useFixedServices() {
+  return useQuery({ queryKey: ["fixed-services"], queryFn: () => apiFetch<FixedServiceDTO[]>("/fixed-services") });
+}
+
+export function useCreateFixedService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: FixedServiceCreateDTO) =>
+      apiFetch<FixedServiceDTO>("/fixed-services", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => invalidateFixedServices(qc),
+  });
+}
+
+export function useUpdateFixedService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: FixedServiceUpdateDTO }) =>
+      apiFetch<FixedServiceDTO>(`/fixed-services/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: () => invalidateFixedServices(qc),
+  });
+}
+
+export function useDeleteFixedService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/fixed-services/${id}`, { method: "DELETE" }),
+    onSuccess: () => invalidateFixedServices(qc),
   });
 }
 
