@@ -1,4 +1,4 @@
-import type { CashFlowDTO, CashFlowMonthDTO, PayslipTipo } from "@ledgerly/shared";
+import { MESES_SERVICIO, type CashFlowDTO, type CashFlowMonthDTO, type FixedServiceCadencia, type PayslipTipo } from "@ledgerly/shared";
 import { addMonths, monthOf, monthRange, monthsBetween } from "./months.js";
 import { rateOnDate, type RatePoint } from "./rateOnDate.js";
 import { raiseFactor, raisesBetween, type SalaryInflation, type SalaryRaise } from "./salaryRaise.js";
@@ -44,6 +44,7 @@ export const estimadoSac = (raises: SalaryRaise[]): string => (raises.length ===
 
 export const estimadoHipoteca = (aumentoMensual: number): string => `Hipoteca (última cuota${detalleAumento(aumentoMensual)})`;
 export const estimadoAuto = (aumentoMensual: number): string => `Auto (último cupón${detalleAumento(aumentoMensual)})`;
+export const estimadoServicios = (aumentoMensual: number): string => `Servicios (último monto${detalleAumento(aumentoMensual)})`;
 
 export interface CashFlowPayslip {
   fechaPago: string;
@@ -85,6 +86,14 @@ export interface CashFlowPlan {
   aumentoMensual: number;
 }
 
+export interface CashFlowService {
+  monto: number;
+  cadencia: FixedServiceCadencia;
+  desde: string;
+  hasta: string | null;
+  montoDesde: string;
+}
+
 export interface InstallmentTxInput {
   amount: number;
   installmentCurrent: number | null;
@@ -100,6 +109,7 @@ export interface CashFlowInput {
   auto: CashFlowPlan;
   usdRates: RatePoint[];
   inflacion?: SalaryInflation;
+  services?: CashFlowService[];
   horizon?: number;
 }
 
@@ -140,6 +150,15 @@ export function projectPlanPayment(plan: CashFlowPlan, month: string): number {
   if (offset < 1) return 0;
   if (plan.cuotasTotales !== null && last.cuotaNro + offset > plan.cuotasTotales) return 0;
   return last.monto * (1 + plan.aumentoMensual) ** offset;
+}
+
+export function servicePays({ cadencia, desde, hasta }: CashFlowService, mes: string): boolean {
+  if (mes < desde || (hasta !== null && mes > hasta)) return false;
+  return monthsBetween(desde, mes) % MESES_SERVICIO[cadencia] === 0;
+}
+
+export function projectServiceAmount({ monto, montoDesde }: CashFlowService, mes: string, aumentoMensual: number): number {
+  return monto * (1 + aumentoMensual) ** Math.max(0, monthsBetween(montoDesde, mes));
 }
 
 export function incomeByMonth(payslips: CashFlowPayslip[]): Map<string, CashFlowPayslip[]> {
@@ -190,6 +209,7 @@ interface FlowContext {
   ultimoNeto: number;
   mesUltimoRecibo: string | null;
   inflacion: SalaryInflation | null;
+  services: CashFlowService[];
 }
 
 const NO_PLAN_MONTH: ClosedPlanMonth = { monto: 0, falta: false };
@@ -273,6 +293,11 @@ function closedPlanMonth(plan: CashFlowPlan, mes: string): ClosedPlanMonth {
   return { monto: 0, falta: !planFinished(plan, last, mes) };
 }
 
+const servicesDue = (ctx: FlowContext, mes: string): CashFlowService[] =>
+  ctx.services.filter((service) => servicePays(service, mes));
+
+const expectedInflation = ({ inflacion }: FlowContext): number => inflacion?.esperadaMensual ?? 0;
+
 function closedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
   const recibos = ctx.recibosPorMes.get(mes) ?? [];
   const conSac = recibos.some(isSac);
@@ -290,7 +315,8 @@ function closedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
     ...onlyIf(totals.some((total) => total.sinCotizacion), FALTA_COTIZACION),
   ];
   const tarjetas = sum(totals.map((total) => total.monto));
-  const egresos = tarjetas + hipoteca.monto + auto.monto;
+  const servicios = sum(servicesDue(ctx, mes).map((service) => service.monto));
+  const egresos = tarjetas + hipoteca.monto + auto.monto + servicios;
   const completo = faltantes.length === 0;
   const margen = completo && ingreso !== null ? ingreso - egresos : null;
   return {
@@ -301,6 +327,7 @@ function closedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
     tarjetas,
     hipoteca: hipoteca.monto,
     auto: auto.monto,
+    servicios,
     egresos,
     margen,
     tasaAhorro: savingsRate(margen, ingreso),
@@ -342,7 +369,9 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
   const hipoteca = projectedPlanMonth(ctx.mortgage, mes);
   const auto = projectedPlanMonth(ctx.auto, mes);
   const ingreso = sueldo + sac;
-  const egresos = tarjetas + hipoteca.monto + auto.monto;
+  const aumentoServicios = expectedInflation(ctx);
+  const servicios = sum(servicesDue(ctx, mes).map((service) => projectServiceAmount(service, mes, aumentoServicios)));
+  const egresos = tarjetas + hipoteca.monto + auto.monto + servicios;
   const margen = ingreso - egresos;
   return {
     mes,
@@ -352,6 +381,7 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
     tarjetas,
     hipoteca: hipoteca.monto,
     auto: auto.monto,
+    servicios,
     egresos,
     margen,
     tasaAhorro: savingsRate(margen, ingreso),
@@ -362,6 +392,7 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
       ...estimadas.map(({ track }) => estimadoTarjeta(track.cardLabel)),
       ...onlyIf(hipoteca.estimado, estimadoHipoteca(ctx.mortgage.aumentoMensual)),
       ...onlyIf(auto.estimado, estimadoAuto(ctx.auto.aumentoMensual)),
+      ...onlyIf(servicios > 0, estimadoServicios(aumentoServicios)),
     ],
   };
 }
@@ -389,6 +420,7 @@ export function buildCashFlow(input: CashFlowInput): CashFlowDTO {
     ultimoNeto: ultimoRecibo?.neto ?? 0,
     mesUltimoRecibo: ultimoRecibo ? monthOf(ultimoRecibo.fechaPago) : null,
     inflacion: input.inflacion ?? null,
+    services: input.services ?? [],
   };
   const desde = later(earliest([...recibosPorMes.keys()]), statements[0].mes);
   const historia = monthRange(desde, addMonths(mesActual, -1));

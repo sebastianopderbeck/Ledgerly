@@ -143,7 +143,7 @@ import {
 
 const cashFlowMonth = {
   mes: "2026-09", estado: "completo", ingreso: 1100000, conSac: false, tarjetas: 578000,
-  hipoteca: 300000, auto: 150000, egresos: 1028000, margen: 72000, tasaAhorro: 0.0655,
+  hipoteca: 300000, auto: 150000, servicios: 0, egresos: 1028000, margen: 72000, tasaAhorro: 0.0655,
   faltantes: [], estimados: [],
 };
 

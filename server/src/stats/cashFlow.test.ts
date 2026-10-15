@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import type { CashFlowDTO, CashFlowMonthDTO, PayslipTipo } from "@ledgerly/shared";
 import {
-  buildCashFlow, incomeByMonth, installmentFloor, projectPlanPayment, statementAmountArs, toCashFlowCard,
-  ESTIMADO_SAC, ESTIMADO_SUELDO, FALTA_AUTO, FALTA_COTIZACION, FALTA_HIPOTECA,
-  FALTA_RECIBO, FALTA_SAC, estimadoAuto, estimadoHipoteca, estimadoTarjeta, faltaResumen,
-  type CashFlowCard, type CashFlowInput, type CashFlowPayslip, type CashFlowPlan, type CashFlowStatement,
+  buildCashFlow, incomeByMonth, installmentFloor, projectPlanPayment, projectServiceAmount, servicePays, statementAmountArs,
+  toCashFlowCard, ESTIMADO_SAC, ESTIMADO_SUELDO, FALTA_AUTO, FALTA_COTIZACION, FALTA_HIPOTECA,
+  FALTA_RECIBO, FALTA_SAC, estimadoAuto, estimadoHipoteca, estimadoServicios, estimadoTarjeta, faltaResumen,
+  type CashFlowCard, type CashFlowInput, type CashFlowPayslip, type CashFlowPlan, type CashFlowService, type CashFlowStatement,
 } from "./cashFlow.js";
 
 const statement = (overrides: Partial<CashFlowStatement> = {}): CashFlowStatement => ({
@@ -222,6 +222,7 @@ describe("buildCashFlow: meses cerrados", () => {
       tarjetas: 578_000,
       hipoteca: 300_000,
       auto: 150_000,
+      servicios: 0,
       egresos: 1_028_000,
       margen: 72_000,
       tasaAhorro: 72_000 / 1_100_000,
@@ -513,5 +514,89 @@ describe("buildCashFlow: proyección", () => {
   it("respeta el horizonte pedido", () => {
     const flow = buildCashFlow({ ...ejemplo(), horizon: 3 });
     expect(flow.meses.filter((mes) => mes.mes >= "2026-10").map((mes) => mes.mes)).toEqual(["2026-10", "2026-11", "2026-12"]);
+  });
+});
+
+const servicio = (overrides: Partial<CashFlowService> = {}): CashFlowService => ({
+  monto: 30_000, cadencia: "mensual", desde: "2026-09", hasta: null, montoDesde: "2026-09", ...overrides,
+});
+
+describe("servicePays", () => {
+  it("un mensual paga todos los meses desde desde hasta hasta", () => {
+    const luz = servicio({ hasta: "2026-11" });
+    expect(["2026-08", "2026-09", "2026-11", "2026-12"].map((mes) => servicePays(luz, mes))).toEqual([false, true, true, false]);
+  });
+
+  it("un bimestral paga cada 2 meses a partir de desde", () => {
+    const gas = servicio({ cadencia: "bimestral", desde: "2026-10" });
+    expect(["2026-10", "2026-11", "2026-12", "2027-01", "2027-02"].map((mes) => servicePays(gas, mes)))
+      .toEqual([true, false, true, false, true]);
+  });
+});
+
+describe("projectServiceAmount", () => {
+  it("suma el aumento mensual desde montoDesde", () => {
+    expect(projectServiceAmount(servicio(), "2026-11", 0.02)).toBeCloseTo(30_000 * 1.02 ** 2, 6);
+  });
+
+  it("antes de montoDesde va el monto plano", () => {
+    expect(projectServiceAmount(servicio({ montoDesde: "2026-11" }), "2026-10", 0.02)).toBe(30_000);
+  });
+});
+
+describe("buildCashFlow: servicios", () => {
+  const sinServicios = buildCashFlow(ejemplo());
+
+  it("en los meses cerrados resta el monto plano desde desde y el mes sigue completo", () => {
+    const flow = buildCashFlow({ ...ejemplo(), services: [servicio()] });
+    const septiembre = mesDe(sinServicios, "2026-09");
+    expect(mesDe(flow, "2026-08")).toMatchObject({ servicios: 0, egresos: mesDe(sinServicios, "2026-08")?.egresos });
+    expect(mesDe(flow, "2026-09")).toMatchObject({
+      estado: "completo",
+      servicios: 30_000,
+      egresos: (septiembre?.egresos ?? 0) + 30_000,
+      margen: (septiembre?.margen ?? 0) - 30_000,
+      faltantes: [],
+    });
+  });
+
+  it("en un mes cerrado incompleto suma los servicios sin agregar faltantes", () => {
+    const base = ejemplo();
+    const flow = buildCashFlow({ ...base, payslips: [payslip("2026-08-31", 1_050_000)], services: [servicio()] });
+    expect(mesDe(flow, "2026-09")).toMatchObject({ estado: "incompleto", servicios: 30_000, faltantes: [FALTA_RECIBO] });
+  });
+
+  it("en los proyectados suma la inflación esperada desde montoDesde y lo anota", () => {
+    const flow = buildCashFlow({
+      ...ejemplo(), services: [servicio()], inflacion: { publicada: [], esperadaMensual: 0.02 },
+    });
+    expect(mesDe(flow, "2026-09")?.servicios).toBe(30_000);
+    expect(mesDe(flow, "2026-10")?.servicios).toBeCloseTo(30_000 * 1.02, 6);
+    expect(mesDe(flow, "2026-11")?.servicios).toBeCloseTo(30_000 * 1.02 ** 2, 6);
+    expect(mesDe(flow, "2026-10")?.estimados.at(-1)).toBe("Servicios (último monto +2,0% por mes)");
+  });
+
+  it("sin inflación va el monto plano y la nota no lleva porcentaje", () => {
+    const flow = buildCashFlow({ ...ejemplo(), services: [servicio()] });
+    const noviembre = mesDe(sinServicios, "2026-11");
+    expect(mesDe(flow, "2026-11")).toMatchObject({
+      servicios: 30_000,
+      egresos: (noviembre?.egresos ?? 0) + 30_000,
+      margen: (noviembre?.margen ?? 0) - 30_000,
+    });
+    expect(mesDe(flow, "2026-11")?.estimados.at(-1)).toBe(estimadoServicios(0));
+    expect(estimadoServicios(0)).toBe("Servicios (último monto)");
+  });
+
+  it("un bimestral solo resta y se anota en sus meses", () => {
+    const flow = buildCashFlow({ ...ejemplo(), services: [servicio({ cadencia: "bimestral", desde: "2026-10", montoDesde: "2026-10" })] });
+    expect(["2026-10", "2026-11", "2026-12"].map((mes) => mesDe(flow, mes)?.servicios)).toEqual([30_000, 0, 30_000]);
+    expect(mesDe(flow, "2026-11")?.estimados).not.toContain(estimadoServicios(0));
+  });
+
+  it("deja de restar después de hasta", () => {
+    const flow = buildCashFlow({ ...ejemplo(), services: [servicio({ hasta: "2026-11" })] });
+    expect(mesDe(flow, "2026-11")?.servicios).toBe(30_000);
+    expect(mesDe(flow, "2026-12")?.servicios).toBe(0);
   });
 });
