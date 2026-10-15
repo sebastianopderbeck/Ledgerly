@@ -1,8 +1,11 @@
 import { Router } from "express";
 import type { Types } from "mongoose";
+import type { SubscriptionDTO } from "@ledgerly/shared";
 import { asyncHandler } from "../errors.js";
+import { loadSubscriptionInputs } from "../loadSubscriptions.js";
 import {
-  AutoCouponModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel, PayslipModel, StatementModel, TransactionModel,
+  AutoCouponModel, FixedServiceModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel, PayslipModel, StatementModel,
+  TransactionModel,
 } from "../../db/models.js";
 import { latestStatementIdsPerIssuer, type StatementRecency } from "../../stats/lastStatement.js";
 import { computeCreditProgress, type CouponInput } from "../../stats/amortization.js";
@@ -12,8 +15,10 @@ import type { RatePoint } from "../../stats/rateOnDate.js";
 import { expectedMonthlyInflation, type MonthlyInflation, type SalaryInflation } from "../../stats/salaryRaise.js";
 import {
   buildCashFlow, toCashFlowCard,
-  type CashFlowCard, type CashFlowCoupon, type CashFlowPayslip, type CashFlowStatement, type InstallmentTxInput,
+  type CashFlowCard, type CashFlowCoupon, type CashFlowPayslip, type CashFlowService, type CashFlowStatement,
+  type CashFlowSubscription, type InstallmentTxInput,
 } from "../../stats/cashFlow.js";
+import { detectSubscriptions, isCounted } from "../../stats/subscriptions.js";
 
 interface MoneyPairRow {
   ars: number;
@@ -40,6 +45,14 @@ interface InstallmentRow {
   amount: number;
   installmentCurrent?: number | null;
   installmentTotal?: number | null;
+}
+
+interface FixedServiceRow {
+  monto: number;
+  cadencia?: string | null;
+  desde: string;
+  hasta?: string | null;
+  montoDesde?: string | null;
 }
 
 const isoDay = (date: Date): string => date.toISOString().slice(0, 10);
@@ -89,6 +102,17 @@ const toInstallmentTx = (tx: InstallmentRow): InstallmentTxInput => ({
   installmentTotal: tx.installmentTotal ?? null,
 });
 
+const toFlowService = ({ monto, cadencia, desde, hasta, montoDesde }: FixedServiceRow): CashFlowService => ({
+  monto,
+  cadencia: cadencia === "bimestral" ? "bimestral" : "mensual",
+  desde,
+  hasta: hasta ?? null,
+  montoDesde: montoDesde ?? desde,
+});
+
+const toFlowSubscription = ({ issuer, moneda, montoActual, cadencia, proximoCobro }: SubscriptionDTO): CashFlowSubscription =>
+  ({ issuer, moneda, monto: montoActual, cadencia, proximoCobro });
+
 const latestCards = (statements: StatementRow[], latestIds: Types.ObjectId[], txs: InstallmentRow[]): CashFlowCard[] => {
   const latest = new Set(latestIds.map(String));
   return statements
@@ -116,7 +140,9 @@ export const cashFlowRouter = Router();
 
 cashFlowRouter.get("/", asyncHandler(async (_req, res) => {
   const today = new Date().toISOString().slice(0, 10);
-  const [payslips, statements, mortgageCoupons, autoCoupons, usdPoints, uvaPoints, inflationRows, lastRem] = await Promise.all([
+  const [
+    payslips, statements, mortgageCoupons, autoCoupons, usdPoints, uvaPoints, inflationRows, lastRem, fixedServices, subscriptionInputs,
+  ] = await Promise.all([
     PayslipModel.find().lean(),
     StatementModel.find().lean(),
     MortgageCouponModel.find().sort({ cuotaNro: 1 }).lean(),
@@ -125,12 +151,17 @@ cashFlowRouter.get("/", asyncHandler(async (_req, res) => {
     MacroSeriesModel.find({ serie: "uva" }).sort({ fecha: 1 }).lean(),
     InflationRateModel.find().lean(),
     MacroSeriesModel.findOne({ serie: "rem_12m" }).sort({ fecha: -1 }).lean(),
+    FixedServiceModel.find().lean(),
+    loadSubscriptionInputs(today),
   ]);
   const latestIds = latestStatementIdsPerIssuer(statements.map(toRecency));
   const installmentTxs = await TransactionModel.find({
     statementId: { $in: latestIds }, type: "purchase", isInstallment: true, currency: "ARS",
   }).lean();
   const credit = computeCreditProgress(mortgageCoupons.map(toCouponInput));
+  const subscriptions = detectSubscriptions(subscriptionInputs.txs, { ...subscriptionInputs.ctx, cotizacion: null })
+    .filter(isCounted)
+    .map(toFlowSubscription);
   res.json(buildCashFlow({
     today,
     payslips: payslips.map(toFlowPayslip),
@@ -151,5 +182,7 @@ cashFlowRouter.get("/", asyncHandler(async (_req, res) => {
     },
     usdRates: usdPoints.map(toRatePoint),
     inflacion: salaryInflation(inflationRows, lastRem?.valor ?? null),
+    services: fixedServices.map(toFlowService),
+    subscriptions,
   }));
 }));
