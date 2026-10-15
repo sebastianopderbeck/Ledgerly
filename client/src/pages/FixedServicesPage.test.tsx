@@ -119,6 +119,33 @@ describe("FixedServicesPage", () => {
     }]));
   });
 
+  it("Agregar servicio deja cargar uno anual en su mes de pago", async () => {
+    renderPage();
+    await screen.findByRole("table", { name: "Servicios activos" });
+    await userEvent.click(screen.getByRole("button", { name: "Agregar servicio" }));
+    const sheet = screen.getByRole("dialog", { name: "Nuevo servicio" });
+    await userEvent.type(within(sheet).getByRole("textbox", { name: "Nombre" }), "ABL");
+    await userEvent.type(within(sheet).getByRole("textbox", { name: "Monto en pesos" }), "120.000");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Anual" }));
+    expect(within(sheet).getByText("El mes en que lo pagás")).toBeInTheDocument();
+    fireEvent.change(within(sheet).getByLabelText("Desde"), { target: { value: "2027-01" } });
+    await userEvent.click(within(sheet).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(requests("POST")).toEqual([{
+      url: "/api/fixed-services",
+      body: { nombre: "ABL", monto: 120_000, cadencia: "anual", desde: "2027-01" },
+    }]));
+  });
+
+  it("un servicio anual muestra su doceavo por mes", async () => {
+    const abl: FixedServiceDTO = { ...luz, id: "f-abl", nombre: "ABL", monto: 120_000, cadencia: "anual", desde: "2027-01" };
+    listReply = { status: 200, body: [abl] };
+    renderPage();
+    const ablRow = within(await screen.findByRole("table", { name: "Servicios activos" })).getByRole("row", { name: /ABL/ });
+    expect(within(ablRow).getByText("Anual")).toBeInTheDocument();
+    expect(within(ablRow).getByText(money(10_000))).toBeInTheDocument();
+    expect(screen.getByText("bimestrales y anuales, prorrateados")).toBeInTheDocument();
+  });
+
   it("editar el monto manda solo el monto", async () => {
     renderPage();
     const sheet = await editar("Luz");

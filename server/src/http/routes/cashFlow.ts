@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { Types } from "mongoose";
-import type { SubscriptionDTO } from "@ledgerly/shared";
+import { fixedServiceCadenciaSchema, type SubscriptionDTO } from "@ledgerly/shared";
 import { asyncHandler } from "../errors.js";
 import { loadSubscriptionInputs } from "../loadSubscriptions.js";
 import {
@@ -104,7 +104,7 @@ const toInstallmentTx = (tx: InstallmentRow): InstallmentTxInput => ({
 
 const toFlowService = ({ monto, cadencia, desde, hasta, montoDesde }: FixedServiceRow): CashFlowService => ({
   monto,
-  cadencia: cadencia === "bimestral" ? "bimestral" : "mensual",
+  cadencia: fixedServiceCadenciaSchema.catch("mensual").parse(cadencia),
   desde,
   hasta: hasta ?? null,
   montoDesde: montoDesde ?? desde,

@@ -41,6 +41,11 @@ describe("POST /api/fixed-services", () => {
       .toMatchObject({ cadencia: "bimestral", desde: "2026-11", montoDesde: "2026-10" });
   });
 
+  it("crea un servicio anual", async () => {
+    expect(await created({ nombre: "ABL", monto: 120_000, cadencia: "anual", desde: "2027-01" }))
+      .toMatchObject({ cadencia: "anual", desde: "2027-01", monto: 120_000 });
+  });
+
   it.each([
     ["sin nombre", { nombre: "", monto: 100 }],
     ["con monto 0", { nombre: "Luz", monto: 0 }],

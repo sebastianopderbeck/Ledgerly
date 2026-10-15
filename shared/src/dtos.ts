@@ -474,9 +474,9 @@ export const manualAssetUpdateSchema = z.object({
 
 export const isoMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Mes inválido");
 
-export const fixedServiceCadenciaSchema = z.enum(["mensual", "bimestral"]);
+export const fixedServiceCadenciaSchema = z.enum(["mensual", "bimestral", "anual"]);
 
-export const MESES_SERVICIO: Record<FixedServiceCadencia, number> = { mensual: 1, bimestral: 2 };
+export const MESES_SERVICIO: Record<FixedServiceCadencia, number> = { mensual: 1, bimestral: 2, anual: 12 };
 
 export const fixedServiceDtoSchema = z.object({
   id: z.string(),

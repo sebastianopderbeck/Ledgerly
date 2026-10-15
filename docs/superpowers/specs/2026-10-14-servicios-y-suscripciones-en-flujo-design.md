@@ -24,8 +24,9 @@ Que los egresos del flujo de caja incluyan lo que se paga todos los meses y hoy 
   desde `desde`, también en los cerrados. Es la consecuencia aceptada de no guardar historial.
 - **Baja sin perder el pasado.** Para dejar de pagar un servicio se completa `hasta`: sigue contando
   hasta ese mes. Borrar un servicio lo saca de todos los meses; sirve para corregir un error.
-- **Cadencia mensual o bimestral.** Gas y agua suelen facturarse cada dos meses. Uno bimestral se paga en
-  `desde` y desde ahí cada 2 meses. No hay anual.
+- **Cadencia mensual, bimestral o anual.** Gas y agua suelen facturarse cada dos meses, y el ABL se paga una
+  vez por año. Uno bimestral se paga en `desde` y desde ahí cada 2 meses; uno anual, en `desde` y desde ahí
+  cada 12 meses. En los dos casos el Flujo resta el total en el mes de pago, sin repartirlo.
 - **Solo pesos.** Los servicios se cargan en ARS.
 - **Proyección de servicios con la inflación esperada.** En el mes en curso y en los proyectados, el
   monto crece con la tasa mensual esperada que el flujo ya usa para el sueldo
@@ -58,7 +59,7 @@ En `server/src/db/models.ts`, colección `fixedservices`, con `timestamps: true`
 |---|---|---|
 | `nombre` | string, requerido | 1 a 60 caracteres, sin espacios al borde |
 | `monto` | number, requerido, > 0 | ARS |
-| `cadencia` | `"mensual"` \| `"bimestral"` | default `"mensual"` |
+| `cadencia` | `"mensual"` \| `"bimestral"` \| `"anual"` | default `"mensual"` |
 | `desde` | string `YYYY-MM`, requerido | default: el mes actual |
 | `hasta` | string `YYYY-MM` \| null | default `null` |
 | `montoDesde` | string `YYYY-MM`, requerido | lo pone el server al crear y cada vez que cambia `monto` |
@@ -70,7 +71,7 @@ En `server/src/db/models.ts`, colección `fixedservices`, con `timestamps: true`
 ```ts
 export const isoMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
-export const fixedServiceCadenciaSchema = z.enum(["mensual", "bimestral"]);
+export const fixedServiceCadenciaSchema = z.enum(["mensual", "bimestral", "anual"]);
 
 export const fixedServiceDtoSchema = z.object({
   id: z.string(),
@@ -179,7 +180,7 @@ Un servicio **paga** en el mes `m` si se cumplen las tres:
 
 - `desde ≤ m`;
 - `hasta === null` o `m ≤ hasta`;
-- `monthsBetween(desde, m) % MESES_SERVICIO[cadencia] === 0`, con `MESES_SERVICIO = { mensual: 1, bimestral: 2 }`
+- `monthsBetween(desde, m) % MESES_SERVICIO[cadencia] === 0`, con `MESES_SERVICIO = { mensual: 1, bimestral: 2, anual: 12 }`
   exportado desde `shared/src/dtos.ts`, porque el cliente también lo usa para el equivalente mensual.
 
 El monto en el mes `m`:
@@ -245,7 +246,7 @@ y el DTO suma `servicios`.
 - **Carga y error:** returns tempranos con el encabezado, como en las demás páginas.
 - **Vacío:** «Todavía no cargaste servicios. Agregá la luz, el gas o internet para que se resten en el Flujo.»
   El botón «Agregar servicio» del encabezado sigue visible.
-- **KPI:** «Por mes» (los activos que ya empezaron, con los bimestrales a la mitad), «Por año» (el mensual
+- **KPI:** «Por mes» (los activos que ya empezaron, con los bimestrales y los anuales prorrateados), «Por año» (el mensual
   × 12) y «Activos» (la cantidad de los que ya empezaron). Si hay servicios con «desde» en un mes futuro,
   el subtítulo de «Activos» dice cuántos empiezan más adelante. Son tres porque `KpiGrid` admite 3 o 4
   tarjetas.
@@ -257,9 +258,9 @@ y el DTO suma `servicios`.
   `useManualAssetForm` y `useManualAssetEditor`):
   - Nombre;
   - Monto (pesos, `inputMode="decimal"`);
-  - Cadencia (toggle Mensual / Bimestral);
+  - Cadencia (toggle Mensual / Bimestral / Anual);
   - Desde (`type="month"`, por defecto el mes actual; si es bimestral, con la ayuda «El primer mes en que
-    lo pagás»);
+    lo pagás»; si es anual, «El mes en que lo pagás»);
   - Hasta (`type="month"`, opcional, con la ayuda «Dejá vacío mientras lo sigas pagando»);
   - «Borrar», solo al editar, con la ayuda «Lo saca también de los meses pasados. Para dejar de pagarlo,
     completá Hasta.» Pide confirmación con `ConfirmDialog` («¿Borrar «Luz»? Se saca también de los meses
@@ -348,6 +349,6 @@ y el DTO suma `servicios`.
 ## Fuera de alcance
 
 - Historial de montos de un servicio.
-- Servicios en dólares o con cadencia anual.
+- Servicios en dólares.
 - Alertas de vencimiento de servicios en Vencimientos.
 - Incluir los servicios en el total de la página Suscripciones.
