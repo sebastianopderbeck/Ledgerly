@@ -468,8 +468,13 @@ describe("schemas de servicios", () => {
     expect(fixedServiceDtoSchema.parse(servicio)).toEqual(servicio);
   });
 
-  it("el bimestral se paga cada 2 meses", () => {
-    expect(MESES_SERVICIO).toEqual({ mensual: 1, bimestral: 2 });
+  it("el bimestral se paga cada 2 meses y el anual cada 12", () => {
+    expect(MESES_SERVICIO).toEqual({ mensual: 1, bimestral: 2, anual: 12 });
+  });
+
+  it("el alta acepta un servicio anual", () => {
+    expect(fixedServiceCreateSchema.parse({ nombre: "ABL", monto: 120000, cadencia: "anual", desde: "2027-01" }))
+      .toEqual({ nombre: "ABL", monto: 120000, cadencia: "anual", desde: "2027-01" });
   });
 
   it("un servicio está activo sin hasta o con hasta desde el mes dado", () => {
@@ -489,7 +494,7 @@ describe("schemas de servicios", () => {
     ["con un mes inválido", { nombre: "Gas", monto: 100, desde: "2026-13" }],
     ["con hasta", { nombre: "Gas", monto: 100, hasta: "2026-12" }],
     ["con montoDesde", { nombre: "Gas", monto: 100, montoDesde: "2026-01" }],
-    ["con una cadencia anual", { nombre: "Gas", monto: 100, cadencia: "anual" }],
+    ["con una cadencia trimestral", { nombre: "Gas", monto: 100, cadencia: "trimestral" }],
   ])("el alta rechaza un servicio %s", (_label, body) => {
     expect(fixedServiceCreateSchema.safeParse(body).success).toBe(false);
   });

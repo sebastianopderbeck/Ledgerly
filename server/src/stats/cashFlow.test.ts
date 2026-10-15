@@ -539,6 +539,12 @@ describe("servicePays", () => {
     expect(["2026-08", "2026-09", "2026-11", "2026-12"].map((mes) => servicePays(luz, mes))).toEqual([false, true, true, false]);
   });
 
+  it("un anual paga una vez por año en el mes de desde", () => {
+    const abl = servicio({ cadencia: "anual", desde: "2027-01" });
+    expect(["2026-12", "2027-01", "2027-02", "2027-12", "2028-01"].map((mes) => servicePays(abl, mes)))
+      .toEqual([false, true, false, false, true]);
+  });
+
   it("un bimestral paga cada 2 meses a partir de desde", () => {
     const gas = servicio({ cadencia: "bimestral", desde: "2026-10" });
     expect(["2026-10", "2026-11", "2026-12", "2027-01", "2027-02"].map((mes) => servicePays(gas, mes)))
@@ -610,6 +616,13 @@ describe("buildCashFlow: servicios", () => {
     const flow = buildCashFlow({ ...ejemplo(), services: [servicio({ cadencia: "bimestral", desde: "2026-10", montoDesde: "2026-10" })] });
     expect(["2026-10", "2026-11", "2026-12"].map((mes) => mesDe(flow, mes)?.servicios)).toEqual([30_000, 0, 30_000]);
     expect(mesDe(flow, "2026-11")?.estimados).not.toContain(estimadoServicios(0));
+  });
+
+  it("un anual resta el total solo en su mes, con la inflación desde montoDesde", () => {
+    const abl = servicio({ monto: 120_000, cadencia: "anual", desde: "2027-01", montoDesde: "2026-10" });
+    const flow = buildCashFlow({ ...ejemplo(), services: [abl], inflacion: { publicada: [], esperadaMensual: 0.02 } });
+    expect(["2026-12", "2027-01", "2027-02"].map((mes) => mesDe(flow, mes)?.servicios))
+      .toEqual([0, expect.closeTo(120_000 * 1.02 ** 3, 6), 0]);
   });
 
   it("deja de restar después de hasta", () => {

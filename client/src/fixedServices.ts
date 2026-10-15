@@ -37,9 +37,13 @@ export interface FixedServiceKpis {
 
 export const SERVICE_NAME_MAX_LENGTH = 60;
 
-export const FIXED_SERVICE_CADENCIAS: FixedServiceCadencia[] = ["mensual", "bimestral"];
+export const FIXED_SERVICE_CADENCIAS: FixedServiceCadencia[] = ["mensual", "bimestral", "anual"];
 
-export const CADENCIA_SERVICIO_LABEL: Record<FixedServiceCadencia, string> = { mensual: "Mensual", bimestral: "Bimestral" };
+export const CADENCIA_SERVICIO_LABEL: Record<FixedServiceCadencia, string> = {
+  mensual: "Mensual",
+  bimestral: "Bimestral",
+  anual: "Anual",
+};
 
 export const SERVICE_LIST_LABEL: Record<FixedServiceVariant, string> = {
   activos: "Servicios activos",

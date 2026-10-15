@@ -201,7 +201,7 @@ const fixedServiceSchema = new Schema(
   {
     nombre: { type: String, required: true },
     monto: { type: Number, required: true, min: 0 },
-    cadencia: { type: String, required: true, enum: ["mensual", "bimestral"], default: "mensual" },
+    cadencia: { type: String, required: true, enum: ["mensual", "bimestral", "anual"], default: "mensual" },
     desde: { type: String, required: true },
     hasta: { type: String, default: null },
     montoDesde: { type: String, required: true },

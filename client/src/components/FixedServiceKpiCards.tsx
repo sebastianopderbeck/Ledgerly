@@ -16,7 +16,7 @@ const count = (value: number): string => String(Math.round(value));
 
 export const FixedServiceKpiCards = ({ kpis: { porMes, vigentes, proximos } }: FixedServiceKpiCardsProps) => (
   <KpiGrid cardCount={3}>
-    <Kpi label="Por mes" value={porMes} format={money} sub="los bimestrales, a la mitad" icon={<ElectricalServicesOutlinedIcon />} color="primary" />
+    <Kpi label="Por mes" value={porMes} format={money} sub="bimestrales y anuales, prorrateados" icon={<ElectricalServicesOutlinedIcon />} color="primary" />
     <Kpi label="Por año" value={porMes * 12} format={money} sub="al monto de hoy" icon={<EventRepeatOutlinedIcon />} color="secondary" />
     <Kpi label="Activos" value={vigentes} format={count} sub={activeKpiSub(proximos)} icon={<FormatListBulletedOutlinedIcon />} color="warning" />
   </KpiGrid>

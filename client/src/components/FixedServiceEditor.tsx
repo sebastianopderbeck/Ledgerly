@@ -25,6 +25,7 @@ type FixedServiceFormProps = Omit<FixedServiceEditorProps, "open" | "onClose">;
 const DESDE_HELPER: Record<FixedServiceCadencia, string> = {
   mensual: "El primer mes que se resta en el Flujo",
   bimestral: "El primer mes en que lo pagás",
+  anual: "El mes en que lo pagás",
 };
 const HASTA_HELPER = "Dejá vacío mientras lo sigas pagando";
 const DELETE_HELPER = "Lo saca también de los meses pasados. Para dejar de pagarlo, completá Hasta.";

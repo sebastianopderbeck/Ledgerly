@@ -99,11 +99,16 @@ describe("GET /api/cash-flow", () => {
       nombre: "Luz", monto: 30_000, cadencia: "mensual", desde: "2026-09", hasta: null, montoDesde: "2026-09",
     });
     await FixedServiceModel.collection.insertOne({ nombre: "Gas", monto: 10_000, desde: "2026-10" });
+    await FixedServiceModel.create({
+      nombre: "ABL", monto: 120_000, cadencia: "anual", desde: "2026-12", hasta: null, montoDesde: "2026-10",
+    });
     const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-08")?.servicios).toBe(0);
     expect(mesDe(flow, "2026-09")).toMatchObject({ servicios: 30_000, egresos: 958_000, margen: 142_000 });
     expect(mesDe(flow, "2026-10")?.servicios).toBe(40_000);
     expect(mesDe(flow, "2026-11")?.servicios).toBe(40_000);
+    expect(mesDe(flow, "2026-12")?.servicios).toBe(160_000);
+    expect(mesDe(flow, "2027-01")?.servicios).toBe(40_000);
     expect(mesDe(flow, "2026-11")?.estimados).toContain("Servicios (último monto)");
   });
 

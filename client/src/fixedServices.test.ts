@@ -17,8 +17,9 @@ const draft = (overrides: Partial<FixedServiceDraft> = {}): FixedServiceDraft =>
 });
 
 describe("monthlyEquivalent y monthlyTotal", () => {
-  it("un bimestral cuenta la mitad por mes", () => {
+  it("un bimestral cuenta la mitad por mes y un anual, un doceavo", () => {
     expect(monthlyEquivalent({ monto: 18_000, cadencia: "bimestral" })).toBe(9_000);
+    expect(monthlyEquivalent({ monto: 120_000, cadencia: "anual" })).toBe(10_000);
     expect(monthlyTotal([servicio(), servicio({ id: "f-gas", monto: 18_000, cadencia: "bimestral" })])).toBe(39_000);
   });
 });
