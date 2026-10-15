@@ -12,6 +12,7 @@ import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
 import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
 import TrackChangesOutlinedIcon from "@mui/icons-material/TrackChangesOutlined";
 import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
+import ElectricalServicesOutlinedIcon from "@mui/icons-material/ElectricalServicesOutlined";
 
 export type NavPlacement = "bar" | "more";
 
@@ -44,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: "/flujo", label: "Flujo", icon: SavingsOutlinedIcon, placement: "more" },
       //{ to: "/presupuestos", label: "Presupuestos", icon: TrackChangesOutlinedIcon, placement: "more" },
       { to: "/suscripciones", label: "Suscripciones", icon: AutorenewOutlinedIcon, placement: "more" },
+      { to: "/servicios", label: "Servicios", icon: ElectricalServicesOutlinedIcon, placement: "more" },
       { to: "/transactions", label: "Movimientos", icon: ReceiptLongOutlinedIcon, placement: "bar" },
     ],
   },

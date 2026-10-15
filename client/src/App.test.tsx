@@ -5,6 +5,7 @@ import { App } from "./App.js";
 const NEW_SECTIONS = [
   { path: "/flujo", title: "Flujo de caja" },
   { path: "/suscripciones", title: "Suscripciones" },
+  { path: "/servicios", title: "Servicios" },
   { path: "/patrimonio", title: "Patrimonio" },
   { path: "/presupuestos", title: "Presupuestos" },
   { path: "/vencimientos", title: "Vencimientos" },
