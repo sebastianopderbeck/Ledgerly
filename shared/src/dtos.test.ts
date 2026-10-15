@@ -444,3 +444,53 @@ describe("mailSyncRunDtoSchema", () => {
     expect(() => mailSyncRunDtoSchema.parse({ ...run, source: "yahoo" })).toThrow();
   });
 });
+
+import {
+  MESES_SERVICIO, fixedServiceCreateSchema, fixedServiceDtoSchema, fixedServiceUpdateSchema, isoMonthSchema,
+} from "./dtos.js";
+
+describe("isoMonthSchema", () => {
+  it("acepta un mes YYYY-MM", () => {
+    expect(isoMonthSchema.safeParse("2026-10").success).toBe(true);
+  });
+
+  it.each(["2026-13", "2026-00", "2026-1", "2026-10-01", ""])("rechaza %s", (mes) => {
+    expect(isoMonthSchema.safeParse(mes).success).toBe(false);
+  });
+});
+
+describe("schemas de servicios", () => {
+  const servicio = {
+    id: "f1", nombre: "Luz", monto: 30000, cadencia: "mensual", desde: "2026-10", hasta: null, montoDesde: "2026-10",
+  };
+
+  it("valida un servicio", () => {
+    expect(fixedServiceDtoSchema.parse(servicio)).toEqual(servicio);
+  });
+
+  it("el bimestral se paga cada 2 meses", () => {
+    expect(MESES_SERVICIO).toEqual({ mensual: 1, bimestral: 2 });
+  });
+
+  it("el alta recorta el nombre y acepta cadencia y desde", () => {
+    expect(fixedServiceCreateSchema.parse({ nombre: "  Gas ", monto: 12000, cadencia: "bimestral", desde: "2026-11" }))
+      .toEqual({ nombre: "Gas", monto: 12000, cadencia: "bimestral", desde: "2026-11" });
+  });
+
+  it.each([
+    ["sin nombre", { nombre: " ", monto: 100 }],
+    ["con monto 0", { nombre: "Gas", monto: 0 }],
+    ["con un mes inválido", { nombre: "Gas", monto: 100, desde: "2026-13" }],
+    ["con hasta", { nombre: "Gas", monto: 100, hasta: "2026-12" }],
+    ["con montoDesde", { nombre: "Gas", monto: 100, montoDesde: "2026-01" }],
+    ["con una cadencia anual", { nombre: "Gas", monto: 100, cadencia: "anual" }],
+  ])("el alta rechaza un servicio %s", (_label, body) => {
+    expect(fixedServiceCreateSchema.safeParse(body).success).toBe(false);
+  });
+
+  it("la edición acepta hasta en null y rechaza montoDesde", () => {
+    expect(fixedServiceUpdateSchema.parse({ hasta: null })).toEqual({ hasta: null });
+    expect(fixedServiceUpdateSchema.parse({ hasta: "2026-12", monto: 15000 })).toEqual({ hasta: "2026-12", monto: 15000 });
+    expect(fixedServiceUpdateSchema.safeParse({ montoDesde: "2026-01" }).success).toBe(false);
+  });
+});

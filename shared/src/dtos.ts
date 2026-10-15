@@ -470,6 +470,37 @@ export const manualAssetUpdateSchema = z.object({
   valuacion: assetValuationSchema.optional(),
 }).strict();
 
+export const isoMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Mes inválido");
+
+export const fixedServiceCadenciaSchema = z.enum(["mensual", "bimestral"]);
+
+export const MESES_SERVICIO: Record<FixedServiceCadencia, number> = { mensual: 1, bimestral: 2 };
+
+export const fixedServiceDtoSchema = z.object({
+  id: z.string(),
+  nombre: z.string(),
+  monto: z.number(),
+  cadencia: fixedServiceCadenciaSchema,
+  desde: isoMonthSchema,
+  hasta: isoMonthSchema.nullable(),
+  montoDesde: isoMonthSchema,
+});
+
+export const fixedServiceCreateSchema = z.object({
+  nombre: z.string().trim().min(1).max(60),
+  monto: z.number().positive(),
+  cadencia: fixedServiceCadenciaSchema.optional(),
+  desde: isoMonthSchema.optional(),
+}).strict();
+
+export const fixedServiceUpdateSchema = z.object({
+  nombre: z.string().trim().min(1).max(60).optional(),
+  monto: z.number().positive().optional(),
+  cadencia: fixedServiceCadenciaSchema.optional(),
+  desde: isoMonthSchema.optional(),
+  hasta: isoMonthSchema.nullable().optional(),
+}).strict();
+
 export const netWorthItemDtoSchema = z.object({
   id: z.string(),
   lado: z.enum(["activo", "pasivo"]),
@@ -650,6 +681,10 @@ export type AssetValuationDTO = z.infer<typeof assetValuationSchema>;
 export type ManualAssetDTO = z.infer<typeof manualAssetDtoSchema>;
 export type ManualAssetCreateDTO = z.infer<typeof manualAssetCreateSchema>;
 export type ManualAssetUpdateDTO = z.infer<typeof manualAssetUpdateSchema>;
+export type FixedServiceCadencia = z.infer<typeof fixedServiceCadenciaSchema>;
+export type FixedServiceDTO = z.infer<typeof fixedServiceDtoSchema>;
+export type FixedServiceCreateDTO = z.infer<typeof fixedServiceCreateSchema>;
+export type FixedServiceUpdateDTO = z.infer<typeof fixedServiceUpdateSchema>;
 export type NetWorthItemDTO = z.infer<typeof netWorthItemDtoSchema>;
 export type NetWorthTotals = z.infer<typeof netWorthTotalsSchema>;
 export type NetWorthMonthDTO = z.infer<typeof netWorthMonthDtoSchema>;
