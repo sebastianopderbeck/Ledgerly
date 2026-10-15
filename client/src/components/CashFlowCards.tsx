@@ -34,6 +34,7 @@ const detailsOf = (mes: CashFlowMonthDTO): RecordField[] => [
   { label: "Hipoteca", value: money(mes.hipoteca) },
   { label: "Auto", value: money(mes.auto) },
   { label: "Servicios", value: money(mes.servicios) },
+  { label: "Suscripciones", value: money(mes.suscripciones) },
   { label: "Egresos", value: money(mes.egresos) },
   ...monthNotes(mes).map(({ label, text }) => ({ label, value: text })),
 ];

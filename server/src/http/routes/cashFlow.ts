@@ -14,11 +14,11 @@ import { autoMonthlyGrowth, mortgageMonthlyGrowth } from "../../stats/planGrowth
 import type { RatePoint } from "../../stats/rateOnDate.js";
 import { expectedMonthlyInflation, type MonthlyInflation, type SalaryInflation } from "../../stats/salaryRaise.js";
 import {
-  buildCashFlow, toCashFlowCard,
+  buildCashFlow, subscriptionsByStatement, toCashFlowCard, SIN_SUSCRIPCIONES,
   type CashFlowCard, type CashFlowCoupon, type CashFlowPayslip, type CashFlowService, type CashFlowStatement,
-  type CashFlowSubscription, type InstallmentTxInput,
+  type CashFlowSubscription, type InstallmentTxInput, type StatementSubscriptions,
 } from "../../stats/cashFlow.js";
-import { detectSubscriptions, isCounted } from "../../stats/subscriptions.js";
+import { detectSubscriptionRuns, isCounted, type DetectedSubscription } from "../../stats/subscriptions.js";
 
 interface MoneyPairRow {
   ars: number;
@@ -68,13 +68,17 @@ const toRecency = (statement: StatementRow): StatementRecency<Types.ObjectId> =>
   uploadedAt: uploadedAtOf(statement),
 });
 
-const toFlowStatement = (statement: StatementRow): CashFlowStatement => ({
+const toFlowStatement = (
+  statement: StatementRow,
+  suscripciones: StatementSubscriptions = SIN_SUSCRIPCIONES,
+): CashFlowStatement => ({
   issuer: statement.issuer,
   cardLabel: statement.cardLabel,
   closingDate: isoDayOrNull(statement.closingDate),
   dueDate: isoDayOrNull(statement.dueDate),
   saldoArs: statement.totals?.saldoActual?.ars ?? 0,
   saldoUsd: statement.totals?.saldoActual?.usd ?? 0,
+  ...suscripciones,
   uploadedAt: uploadedAtOf(statement).toISOString(),
 });
 
@@ -112,6 +116,9 @@ const toFlowService = ({ monto, cadencia, desde, hasta, montoDesde }: FixedServi
 
 const toFlowSubscription = ({ issuer, moneda, montoActual, cadencia, proximoCobro }: SubscriptionDTO): CashFlowSubscription =>
   ({ issuer, moneda, monto: montoActual, cadencia, proximoCobro });
+
+const statementSubscriptions = (detected: DetectedSubscription[]): Map<string, StatementSubscriptions> =>
+  subscriptionsByStatement(detected.filter(({ subscription }) => !subscription.oculta).flatMap(({ run }) => run));
 
 const latestCards = (statements: StatementRow[], latestIds: Types.ObjectId[], txs: InstallmentRow[]): CashFlowCard[] => {
   const latest = new Set(latestIds.map(String));
@@ -159,13 +166,13 @@ cashFlowRouter.get("/", asyncHandler(async (_req, res) => {
     statementId: { $in: latestIds }, type: "purchase", isInstallment: true, currency: "ARS",
   }).lean();
   const credit = computeCreditProgress(mortgageCoupons.map(toCouponInput));
-  const subscriptions = detectSubscriptions(subscriptionInputs.txs, { ...subscriptionInputs.ctx, cotizacion: null })
-    .filter(isCounted)
-    .map(toFlowSubscription);
+  const detected = detectSubscriptionRuns(subscriptionInputs.txs, { ...subscriptionInputs.ctx, cotizacion: null });
+  const subscriptions = detected.map(({ subscription }) => subscription).filter(isCounted).map(toFlowSubscription);
+  const porResumen = statementSubscriptions(detected);
   res.json(buildCashFlow({
     today,
     payslips: payslips.map(toFlowPayslip),
-    statements: statements.map(toFlowStatement),
+    statements: statements.map((statement) => toFlowStatement(statement, porResumen.get(String(statement._id)))),
     cards: latestCards(statements, latestIds, installmentTxs),
     mortgage: {
       coupons: mortgageCoupons.map((coupon) => toFlowCoupon(coupon.fechaDebito, coupon.cuotaNro, coupon.totalDebitado)),

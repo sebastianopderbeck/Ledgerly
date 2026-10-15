@@ -310,6 +310,7 @@ export const cashFlowMonthSchema = z.object({
   hipoteca: z.number(),
   auto: z.number(),
   servicios: z.number(),
+  suscripciones: z.number(),
   egresos: z.number(),
   margen: z.number().nullable(),
   tasaAhorro: z.number().nullable(),

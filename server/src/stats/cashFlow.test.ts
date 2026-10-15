@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import type { CashFlowDTO, CashFlowMonthDTO, PayslipTipo } from "@ledgerly/shared";
 import {
   buildCashFlow, incomeByMonth, installmentFloor, projectPlanPayment, projectServiceAmount, servicePays, statementAmountArs,
-  toCashFlowCard, ESTIMADO_SAC, ESTIMADO_SUELDO, FALTA_AUTO, FALTA_COTIZACION, FALTA_HIPOTECA,
-  FALTA_RECIBO, FALTA_SAC, estimadoAuto, estimadoHipoteca, estimadoServicios, estimadoTarjeta,
-  estimadoTarjetaConSuscripciones, faltaResumen, subscriptionPaymentMonths,
+  statementSubscriptionsArs, subscriptionsByStatement, toCashFlowCard, ESTIMADO_SAC, ESTIMADO_SUELDO, ESTIMADO_SUSCRIPCIONES,
+  FALTA_AUTO, FALTA_COTIZACION, FALTA_HIPOTECA, FALTA_RECIBO, FALTA_SAC, estimadoAuto, estimadoHipoteca, estimadoServicios,
+  estimadoTarjeta, faltaResumen, subscriptionPaymentMonths,
   type CashFlowCard, type CashFlowInput, type CashFlowPayslip, type CashFlowPlan, type CashFlowService, type CashFlowStatement,
   type CashFlowSubscription,
 } from "./cashFlow.js";
@@ -16,6 +16,8 @@ const statement = (overrides: Partial<CashFlowStatement> = {}): CashFlowStatemen
   dueDate: "2026-09-14",
   saldoArs: 100_000,
   saldoUsd: 0,
+  suscripcionesArs: 0,
+  suscripcionesUsd: 0,
   uploadedAt: "2026-09-05T10:00:00.000Z",
   ...overrides,
 });
@@ -88,6 +90,42 @@ describe("statementAmountArs", () => {
 
   it("un saldo a favor cuenta 0", () => {
     expect(statementAmountArs({ saldoArs: -5_000, saldoUsd: 0 }, null)).toBe(0);
+  });
+});
+
+describe("subscriptionsByStatement", () => {
+  it("suma los cobros de cada resumen por moneda", () => {
+    const porResumen = subscriptionsByStatement([
+      { statementId: "a", currency: "ARS", amount: 100 },
+      { statementId: "a", currency: "USD", amount: 5 },
+      { statementId: "a", currency: "ARS", amount: 50 },
+      { statementId: "b", currency: "ARS", amount: 10 },
+    ]);
+    expect(Object.fromEntries(porResumen)).toEqual({
+      a: { suscripcionesArs: 150, suscripcionesUsd: 5 },
+      b: { suscripcionesArs: 10, suscripcionesUsd: 0 },
+    });
+  });
+});
+
+describe("statementSubscriptionsArs", () => {
+  const resumen = { saldoArs: 450_000, saldoUsd: 20, suscripcionesArs: 30_000, suscripcionesUsd: 5 };
+
+  it("suma los pesos y los dólares al oficial", () => {
+    expect(statementSubscriptionsArs(resumen, 1_400)).toBe(37_000);
+  });
+
+  it("sin cotización suma solo los pesos", () => {
+    expect(statementSubscriptionsArs(resumen, null)).toBe(30_000);
+  });
+
+  it("en cada moneda no pasa del saldo de esa moneda", () => {
+    expect(statementSubscriptionsArs({ ...resumen, saldoArs: 10_000, saldoUsd: 0 }, 1_400)).toBe(10_000);
+  });
+
+  it("no pasa del monto del resumen", () => {
+    const aFavorEnPesos = { saldoArs: -5_000, saldoUsd: 20, suscripcionesArs: 0, suscripcionesUsd: 20 };
+    expect(statementSubscriptionsArs(aFavorEnPesos, 1_000)).toBe(15_000);
   });
 });
 
@@ -235,6 +273,7 @@ describe("buildCashFlow: meses cerrados", () => {
       hipoteca: 300_000,
       auto: 150_000,
       servicios: 0,
+      suscripciones: 0,
       egresos: 1_028_000,
       margen: 72_000,
       tasaAhorro: 72_000 / 1_100_000,
@@ -687,18 +726,23 @@ describe("subscriptionPaymentMonths", () => {
   });
 });
 
-describe("buildCashFlow: suscripciones", () => {
+describe("buildCashFlow: suscripciones de las tarjetas estimadas", () => {
   const sinSuscripciones = buildCashFlow(ejemplo());
   const tarjetasDe = (flow: CashFlowDTO, mes: string): number => mesDe(flow, mes)?.tarjetas ?? 0;
 
-  it("suma la suscripción a la tarjeta estimada y cambia la nota", () => {
+  it("pasa la suscripción de la tarjeta estimada a su columna y la nota de la tarjeta queda en solo cuotas", () => {
     const flow = buildCashFlow({ ...ejemplo(), subscriptions: [suscripcion()] });
-    expect(tarjetasDe(flow, "2026-11")).toBe(tarjetasDe(sinSuscripciones, "2026-11") + 5_000);
+    expect(tarjetasDe(flow, "2026-11")).toBe(tarjetasDe(sinSuscripciones, "2026-11"));
+    expect(mesDe(flow, "2026-11")?.suscripciones).toBe(5_000);
     expect(mesDe(flow, "2026-11")?.egresos).toBe((mesDe(sinSuscripciones, "2026-11")?.egresos ?? 0) + 5_000);
-    expect(mesDe(flow, "2026-11")?.estimados).toContain(estimadoTarjetaConSuscripciones("Visa Signature"));
-    expect(mesDe(flow, "2026-11")?.estimados).not.toContain(estimadoTarjeta("Visa Signature"));
-    expect(mesDe(flow, "2026-11")?.estimados).toContain(estimadoTarjeta("ICBC"));
-    expect(estimadoTarjetaConSuscripciones("Visa Signature")).toBe("Visa Signature (cuotas y suscripciones)");
+    expect(mesDe(flow, "2026-11")?.estimados).toContain(estimadoTarjeta("Visa Signature"));
+    expect(mesDe(flow, "2026-11")?.estimados).toContain(ESTIMADO_SUSCRIPCIONES);
+    expect(ESTIMADO_SUSCRIPCIONES).toBe("Suscripciones (último cobro)");
+  });
+
+  it("sin suscripciones la columna queda en 0 y no hay nota", () => {
+    expect(mesDe(sinSuscripciones, "2026-11")?.suscripciones).toBe(0);
+    expect(mesDe(sinSuscripciones, "2026-11")?.estimados).not.toContain(ESTIMADO_SUSCRIPCIONES);
   });
 
   it("no toca el mes que ya tiene el resumen real de esa tarjeta", () => {
@@ -706,10 +750,11 @@ describe("buildCashFlow: suscripciones", () => {
     expect(mesDe(flow, "2026-10")).toEqual(mesDe(sinSuscripciones, "2026-10"));
   });
 
-  it("en el mes en curso suma a la tarjeta que todavía no tiene resumen", () => {
+  it("en el mes en curso suma la de la tarjeta que todavía no tiene resumen", () => {
     const flow = buildCashFlow({ ...ejemplo(), subscriptions: [suscripcion({ issuer: "icbc", proximoCobro: "2026-09-12" })] });
-    expect(tarjetasDe(flow, "2026-10")).toBe(tarjetasDe(sinSuscripciones, "2026-10") + 5_000);
-    expect(mesDe(flow, "2026-10")?.estimados).toContain(estimadoTarjetaConSuscripciones("ICBC"));
+    expect(mesDe(flow, "2026-10")?.suscripciones).toBe(5_000);
+    expect(tarjetasDe(flow, "2026-10")).toBe(tarjetasDe(sinSuscripciones, "2026-10"));
+    expect(mesDe(flow, "2026-10")?.estimados).toContain(ESTIMADO_SUSCRIPCIONES);
   });
 
   it("no suma una suscripción a la tarjeta de otro emisor ni a un emisor sin tarjeta", () => {
@@ -724,7 +769,7 @@ describe("buildCashFlow: suscripciones", () => {
 
   it("pasa los dólares a pesos con la cotización de hoy", () => {
     const flow = buildCashFlow({ ...ejemplo(), subscriptions: [suscripcion({ moneda: "USD", monto: 10 })] });
-    expect(tarjetasDe(flow, "2026-11")).toBe(tarjetasDe(sinSuscripciones, "2026-11") + 10 * 1_450);
+    expect(mesDe(flow, "2026-11")?.suscripciones).toBe(10 * 1_450);
   });
 
   it("sin cotización no suma los dólares y lista el faltante una sola vez", () => {
@@ -733,7 +778,42 @@ describe("buildCashFlow: suscripciones", () => {
       ...base,
       subscriptions: [suscripcion({ moneda: "USD", monto: 10 }), suscripcion({ moneda: "USD", monto: 7 }), suscripcion()],
     });
-    expect(tarjetasDe(flow, "2026-11")).toBe(tarjetasDe(buildCashFlow(base), "2026-11") + 5_000);
+    expect(mesDe(flow, "2026-11")?.suscripciones).toBe(5_000);
+    expect(tarjetasDe(flow, "2026-11")).toBe(tarjetasDe(buildCashFlow(base), "2026-11"));
     expect(mesDe(flow, "2026-11")?.faltantes).toEqual([FALTA_COTIZACION]);
+  });
+});
+
+describe("buildCashFlow: suscripciones de los resúmenes", () => {
+  const conSuscripciones = (closingDate: string, suscripcionesArs: number, suscripcionesUsd = 0): CashFlowInput => {
+    const base = ejemplo();
+    return {
+      ...base,
+      statements: base.statements.map((item) => (
+        item.issuer === "visa_signature" && item.closingDate === closingDate ? { ...item, suscripcionesArs, suscripcionesUsd } : item
+      )),
+    };
+  };
+  const sinSuscripciones = buildCashFlow(ejemplo());
+
+  it("en un mes cerrado las separa de Tarjetas, con los dólares al oficial del vencimiento, y los egresos no cambian", () => {
+    const flow = buildCashFlow(conSuscripciones("2026-09-03", 8_000, 5));
+    expect(mesDe(flow, "2026-09")).toMatchObject({
+      estado: "completo", tarjetas: 563_000, suscripciones: 8_000 + 5 * 1_400, egresos: 1_028_000, margen: 72_000,
+    });
+  });
+
+  it("sin cotización separa solo los pesos", () => {
+    const flow = buildCashFlow({ ...conSuscripciones("2026-09-03", 8_000, 5), usdRates: [] });
+    expect(mesDe(flow, "2026-09")).toMatchObject({ tarjetas: 542_000, suscripciones: 8_000, egresos: 1_000_000 });
+  });
+
+  it("en el mes en curso separa las del resumen ya emitido sin agregar la nota de estimado", () => {
+    const flow = buildCashFlow(conSuscripciones("2026-10-02", 6_000));
+    const antes = mesDe(sinSuscripciones, "2026-10");
+    expect(mesDe(flow, "2026-10")).toMatchObject({
+      tarjetas: (antes?.tarjetas ?? 0) - 6_000, suscripciones: 6_000, egresos: antes?.egresos,
+    });
+    expect(mesDe(flow, "2026-10")?.estimados).not.toContain(ESTIMADO_SUSCRIPCIONES);
   });
 });

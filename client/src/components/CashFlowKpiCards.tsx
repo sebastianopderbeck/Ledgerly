@@ -50,7 +50,7 @@ export const CashFlowKpiCards = ({ meses }: CashFlowKpiCardsProps) => {
       <Box sx={{ mt: 1.5 }}>
         <KpiGrid>
           <Kpi label="Ingreso" value={completo.ingreso ?? 0} format={money} sub={ingresoSub} icon={<PaymentsIcon />} color="primary" />
-          <Kpi label="Egresos conocidos" value={completo.egresos} format={money} sub="tarjetas, hipoteca, auto y servicios" icon={<ReceiptLongIcon />} color="warning" />
+          <Kpi label="Egresos conocidos" value={completo.egresos} format={money} sub="tarjetas, hipoteca, auto, servicios y suscripciones" icon={<ReceiptLongIcon />} color="warning" />
           <Kpi label="Margen libre" value={margen} format={money} sub="lo que quedó del mes" icon={<SavingsIcon />} color={margenColor} />
           <Kpi label="Tasa de ahorro" value={(completo.tasaAhorro ?? 0) * 100} format={formatPercent} sub={promedio} icon={<PercentIcon />} color="secondary" />
         </KpiGrid>

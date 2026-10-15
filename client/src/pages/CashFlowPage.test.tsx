@@ -15,6 +15,7 @@ const base: CashFlowMonthDTO = {
   hipoteca: 300_000,
   auto: 100_000,
   servicios: 0,
+  suscripciones: 0,
   egresos: 900_000,
   margen: 100_000,
   tasaAhorro: 0.1,
@@ -68,9 +69,11 @@ describe("CashFlowPage", () => {
     expect(screen.getByText("Ingreso, egresos y margen por mes")).toBeInTheDocument();
     expect(screen.getByText("Próximos 2 meses (estimado)")).toBeInTheDocument();
     expect(screen.getByText(/más los aumentos de enero, mayo y septiembre por el IPC de los 4 meses anteriores/)).toBeInTheDocument();
-    expect(screen.getByText("Lo que entra por sueldo menos lo que sale sí o sí: tarjetas, hipoteca, auto y servicios.")).toBeInTheDocument();
-    expect(screen.getByText("tarjetas, hipoteca, auto y servicios")).toBeInTheDocument();
-    expect(screen.getByText(/después, las cuotas que ya compraste y tus suscripciones/)).toBeInTheDocument();
+    expect(screen.getByText("Lo que entra por sueldo menos lo que sale sí o sí: tarjetas, hipoteca, auto, servicios y suscripciones."))
+      .toBeInTheDocument();
+    expect(screen.getByText("tarjetas, hipoteca, auto, servicios y suscripciones")).toBeInTheDocument();
+    expect(screen.getByText(/después, las cuotas que ya compraste; suscripciones con el último cobro de cada una, en el mes en que vence su resumen;/))
+      .toBeInTheDocument();
     expect(screen.getByText(/servicios con el último monto más la inflación esperada del REM/)).toBeInTheDocument();
     expect(screen.getByText(/gastos que no cargaste en Servicios\./)).toBeInTheDocument();
     expect(screen.getByText(/Los meses incompletos se ven atenuados y sin margen: Sep 2026/)).toBeInTheDocument();
