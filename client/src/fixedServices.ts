@@ -75,6 +75,8 @@ export function fixedServiceDraftFrom(service: FixedServiceDTO | null, mesActual
 
 const isValidName = (nombre: string): boolean => nombre !== "" && nombre.length <= SERVICE_NAME_MAX_LENGTH;
 
+const toCents = (value: number): number => Math.round(value * 100) / 100;
+
 const isMonth = (mes: string): boolean => isoMonthSchema.safeParse(mes).success;
 
 const isValidRange = ({ desde, hasta }: FixedServiceDraft): boolean =>
@@ -84,7 +86,7 @@ const updateBody = (draft: FixedServiceDraft, service: FixedServiceDTO, nombre: 
   const hasta = draft.hasta === "" ? null : draft.hasta;
   return {
     ...(nombre !== service.nombre ? { nombre } : {}),
-    ...(monto !== service.monto ? { monto } : {}),
+    ...(monto !== toCents(service.monto) ? { monto } : {}),
     ...(draft.cadencia !== service.cadencia ? { cadencia: draft.cadencia } : {}),
     ...(draft.desde !== service.desde ? { desde: draft.desde } : {}),
     ...(hasta !== service.hasta ? { hasta } : {}),
@@ -93,7 +95,8 @@ const updateBody = (draft: FixedServiceDraft, service: FixedServiceDTO, nombre: 
 
 export function fixedServiceRequest(draft: FixedServiceDraft, service: FixedServiceDTO | null): FixedServiceRequest | null {
   const nombre = draft.nombre.trim();
-  const monto = parseMoneyInput(draft.monto);
+  const parsed = parseMoneyInput(draft.monto);
+  const monto = parsed === null ? null : toCents(parsed);
   if (!isValidName(nombre) || monto === null || monto <= 0 || !isValidRange(draft)) return null;
   if (!service) return { kind: "create", body: { nombre, monto, cadencia: draft.cadencia, desde: draft.desde } };
   const body = updateBody(draft, service, nombre, monto);

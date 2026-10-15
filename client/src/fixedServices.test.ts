@@ -65,6 +65,16 @@ describe("fixedServiceRequest", () => {
     expect(fixedServiceRequest(draft({ monto: "12.345,50" }), null)).toMatchObject({ body: { monto: 12_345.5 } });
   });
 
+  it("redondea el monto a centavos", () => {
+    expect(fixedServiceRequest(draft({ monto: "1.234,567" }), null)).toMatchObject({ body: { monto: 1_234.57 } });
+  });
+
+  it("editar solo el nombre de un monto con más de dos decimales no manda el monto", () => {
+    const viejo = servicio({ monto: 1_234.567 });
+    expect(fixedServiceRequest({ ...fixedServiceDraftFrom(viejo, MES), nombre: "Electricidad" }, viejo))
+      .toEqual({ kind: "update", id: "f-luz", body: { nombre: "Electricidad" } });
+  });
+
   it.each([
     ["sin nombre", { nombre: "  " }],
     ["sin monto", { monto: "" }],
