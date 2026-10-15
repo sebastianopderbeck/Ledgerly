@@ -5,6 +5,7 @@ import {
   addMonthsClamped,
   CATEGORIA_SUSCRIPCIONES,
   detectSubscriptions,
+  isCounted,
   latestClosingByIssuer,
   monthlyRuns,
   priceIncrease,
@@ -319,6 +320,7 @@ describe("detectSubscriptions", () => {
       busqueda: "STREAMFLIX",
       categoria: "Entretenimiento",
       cardLabel: "Visa Signature",
+      issuer: "visa_signature",
       moneda: "ARS",
       montoActual: 5490,
       montoMensualArs: 5490,
@@ -855,6 +857,7 @@ describe("summarizeSubscriptions", () => {
     busqueda: "K",
     categoria: "Suscripciones",
     cardLabel: "ICBC",
+    issuer: "icbc",
     moneda: "ARS",
     montoActual: 0,
     montoMensualArs: 0,
@@ -898,5 +901,11 @@ describe("summarizeSubscriptions", () => {
 
   it("sin suscripciones da totales en cero", () => {
     expect(summarizeSubscriptions([])).toEqual({ totalMensualArs: 0, totalMensualUsd: 0, totalAnualArs: 0 });
+  });
+
+  it("isCounted cuenta solo las activas que no están ocultas", () => {
+    expect(isCounted({ estado: "activa", oculta: false })).toBe(true);
+    expect(isCounted({ estado: "activa", oculta: true })).toBe(false);
+    expect(isCounted({ estado: "cortada", oculta: false })).toBe(false);
   });
 });

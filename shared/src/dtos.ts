@@ -335,6 +335,7 @@ export const subscriptionDtoSchema = z.object({
   busqueda: z.string(),
   categoria: z.string(),
   cardLabel: z.string(),
+  issuer: issuerSchema,
   moneda: currencySchema,
   montoActual: z.number(),
   montoMensualArs: z.number().nullable(),

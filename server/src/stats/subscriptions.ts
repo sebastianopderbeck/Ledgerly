@@ -334,6 +334,7 @@ const subscriptionOf = (
     busqueda: merchantSearchTerm(run.map(({ merchant }) => merchant).reverse()),
     categoria: last.category,
     cardLabel: last.cardLabel,
+    issuer: last.issuer,
     moneda: last.currency,
     montoActual: last.amount,
     montoMensualArs: monthlyArs(last, meses, ctx.cotizacion),
@@ -384,8 +385,11 @@ export function detectSubscriptions(txs: SubscriptionTx[], ctx: SubscriptionCont
 
 const monthlyUsd = ({ montoActual, cadencia }: SubscriptionDTO): number => montoActual / MESES_CADENCIA[cadencia];
 
+export const isCounted = ({ estado, oculta }: Pick<SubscriptionDTO, "estado" | "oculta">): boolean =>
+  estado === "activa" && !oculta;
+
 export function summarizeSubscriptions(items: SubscriptionDTO[]): SubscriptionTotals {
-  const counted = items.filter(({ estado, oculta }) => estado === "activa" && !oculta);
+  const counted = items.filter(isCounted);
   const totalMensualArs = roundCents(sum(counted.map(({ montoMensualArs }) => montoMensualArs ?? 0)));
   const totalMensualUsd = roundCents(sum(counted.filter(({ moneda }) => moneda === "USD").map(monthlyUsd)));
   return { totalMensualArs, totalMensualUsd, totalAnualArs: roundCents(totalMensualArs * 12) };

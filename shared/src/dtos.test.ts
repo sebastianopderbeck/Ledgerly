@@ -174,7 +174,7 @@ describe("cashFlowDtoSchema", () => {
 
 const subscription = {
   key: "MUSICAPP", nombre: "MUSICAPP", busqueda: "MUSICAPP", categoria: "Suscripciones", cardLabel: "ICBC",
-  moneda: "ARS", montoActual: 5490, montoMensualArs: 5490,
+  issuer: "icbc", moneda: "ARS", montoActual: 5490, montoMensualArs: 5490,
   primerCobro: "2026-03-12", ultimoCobro: "2026-08-12", proximoCobro: "2026-09-12",
   cobros: 6, estado: "activa", oculta: false,
   aumento: { variacion: 0.1002, desde: "2026-03", montoAnterior: 4990 }, monedaAnterior: null,

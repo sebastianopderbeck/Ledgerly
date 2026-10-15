@@ -9,13 +9,13 @@ import { SubscriptionsPage } from "./SubscriptionsPage.js";
 
 const streamflix: SubscriptionDTO = {
   key: "STREAMFLIX COM", nombre: "STREAMFLIX.COM", busqueda: "STREAMFLIX", categoria: "Suscripciones",
-  cardLabel: "Visa Signature", moneda: "USD", montoActual: 12.99, montoMensualArs: 19030.35,
+  cardLabel: "Visa Signature", issuer: "visa_signature", moneda: "USD", montoActual: 12.99, montoMensualArs: 19030.35,
   primerCobro: "2026-01-09", ultimoCobro: "2026-08-09", proximoCobro: "2026-09-09", cobros: 8,
   estado: "activa", oculta: false, aumento: null, monedaAnterior: "ARS", cadencia: "mensual",
 };
 
 const musicapp: SubscriptionDTO = {
-  ...streamflix, key: "MUSICAPP", nombre: "MUSICAPP", busqueda: "MUSICAPP", cardLabel: "ICBC", moneda: "ARS",
+  ...streamflix, key: "MUSICAPP", nombre: "MUSICAPP", busqueda: "MUSICAPP", cardLabel: "ICBC", issuer: "icbc", moneda: "ARS",
   montoActual: 5490, montoMensualArs: 5490, primerCobro: "2026-03-12", ultimoCobro: "2026-08-12",
   proximoCobro: "2026-09-12", cobros: 6, aumento: { variacion: 0.1002, desde: "2026-03", montoAnterior: 4990 },
   monedaAnterior: null,

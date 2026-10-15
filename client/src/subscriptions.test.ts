@@ -28,6 +28,7 @@ const item = (overrides: Partial<SubscriptionDTO>): SubscriptionDTO => ({
   busqueda: "MUSICAPP",
   categoria: "Suscripciones",
   cardLabel: "ICBC",
+  issuer: "icbc",
   moneda: "ARS",
   montoActual: 5490,
   montoMensualArs: 5490,
