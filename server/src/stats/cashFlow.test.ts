@@ -572,10 +572,16 @@ describe("buildCashFlow: servicios", () => {
     });
   });
 
-  it("en un mes cerrado incompleto suma los servicios sin agregar faltantes", () => {
-    const base = ejemplo();
-    const flow = buildCashFlow({ ...base, payslips: [payslip("2026-08-31", 1_050_000)], services: [servicio()] });
-    expect(mesDe(flow, "2026-09")).toMatchObject({ estado: "incompleto", servicios: 30_000, faltantes: [FALTA_RECIBO] });
+  it("en un mes cerrado incompleto suma los servicios a los egresos sin agregar faltantes", () => {
+    const payslips = [payslip("2026-08-31", 1_050_000)];
+    const sinServiciosIncompleto = mesDe(buildCashFlow({ ...ejemplo(), payslips }), "2026-09");
+    const flow = buildCashFlow({ ...ejemplo(), payslips, services: [servicio()] });
+    expect(mesDe(flow, "2026-09")).toMatchObject({
+      estado: "incompleto",
+      servicios: 30_000,
+      egresos: (sinServiciosIncompleto?.egresos ?? 0) + 30_000,
+      faltantes: [FALTA_RECIBO],
+    });
   });
 
   it("en los proyectados suma la inflación esperada desde montoDesde y lo anota", () => {
