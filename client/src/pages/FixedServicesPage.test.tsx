@@ -79,6 +79,14 @@ describe("FixedServicesPage", () => {
     expect(screen.getByText("Por año")).toBeInTheDocument();
   });
 
+  it("un servicio que empieza más adelante no cuenta en los KPIs y se avisa", async () => {
+    const internet: FixedServiceDTO = { ...luz, id: "f-internet", nombre: "Internet", desde: "2026-12", montoDesde: "2026-10" };
+    listReply = { status: 200, body: [luz, gas, internet] };
+    renderPage();
+    expect(await screen.findByText("1 empieza más adelante")).toBeInTheDocument();
+    expect(within(screen.getByRole("table", { name: "Servicios activos" })).getByRole("row", { name: /Internet/ })).toBeInTheDocument();
+  });
+
   it("sin servicios muestra el estado vacío y deja agregar uno", async () => {
     listReply = { status: 200, body: [] };
     renderPage();

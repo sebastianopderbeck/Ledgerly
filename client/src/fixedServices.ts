@@ -29,6 +29,12 @@ export interface FixedServiceSections {
   deBaja: FixedServiceDTO[];
 }
 
+export interface FixedServiceKpis {
+  porMes: number;
+  vigentes: number;
+  proximos: number;
+}
+
 export const SERVICE_NAME_MAX_LENGTH = 60;
 
 export const FIXED_SERVICE_CADENCIAS: FixedServiceCadencia[] = ["mensual", "bimestral"];
@@ -55,6 +61,16 @@ export const fixedServiceSections = (services: FixedServiceDTO[], mesActual: str
   activos: services.filter((service) => isActiveFixedService(service, mesActual)),
   deBaja: services.filter((service) => !isActiveFixedService(service, mesActual)),
 });
+
+export const fixedServiceKpis = (activos: FixedServiceDTO[], mesActual: string): FixedServiceKpis => {
+  const vigentes = activos.filter((service) => service.desde <= mesActual);
+  return { porMes: monthlyTotal(vigentes), vigentes: vigentes.length, proximos: activos.length - vigentes.length };
+};
+
+export const activeKpiSub = (proximos: number): string => {
+  if (proximos === 0) return "se restan en el Flujo";
+  return `${proximos} ${proximos === 1 ? "empieza" : "empiezan"} más adelante`;
+};
 
 export const serviceMonth = (variant: FixedServiceVariant, { desde, hasta }: Pick<FixedServiceDTO, "desde" | "hasta">): string =>
   (variant === "deBaja" && hasta !== null ? hasta : desde);

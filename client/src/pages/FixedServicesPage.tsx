@@ -11,7 +11,7 @@ import { FixedServiceKpiCards } from "../components/FixedServiceKpiCards.js";
 import { FixedServicesTable } from "../components/FixedServicesTable.js";
 import { useFixedServiceEditor } from "../components/useFixedServiceEditor.js";
 import { tapTargetSx } from "../components/tapTarget.js";
-import { fixedServiceSections } from "../fixedServices.js";
+import { fixedServiceKpis, fixedServiceSections } from "../fixedServices.js";
 import { monthOf, todayIso } from "../isoDate.js";
 import { useIsMobile } from "../useIsMobile.js";
 
@@ -56,6 +56,7 @@ const FixedServicesHeader = ({ onAdd }: FixedServicesHeaderProps) => (
 const FixedServicesContent = ({ services, isLoading, isError, mesActual, onEdit }: FixedServicesContentProps) => {
   const isMobile = useIsMobile();
   const { activos, deBaja } = useMemo(() => fixedServiceSections(services, mesActual), [services, mesActual]);
+  const kpis = useMemo(() => fixedServiceKpis(activos, mesActual), [activos, mesActual]);
 
   if (isLoading) return <CircularProgress />;
   if (isError) return <Typography color="error">{ERROR}</Typography>;
@@ -74,7 +75,7 @@ const FixedServicesContent = ({ services, isLoading, isError, mesActual, onEdit 
 
   return (
     <>
-      <FixedServiceKpiCards activos={activos} />
+      <FixedServiceKpiCards kpis={kpis} />
       <Typography variant="h6" sx={{ mb: 1 }}>Activos</Typography>
       {activeList}
       {stoppedSection}

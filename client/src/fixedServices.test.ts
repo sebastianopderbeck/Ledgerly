@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import type { FixedServiceDTO } from "@ledgerly/shared";
 import {
-  fixedServiceDraftFrom, fixedServiceRequest, fixedServiceSections, monthlyEquivalent, monthlyTotal,
-  serviceMonth, type FixedServiceDraft,
+  activeKpiSub, fixedServiceDraftFrom, fixedServiceKpis, fixedServiceRequest, fixedServiceSections, monthlyEquivalent,
+  monthlyTotal, serviceMonth, type FixedServiceDraft,
 } from "./fixedServices.js";
 
 const MES = "2026-10";
@@ -27,6 +27,20 @@ describe("fixedServiceSections", () => {
   it("separa activos y dados de baja", () => {
     const cable = servicio({ id: "f-cable", nombre: "Cable", hasta: "2026-08" });
     expect(fixedServiceSections([servicio(), cable], MES)).toEqual({ activos: [servicio()], deBaja: [cable] });
+  });
+});
+
+describe("fixedServiceKpis y activeKpiSub", () => {
+  it("los KPIs cuentan solo los servicios que ya empezaron y separan los que empiezan más adelante", () => {
+    const gas = servicio({ id: "f-gas", monto: 18_000, cadencia: "bimestral", desde: MES });
+    const internet = servicio({ id: "f-internet", monto: 25_000, desde: "2026-12" });
+    expect(fixedServiceKpis([servicio(), gas, internet], MES)).toEqual({ porMes: 39_000, vigentes: 2, proximos: 1 });
+  });
+
+  it("el subtítulo de Activos avisa cuántos empiezan más adelante", () => {
+    expect(activeKpiSub(0)).toBe("se restan en el Flujo");
+    expect(activeKpiSub(1)).toBe("1 empieza más adelante");
+    expect(activeKpiSub(2)).toBe("2 empiezan más adelante");
   });
 });
 

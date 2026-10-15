@@ -245,8 +245,10 @@ y el DTO suma `servicios`.
 - **Carga y error:** returns tempranos con el encabezado, como en las demás páginas.
 - **Vacío:** «Todavía no cargaste servicios. Agregá la luz, el gas o internet para que se resten en el Flujo.»
   El botón «Agregar servicio» del encabezado sigue visible.
-- **KPI:** «Por mes» (los activos, con los bimestrales a la mitad), «Por año» (el mensual × 12) y
-  «Activos» (la cantidad). Son tres porque `KpiGrid` admite 3 o 4 tarjetas.
+- **KPI:** «Por mes» (los activos que ya empezaron, con los bimestrales a la mitad), «Por año» (el mensual
+  × 12) y «Activos» (la cantidad de los que ya empezaron). Si hay servicios con «desde» en un mes futuro,
+  el subtítulo de «Activos» dice cuántos empiezan más adelante. Son tres porque `KpiGrid` admite 3 o 4
+  tarjetas.
 - **Activos:** tabla en escritorio y tarjetas (`RecordCard`) en el celular, como Suscripciones. Columnas:
   Nombre, Monto, Cadencia, Desde, Por mes. Tocar una fila abre el editor.
 - **Dados de baja:** sección aparte, atenuada, con «Hasta» en lugar de «Desde».
