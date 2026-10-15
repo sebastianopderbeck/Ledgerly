@@ -36,7 +36,7 @@ Que los egresos del flujo de caja incluyan lo que se paga todos los meses y hoy 
   resumen, así que en los meses estimados se suman al piso de la tarjeta y no a una columna propia. La
   nota de la tarjeta pasa de «(solo cuotas)» a «(cuotas y suscripciones)».
 - **Qué suscripciones entran.** Las activas y no ocultas: la misma regla que `summarizeSubscriptions`
-  usa para el total de la página Suscripciones. Las ocultas no entran, así un cobro que ya cuenta en
+  usa para el total de la página Suscripciones. Se extrae a `isCounted` y la usan los dos. Las ocultas no entran, así un cobro que ya cuenta en
   Hipoteca o Auto no se duplica.
 - **Las suscripciones no se indexan.** Van con el monto del último cobro, como las cuotas. El precio ya
   se conoce, y si sube, el próximo resumen lo trae.
@@ -179,7 +179,8 @@ Un servicio **paga** en el mes `m` si se cumplen las tres:
 
 - `desde ≤ m`;
 - `hasta === null` o `m ≤ hasta`;
-- `monthsBetween(desde, m) % MESES_SERVICIO[cadencia] === 0`, con `MESES_SERVICIO = { mensual: 1, bimestral: 2 }`.
+- `monthsBetween(desde, m) % MESES_SERVICIO[cadencia] === 0`, con `MESES_SERVICIO = { mensual: 1, bimestral: 2 }`
+  exportado desde `shared/src/dtos.ts`, porque el cliente también lo usa para el equivalente mensual.
 
 El monto en el mes `m`:
 
@@ -239,8 +240,10 @@ y el DTO suma `servicios`.
 - **Encabezado** (en todos los estados): título «Servicios» y la bajada «Lo que pagás fuera de la
   tarjeta (luz, gas, agua, internet, expensas). Se restan en el Flujo desde el mes que elijas.»
 - **Carga y error:** returns tempranos con el encabezado, como en las demás páginas.
-- **Vacío:** «Todavía no cargaste servicios.» y el botón «Agregar servicio».
-- **KPI:** «Total por mes» (los activos, con los bimestrales a la mitad) y «Activos» (la cantidad).
+- **Vacío:** «Todavía no cargaste servicios. Agregá la luz, el gas o internet para que se resten en el Flujo.»
+  El botón «Agregar servicio» del encabezado sigue visible.
+- **KPI:** «Por mes» (los activos, con los bimestrales a la mitad), «Por año» (el mensual × 12) y
+  «Activos» (la cantidad). Son tres porque `KpiGrid` admite 3 o 4 tarjetas.
 - **Activos:** tabla en escritorio y tarjetas (`RecordCard`) en el celular, como Suscripciones. Columnas:
   Nombre, Monto, Cadencia, Desde, Por mes. Tocar una fila abre el editor.
 - **Dados de baja:** sección aparte, atenuada, con «Hasta» en lugar de «Desde».
@@ -254,7 +257,8 @@ y el DTO suma `servicios`.
     lo pagás»);
   - Hasta (`type="month"`, opcional, con la ayuda «Dejá vacío mientras lo sigas pagando»);
   - «Borrar», solo al editar, con la ayuda «Lo saca también de los meses pasados. Para dejar de pagarlo,
-    completá Hasta.»;
+    completá Hasta.» Pide confirmación con `ConfirmDialog` («¿Borrar «Luz»? Se saca también de los meses
+    pasados del Flujo.»), como Patrimonio;
   - el error del server en un `Alert`.
 - **Hooks** (`client/src/api/hooks.ts`): `useFixedServices` (queryKey `["fixed-services"]`),
   `useCreateFixedService`, `useUpdateFixedService` y `useDeleteFixedService`. Las mutaciones invalidan
