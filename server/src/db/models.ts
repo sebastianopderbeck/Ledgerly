@@ -197,6 +197,18 @@ const manualAssetSchema = new Schema(
   { timestamps: true },
 );
 
+const fixedServiceSchema = new Schema(
+  {
+    nombre: { type: String, required: true },
+    monto: { type: Number, required: true, min: 0 },
+    cadencia: { type: String, required: true, enum: ["mensual", "bimestral"], default: "mensual" },
+    desde: { type: String, required: true },
+    hasta: { type: String, default: null },
+    montoDesde: { type: String, required: true },
+  },
+  { timestamps: true },
+);
+
 const budgetSchema = new Schema({
   category: { type: String, required: true, unique: true },
   topeArs: { type: Number, required: true },
@@ -243,6 +255,7 @@ export type HiddenSubscriptionDoc = InferSchemaType<typeof hiddenSubscriptionSch
 export type ManualSubscriptionDoc = InferSchemaType<typeof manualSubscriptionSchema>;
 export type SubscriptionCadenceDoc = InferSchemaType<typeof subscriptionCadenceSchema>;
 export type ManualAssetDoc = InferSchemaType<typeof manualAssetSchema>;
+export type FixedServiceDoc = InferSchemaType<typeof fixedServiceSchema>;
 export type BudgetDoc = InferSchemaType<typeof budgetSchema>;
 export type MailSyncRunDoc = InferSchemaType<typeof mailSyncRunSchema>;
 export type MailAttachmentDoc = InferSchemaType<typeof mailAttachmentSchema>;
@@ -272,6 +285,8 @@ export const SubscriptionCadenceModel: Model<SubscriptionCadenceDoc> =
   ?? mongoose.model("SubscriptionCadence", subscriptionCadenceSchema, "annualsubscriptions");
 export const ManualAssetModel: Model<ManualAssetDoc> =
   mongoose.models.ManualAsset ?? mongoose.model("ManualAsset", manualAssetSchema);
+export const FixedServiceModel: Model<FixedServiceDoc> =
+  mongoose.models.FixedService ?? mongoose.model("FixedService", fixedServiceSchema);
 export const BudgetModel: Model<BudgetDoc> =
   mongoose.models.Budget ?? mongoose.model("Budget", budgetSchema);
 export const MailSyncRunModel: Model<MailSyncRunDoc> =

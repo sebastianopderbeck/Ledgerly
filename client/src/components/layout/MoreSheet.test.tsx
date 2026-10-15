@@ -16,11 +16,11 @@ describe("MoreSheet", () => {
     expect(screen.getByRole("dialog", { name: "Más secciones" })).toBeInTheDocument();
   });
 
-  it("lista Sueldo, Vencimientos, Flujo, Suscripciones, Auto, Créditos, Patrimonio, Contexto y Reglas", () => {
+  it("lista Sueldo, Vencimientos, Flujo, Suscripciones, Servicios, Auto, Créditos, Patrimonio, Contexto y Reglas", () => {
     renderWithProviders(<MoreSheet open onClose={noop} />);
     const names = within(sheetNav()).getAllByRole("link").map((link) => link.textContent);
     expect(names).toEqual([
-      "Sueldo", "Vencimientos", "Flujo", "Suscripciones", "Auto", "Créditos", "Patrimonio", "Contexto", "Reglas",
+      "Sueldo", "Vencimientos", "Flujo", "Suscripciones", "Servicios", "Auto", "Créditos", "Patrimonio", "Contexto", "Reglas",
     ]);
   });
 

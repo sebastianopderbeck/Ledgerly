@@ -14,7 +14,7 @@ interface CashFlowTableRowProps {
   mes: CashFlowMonthDTO;
 }
 
-const AMOUNT_HEADERS = ["Ingreso", "Tarjetas", "Hipoteca", "Auto", "Egresos", "Margen", "Ahorro"];
+const AMOUNT_HEADERS = ["Ingreso", "Tarjetas", "Hipoteca", "Auto", "Servicios", "Egresos", "Margen", "Ahorro"];
 const NO_WRAP = { whiteSpace: "nowrap" } as const;
 
 const money = (value: number | null): string => formatMoneyOrDash(value, "ARS");
@@ -31,6 +31,7 @@ const CashFlowTableRow = ({ mes }: CashFlowTableRowProps) => {
       <TableCell align="right" sx={NO_WRAP}>{money(mes.tarjetas)}</TableCell>
       <TableCell align="right" sx={NO_WRAP}>{money(mes.hipoteca)}</TableCell>
       <TableCell align="right" sx={NO_WRAP}>{money(mes.auto)}</TableCell>
+      <TableCell align="right" sx={NO_WRAP}>{money(mes.servicios)}</TableCell>
       <TableCell align="right" sx={NO_WRAP}>{money(mes.egresos)}</TableCell>
       <TableCell align="right" sx={{ ...NO_WRAP, color: margenColor }}>{money(mes.margen)}</TableCell>
       <TableCell align="right" sx={NO_WRAP}>{formatSavingsRate(mes.tasaAhorro)}</TableCell>

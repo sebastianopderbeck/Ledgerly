@@ -18,6 +18,7 @@ import { MacroPage } from "./pages/MacroPage.js";
 import { CashFlowPage } from "./pages/CashFlowPage.js";
 import { BudgetsPage } from "./pages/BudgetsPage.js";
 import { SubscriptionsPage } from "./pages/SubscriptionsPage.js";
+import { FixedServicesPage } from "./pages/FixedServicesPage.js";
 import { NetWorthPage } from "./pages/NetWorthPage.js";
 import { VencimientosPage } from "./pages/VencimientosPage.js";
 
@@ -41,6 +42,7 @@ const AnimatedRoutes = () => {
         <Route path="/presupuestos" element={<PageTransition><BudgetsPage /></PageTransition>} />
         <Route path="/transactions" element={<PageTransition><TransactionsPage /></PageTransition>} />
         <Route path="/suscripciones" element={<PageTransition><SubscriptionsPage /></PageTransition>} />
+        <Route path="/servicios" element={<PageTransition><FixedServicesPage /></PageTransition>} />
         <Route path="/installments" element={<PageTransition><InstallmentsPage /></PageTransition>} />
       </Routes>
     </AnimatePresence>

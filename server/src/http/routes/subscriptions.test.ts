@@ -61,6 +61,13 @@ beforeEach(() => {
 });
 
 describe("GET /api/subscriptions", () => {
+  it("cada suscripción trae el emisor de su tarjeta", async () => {
+    await seedVisa(streamflixAndNoise());
+    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    expect(report.items.length).toBeGreaterThan(0);
+    expect(new Set(report.items.map((item) => item.issuer))).toEqual(new Set(["visa_signature"]));
+  });
+
   it("sin datos responde 200 con la lista vacía y totales en cero", async () => {
     const res = await request(app).get("/api/subscriptions");
     expect(res.status).toBe(200);

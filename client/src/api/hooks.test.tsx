@@ -6,12 +6,15 @@ import type { StatementReviewDTO } from "@ledgerly/shared";
 import {
   statementReviewKey,
   useBudgetSpending,
+  useCreateFixedService,
+  useDeleteFixedService,
   useMarkFindingsReviewed,
   useMarkSubscription,
   useNetWorth,
   useSetSubscriptionCadence,
   useSetSubscriptionHidden,
   useStatementReview,
+  useUpdateFixedService,
 } from "./hooks.js";
 
 afterEach(() => {
@@ -34,6 +37,42 @@ const respond = (status: number, body?: unknown) =>
 const calledUrls = () => vi.mocked(fetch).mock.calls.map(([url, init]) => `${init?.method ?? "GET"} ${String(url)}`);
 
 describe("hooks de las features nuevas", () => {
+  const LUZ = { id: "f1", nombre: "Luz", monto: 30000, cadencia: "mensual", desde: "2026-10", hasta: null, montoDesde: "2026-10" };
+
+  it("useCreateFixedService manda el alta por POST e invalida los servicios y el flujo", async () => {
+    vi.stubGlobal("fetch", respond(201, LUZ));
+    const client = newClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useCreateFixedService(), { wrapper: wrapperFor(client) });
+    await act(() => result.current.mutateAsync({ nombre: "Luz", monto: 30000 }));
+    expect(calledUrls()).toEqual(["POST /api/fixed-services"]);
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ nombre: "Luz", monto: 30000 });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["fixed-services"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cash-flow"] });
+  });
+
+  it("useUpdateFixedService manda la edición por PATCH e invalida los servicios y el flujo", async () => {
+    vi.stubGlobal("fetch", respond(200, LUZ));
+    const client = newClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useUpdateFixedService(), { wrapper: wrapperFor(client) });
+    await act(() => result.current.mutateAsync({ id: "f1", body: { hasta: "2026-11" } }));
+    expect(calledUrls()).toEqual(["PATCH /api/fixed-services/f1"]);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["fixed-services"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cash-flow"] });
+  });
+
+  it("useDeleteFixedService borra por DELETE e invalida los servicios y el flujo", async () => {
+    vi.stubGlobal("fetch", respond(204));
+    const client = newClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useDeleteFixedService(), { wrapper: wrapperFor(client) });
+    await act(() => result.current.mutateAsync("f1"));
+    expect(calledUrls()).toEqual(["DELETE /api/fixed-services/f1"]);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["fixed-services"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cash-flow"] });
+  });
+
   it("useNetWorth con 204 deja data en null sin marcar error", async () => {
     vi.stubGlobal("fetch", respond(204));
     const { result } = renderHook(() => useNetWorth(), { wrapper: wrapperFor(newClient()) });

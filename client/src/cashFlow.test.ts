@@ -14,6 +14,7 @@ const month = (mes: string, overrides: Partial<CashFlowMonthDTO> = {}): CashFlow
   tarjetas: 500_000,
   hipoteca: 300_000,
   auto: 100_000,
+  servicios: 0,
   egresos: 900_000,
   margen: 100_000,
   tasaAhorro: 0.1,

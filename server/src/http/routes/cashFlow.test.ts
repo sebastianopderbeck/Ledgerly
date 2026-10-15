@@ -4,8 +4,10 @@ import { cashFlowDtoSchema, type CashFlowDTO } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
 import { createApp } from "../app.js";
 import {
-  AutoCouponModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel, PayslipModel, StatementModel, TransactionModel,
+  AutoCouponModel, FixedServiceModel, HiddenSubscriptionModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel,
+  PayslipModel, StatementModel, TransactionModel,
 } from "../../db/models.js";
+import { merchantKey } from "../../stats/merchantKey.js";
 
 withDb();
 const app = createApp();
@@ -67,6 +69,7 @@ const seed = async () => {
     sourceFileName: "cupon-12.pdf", sourceHash: "cupon-12",
   });
   await AutoCouponModel.create(cuponAuto(20, "2026-09-10", 20_000_000, 150_000));
+  return statements;
 };
 
 const mesDe = (flow: CashFlowDTO, mes: string) => flow.meses.find((item) => item.mes === mes);
@@ -79,6 +82,49 @@ describe("GET /api/cash-flow", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  const suscripcionVisa = async (statementId: unknown) => {
+    await TransactionModel.insertMany(["2026-07-20", "2026-08-20", "2026-09-20"].map((fecha, index) => ({
+      statementId, issuer: "visa_signature", cardLabel: "Visa Signature", date: new Date(fecha),
+      descriptionRaw: "STREAMBOX", merchant: "STREAMBOX", category: "Suscripciones", categorySource: "rule",
+      amount: 5_000, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
+      installmentCurrent: null, installmentTotal: null, comprobante: null, fingerprint: `streambox-${index}`,
+    })));
+  };
+
+  it("resta los servicios cargados, con defaults para los documentos viejos", async () => {
+    await seed();
+    await FixedServiceModel.create({
+      nombre: "Luz", monto: 30_000, cadencia: "mensual", desde: "2026-09", hasta: null, montoDesde: "2026-09",
+    });
+    await FixedServiceModel.collection.insertOne({ nombre: "Gas", monto: 10_000, desde: "2026-10" });
+    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    expect(mesDe(flow, "2026-08")?.servicios).toBe(0);
+    expect(mesDe(flow, "2026-09")).toMatchObject({ servicios: 30_000, egresos: 958_000, margen: 142_000 });
+    expect(mesDe(flow, "2026-10")?.servicios).toBe(40_000);
+    expect(mesDe(flow, "2026-11")?.servicios).toBe(40_000);
+    expect(mesDe(flow, "2026-11")?.estimados).toContain("Servicios (último monto)");
+  });
+
+  it("suma las suscripciones activas de la tarjeta en los meses estimados", async () => {
+    const statements = await seed();
+    await suscripcionVisa(statements[2]._id);
+    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    expect(mesDe(flow, "2026-10")?.tarjetas).toBe(500_000);
+    expect(mesDe(flow, "2026-11")?.tarjetas).toBe(35_000);
+    expect(mesDe(flow, "2026-12")?.tarjetas).toBe(35_000);
+    expect(mesDe(flow, "2027-01")?.tarjetas).toBe(5_000);
+    expect(mesDe(flow, "2026-11")?.estimados).toContain("Visa Signature (cuotas y suscripciones)");
+  });
+
+  it("no suma una suscripción oculta", async () => {
+    const statements = await seed();
+    await suscripcionVisa(statements[2]._id);
+    await HiddenSubscriptionModel.create({ key: merchantKey("STREAMBOX") });
+    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    expect(mesDe(flow, "2026-11")?.tarjetas).toBe(30_000);
+    expect(mesDe(flow, "2026-11")?.estimados).toContain("Visa Signature (solo cuotas)");
   });
 
   it("con la base vacía no hay flujo", async () => {

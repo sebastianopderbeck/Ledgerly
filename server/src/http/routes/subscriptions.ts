@@ -3,24 +3,16 @@ import { isValidObjectId } from "mongoose";
 import {
   manualSubscriptionInputSchema,
   subscriptionCadenceInputSchema,
-  type Currency,
-  type Direction,
-  type Issuer,
   type SubscriptionsReportDTO,
-  type TxType,
 } from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
 import {
-  HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, SubscriptionCadenceModel, TransactionModel,
+  HiddenSubscriptionModel, ManualSubscriptionModel, SubscriptionCadenceModel, TransactionModel,
 } from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import { merchantKey } from "../../stats/merchantKey.js";
-import {
-  detectSubscriptions,
-  latestClosingByIssuer,
-  summarizeSubscriptions,
-  type SubscriptionTx,
-} from "../../stats/subscriptions.js";
+import { detectSubscriptions, summarizeSubscriptions } from "../../stats/subscriptions.js";
+import { loadSubscriptionInputs } from "../loadSubscriptions.js";
 
 const MAX_CLAVE = 60;
 const INVALID_TRANSACTION = "Movimiento inválido";
@@ -40,38 +32,8 @@ const keyParamOf = (req: Request): string => {
 
 subscriptionsRouter.get("/", asyncHandler(async (_req, res) => {
   const hoy = isoDay(new Date());
-  const [transactions, statements, hidden, manual, cadences, cotizacion] = await Promise.all([
-    TransactionModel.find({ isInstallment: false, type: { $in: ["purchase", "refund"] } }).lean(),
-    StatementModel.find({}, { issuer: 1, closingDate: 1 }).lean(),
-    HiddenSubscriptionModel.find().lean(),
-    ManualSubscriptionModel.find().lean(),
-    SubscriptionCadenceModel.find(),
-    fetchOficialRate(hoy),
-  ]);
-  const txs: SubscriptionTx[] = transactions.map((t) => ({
-    date: isoDay(t.date),
-    merchant: t.merchant,
-    amount: t.amount,
-    currency: t.currency as Currency,
-    direction: t.direction as Direction,
-    type: t.type as TxType,
-    isInstallment: t.isInstallment,
-    category: t.category,
-    issuer: t.issuer as Issuer,
-    cardLabel: t.cardLabel,
-  }));
-  const items = detectSubscriptions(txs, {
-    hoy,
-    ultimoCierre: latestClosingByIssuer(statements.map((s) => ({ issuer: s.issuer, closingDate: s.closingDate ?? null }))),
-    ocultas: new Set(hidden.map((h) => h.key)),
-    manuales: new Set(manual.map((m) => m.key)),
-    cobrosMarcados: new Map(manual.map(({ key, cobros = [] }) => [
-      key,
-      cobros.map(({ date, amount, currency }) => ({ date, amount, currency: currency as Currency })),
-    ])),
-    cadencias: new Map(cadences.map(({ key, cadencia }) => [key, cadencia])),
-    cotizacion,
-  });
+  const [{ txs, ctx }, cotizacion] = await Promise.all([loadSubscriptionInputs(hoy), fetchOficialRate(hoy)]);
+  const items = detectSubscriptions(txs, { ...ctx, cotizacion });
   const report: SubscriptionsReportDTO = { cotizacionOficial: cotizacion, ...summarizeSubscriptions(items), items };
   res.json(report);
 }));

@@ -7,7 +7,7 @@ describe("grupos del menú", () => {
   it("separa Dashboard, el día a día, el largo plazo y Reglas", () => {
     expect(NAV_GROUPS.map(({ items }) => labelsOf(items))).toEqual([
       ["Dashboard"],
-      ["Sueldo", "Vencimientos", "Flujo", "Suscripciones", "Movimientos"],
+      ["Sueldo", "Vencimientos", "Flujo", "Suscripciones", "Servicios", "Movimientos"],
       ["Auto", "Créditos", "Patrimonio", "Contexto"],
       ["Reglas"],
     ]);
@@ -24,7 +24,7 @@ describe("grupos del menú", () => {
 
   it("«Más» conserva los grupos que tienen secciones de «Más»", () => {
     expect(MORE_GROUPS.map(({ items }) => labelsOf(items))).toEqual([
-      ["Sueldo", "Vencimientos", "Flujo", "Suscripciones"],
+      ["Sueldo", "Vencimientos", "Flujo", "Suscripciones", "Servicios"],
       ["Auto", "Créditos", "Patrimonio", "Contexto"],
       ["Reglas"],
     ]);
@@ -40,9 +40,9 @@ describe("secciones en mobile", () => {
     expect(BAR_ITEMS[0].shortLabel).toBe("Inicio");
   });
 
-  it("«Más» lleva Sueldo, Vencimientos, Flujo, Suscripciones, Auto, Créditos, Patrimonio, Contexto y Reglas", () => {
+  it("«Más» lleva Sueldo, Vencimientos, Flujo, Suscripciones, Servicios, Auto, Créditos, Patrimonio, Contexto y Reglas", () => {
     expect(labelsOf(MORE_ITEMS)).toEqual([
-      "Sueldo", "Vencimientos", "Flujo", "Suscripciones", "Auto", "Créditos", "Patrimonio", "Contexto", "Reglas",
+      "Sueldo", "Vencimientos", "Flujo", "Suscripciones", "Servicios", "Auto", "Créditos", "Patrimonio", "Contexto", "Reglas",
     ]);
   });
 
@@ -55,7 +55,7 @@ describe("secciones en mobile", () => {
   it("isMoreRoute reconoce solo las rutas de «Más»", () => {
     expect(isMoreRoute("/credits")).toBe(true);
     expect(isMoreRoute("/rules")).toBe(true);
-    for (const route of ["/patrimonio", "/vencimientos", "/flujo", "/suscripciones"]) {
+    for (const route of ["/patrimonio", "/vencimientos", "/flujo", "/suscripciones", "/servicios"]) {
       expect(isMoreRoute(route)).toBe(true);
     }
     expect(isMoreRoute("/")).toBe(false);
