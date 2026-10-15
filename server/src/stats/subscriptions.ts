@@ -37,6 +37,7 @@ export interface SubscriptionTx {
   category: string;
   issuer: Issuer;
   cardLabel: string;
+  statementId: string;
 }
 
 export type MarkedCharge = Pick<SubscriptionTx, "date" | "amount" | "currency">;
@@ -53,6 +54,11 @@ export interface SubscriptionContext {
 
 export interface Charge extends SubscriptionTx {
   key: string;
+}
+
+export interface DetectedSubscription {
+  subscription: SubscriptionDTO;
+  run: Charge[];
 }
 
 type SubscriptionTotals = Pick<SubscriptionsReportDTO, "totalMensualArs" | "totalMensualUsd" | "totalAnualArs">;
@@ -319,7 +325,7 @@ const subscriptionOf = (
   marked: Marked,
   marcados: readonly MarkedCharge[],
   ctx: SubscriptionContext,
-): SubscriptionDTO | null => {
+): DetectedSubscription | null => {
   const run = subscriptionRun(charges, cadencia, marked, marcados, ctx);
   if (run === undefined) return null;
   const first = run[0];
@@ -328,7 +334,7 @@ const subscriptionOf = (
   const proximoCobro = addMonthsClamped(last.date, meses);
   const estado = statusOf(last, proximoCobro, ctx);
   if (estado === "cortada" && tooOldToList(cadencia, last, proximoCobro, ctx.hoy)) return null;
-  return {
+  const subscription: SubscriptionDTO = {
     key: last.key,
     nombre: merchantDisplayName(last.merchant),
     busqueda: merchantSearchTerm(run.map(({ merchant }) => merchant).reverse()),
@@ -348,6 +354,7 @@ const subscriptionOf = (
     monedaAnterior: previousCurrency(run, last),
     cadencia,
   };
+  return { subscription, run };
 };
 
 const compareMonthlyArs = (a: number | null, b: number | null): number => {
@@ -363,7 +370,7 @@ const compareSubscriptions = (a: SubscriptionDTO, b: SubscriptionDTO): number =>
   return compareMonthlyArs(a.montoMensualArs, b.montoMensualArs) || a.nombre.localeCompare(b.nombre);
 };
 
-export function detectSubscriptions(txs: SubscriptionTx[], ctx: SubscriptionContext): SubscriptionDTO[] {
+export function detectSubscriptionRuns(txs: SubscriptionTx[], ctx: SubscriptionContext): DetectedSubscription[] {
   const debitRows = keyed(txs.filter(isEligibleDebit));
   const creditRows = keyed(txs.filter(isRefundCredit));
   const canonical = canonicalMerchantKeys([...debitRows, ...creditRows].map(({ rawKey }) => rawKey));
@@ -377,10 +384,14 @@ export function detectSubscriptions(txs: SubscriptionTx[], ctx: SubscriptionCont
       const marked: Marked = (marks) => hasMark(key, rawKeys, marks);
       const cadencia = markedCadence(key, rawKeys, ctx.cadencias);
       const marcados = markedChargesOf(key, rawKeys, ctx.cobrosMarcados);
-      const subscription = subscriptionOf(charges, cadencia, marked, marcados, ctx);
-      return subscription ? [subscription] : [];
+      const detected = subscriptionOf(charges, cadencia, marked, marcados, ctx);
+      return detected ? [detected] : [];
     })
-    .sort(compareSubscriptions);
+    .sort((a, b) => compareSubscriptions(a.subscription, b.subscription));
+}
+
+export function detectSubscriptions(txs: SubscriptionTx[], ctx: SubscriptionContext): SubscriptionDTO[] {
+  return detectSubscriptionRuns(txs, ctx).map(({ subscription }) => subscription);
 }
 
 const monthlyUsd = ({ montoActual, cadencia }: SubscriptionDTO): number => montoActual / MESES_CADENCIA[cadencia];

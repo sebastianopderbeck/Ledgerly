@@ -4,6 +4,7 @@ import { addMonths } from "./months.js";
 import {
   addMonthsClamped,
   CATEGORIA_SUSCRIPCIONES,
+  detectSubscriptionRuns,
   detectSubscriptions,
   isCounted,
   latestClosingByIssuer,
@@ -32,6 +33,7 @@ const tx = (date: string, amount: number, overrides: Partial<SubscriptionTx> = {
   category: "Entretenimiento",
   issuer: "visa_signature",
   cardLabel: "Visa Signature",
+  statementId: "resumen-1",
   ...overrides,
 });
 
@@ -512,6 +514,33 @@ describe("detectSubscriptions", () => {
       "cortada OTRO CLUB",
       "cortada VIEJO GIMNASIO",
     ]);
+  });
+});
+
+describe("detectSubscriptionRuns", () => {
+  it("devuelve cada suscripción con los cobros de su racha y el resumen de cada uno", () => {
+    const txs = [
+      tx("2026-01-09", 5490, { statementId: "resumen-enero" }),
+      tx("2026-02-09", 5490, { statementId: "resumen-febrero" }),
+      tx("2026-02-20", 12_000, { statementId: "resumen-febrero" }),
+      tx("2026-03-09", 5490, { statementId: "resumen-marzo" }),
+    ];
+    const [detected] = detectSubscriptionRuns(txs, ctx());
+    expect(detected.subscription).toEqual(detectSubscriptions(txs, ctx())[0]);
+    expect(detected.run.map(({ date, statementId }) => [date, statementId])).toEqual([
+      ["2026-01-09", "resumen-enero"],
+      ["2026-02-09", "resumen-febrero"],
+      ["2026-03-09", "resumen-marzo"],
+    ]);
+  });
+
+  it("mantiene el orden de detectSubscriptions", () => {
+    const txs = [
+      ...monthly([100, 100, 100]),
+      ...monthly([900, 900, 900], "2026-01", { merchant: "MUSICBOX 1234" }),
+    ];
+    expect(detectSubscriptionRuns(txs, ctx()).map(({ subscription }) => subscription))
+      .toEqual(detectSubscriptions(txs, ctx()));
   });
 });
 

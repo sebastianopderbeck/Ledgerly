@@ -6,7 +6,7 @@ import { addDays, addMonths, monthOf, monthRange, monthsBetween } from "./months
 import { rateOnDate, type RatePoint } from "./rateOnDate.js";
 import { raiseFactor, raisesBetween, type SalaryInflation, type SalaryRaise } from "./salaryRaise.js";
 import { DIAS_CIERRE_A_VENCIMIENTO, statementDueDate } from "./statementDueDate.js";
-import { MESES_CADENCIA } from "./subscriptions.js";
+import { MESES_CADENCIA, type SubscriptionTx } from "./subscriptions.js";
 
 export const HORIZONTE_MESES = 6;
 
@@ -19,8 +19,8 @@ export const faltaResumen = (cardLabel: string): string => `Resumen ${cardLabel}
 export const ESTIMADO_SUELDO = "Sueldo (último neto)";
 export const ESTIMADO_SAC = "SAC (½ del último neto)";
 export const ESTIMADO_SAC_CON_AUMENTO = "SAC (½ del sueldo estimado)";
+export const ESTIMADO_SUSCRIPCIONES = "Suscripciones (último cobro)";
 export const estimadoTarjeta = (cardLabel: string): string => `${cardLabel} (solo cuotas)`;
-export const estimadoTarjetaConSuscripciones = (cardLabel: string): string => `${cardLabel} (cuotas y suscripciones)`;
 
 const AUMENTO_MENSUAL = new Intl.NumberFormat("es-AR", {
   style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: "exceptZero",
@@ -64,8 +64,14 @@ export interface CashFlowStatement {
   dueDate: string | null;
   saldoArs: number;
   saldoUsd: number;
+  suscripcionesArs: number;
+  suscripcionesUsd: number;
   uploadedAt: string;
 }
+
+export type StatementSubscriptions = Pick<CashFlowStatement, "suscripcionesArs" | "suscripcionesUsd">;
+
+export type StatementSubscriptionCharge = Pick<SubscriptionTx, "statementId" | "currency" | "amount">;
 
 export interface PendingInstallment {
   amount: number;
@@ -128,13 +134,37 @@ export interface CashFlowInput {
   horizon?: number;
 }
 
+export const SIN_SUSCRIPCIONES: StatementSubscriptions = { suscripcionesArs: 0, suscripcionesUsd: 0 };
+
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
+
+const positive = (value: number): number => Math.max(0, value);
 
 export function statementAmountArs(
   { saldoArs, saldoUsd }: Pick<CashFlowStatement, "saldoArs" | "saldoUsd">,
   rate: number | null,
 ): number {
-  return Math.max(0, saldoArs + saldoUsd * (rate ?? 0));
+  return positive(saldoArs + saldoUsd * (rate ?? 0));
+}
+
+export function statementSubscriptionsArs(
+  { saldoArs, saldoUsd, suscripcionesArs, suscripcionesUsd }: Pick<CashFlowStatement, "saldoArs" | "saldoUsd"> & StatementSubscriptions,
+  rate: number | null,
+): number {
+  const ars = Math.min(suscripcionesArs, positive(saldoArs));
+  const usd = Math.min(suscripcionesUsd, positive(saldoUsd)) * (rate ?? 0);
+  return Math.min(ars + usd, statementAmountArs({ saldoArs, saldoUsd }, rate));
+}
+
+export function subscriptionsByStatement(charges: StatementSubscriptionCharge[]): Map<string, StatementSubscriptions> {
+  const byStatement = new Map<string, StatementSubscriptions>();
+  for (const { statementId, currency, amount } of charges) {
+    const { suscripcionesArs, suscripcionesUsd } = byStatement.get(statementId) ?? SIN_SUSCRIPCIONES;
+    byStatement.set(statementId, currency === "USD"
+      ? { suscripcionesArs, suscripcionesUsd: suscripcionesUsd + amount }
+      : { suscripcionesArs: suscripcionesArs + amount, suscripcionesUsd });
+  }
+  return byStatement;
 }
 
 const remainingOf = ({ installmentCurrent, installmentTotal }: InstallmentTxInput): number =>
@@ -221,7 +251,8 @@ interface CardTrack {
 }
 
 interface StatementTotal {
-  monto: number;
+  tarjeta: number;
+  suscripciones: number;
   sinCotizacion: boolean;
 }
 
@@ -244,7 +275,8 @@ interface SubscriptionCharge {
 
 interface EstimatedCard {
   cardLabel: string;
-  monto: number;
+  cuotas: number;
+  suscripciones: number;
   conSuscripciones: boolean;
   sinCotizacion: boolean;
 }
@@ -317,10 +349,15 @@ function cardTracks(statements: DatedStatement[], cards: CashFlowCard[]): CardTr
   }));
 }
 
+function splitStatement(statement: CashFlowStatement, rate: number | null, sinCotizacion: boolean): StatementTotal {
+  const suscripciones = statementSubscriptionsArs(statement, rate);
+  return { tarjeta: statementAmountArs(statement, rate) - suscripciones, suscripciones, sinCotizacion };
+}
+
 function statementTotal({ statement, vence }: DatedStatement, ctx: FlowContext): StatementTotal {
-  if (statement.saldoUsd <= 0) return { monto: statementAmountArs(statement, null), sinCotizacion: false };
+  if (statement.saldoUsd <= 0) return splitStatement(statement, null, false);
   const rate = rateOnDate(vence < ctx.today ? vence : ctx.today, ctx.usdRates);
-  return { monto: statementAmountArs(statement, rate), sinCotizacion: rate === null };
+  return splitStatement(statement, rate, rate === null);
 }
 
 const trackMonths = (ctx: FlowContext, mes: string): TrackMonth[] =>
@@ -367,9 +404,10 @@ function closedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
     ...onlyIf(auto.falta, FALTA_AUTO),
     ...onlyIf(totals.some((total) => total.sinCotizacion), FALTA_COTIZACION),
   ];
-  const tarjetas = sum(totals.map((total) => total.monto));
+  const tarjetas = sum(totals.map((total) => total.tarjeta));
+  const suscripciones = sum(totals.map((total) => total.suscripciones));
   const servicios = sum(servicesDue(ctx, mes).map((service) => service.monto));
-  const egresos = tarjetas + hipoteca.monto + auto.monto + servicios;
+  const egresos = tarjetas + hipoteca.monto + auto.monto + servicios + suscripciones;
   const completo = faltantes.length === 0;
   const margen = completo && ingreso !== null ? ingreso - egresos : null;
   return {
@@ -381,6 +419,7 @@ function closedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
     hipoteca: hipoteca.monto,
     auto: auto.monto,
     servicios,
+    suscripciones,
     egresos,
     margen,
     tasaAhorro: savingsRate(margen, ingreso),
@@ -417,21 +456,19 @@ const chargeArs = ({ moneda, monto }: SubscriptionCharge, cotizacion: number | n
 };
 
 function estimatedCard(ctx: FlowContext, { cardLabel, card }: CardTrack, mes: string): EstimatedCard {
-  if (!card) return { cardLabel, monto: 0, conSuscripciones: false, sinCotizacion: false };
+  if (!card) return { cardLabel, cuotas: 0, suscripciones: 0, conSuscripciones: false, sinCotizacion: false };
   const montos = ctx.charges
     .filter((charge) => charge.issuer === card.issuer && charge.mes === mes)
     .map((charge) => chargeArs(charge, ctx.cotizacionHoy));
   const convertidos = montos.filter((monto): monto is number => monto !== null);
   return {
     cardLabel,
-    monto: installmentFloor(card, mes) + sum(convertidos),
+    cuotas: installmentFloor(card, mes),
+    suscripciones: sum(convertidos),
     conSuscripciones: montos.length > 0,
     sinCotizacion: convertidos.length < montos.length,
   };
 }
-
-const estimatedCardNote = ({ cardLabel, conSuscripciones }: EstimatedCard): string =>
-  (conSuscripciones ? estimadoTarjetaConSuscripciones(cardLabel) : estimadoTarjeta(cardLabel));
 
 function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
   const recibos = ctx.recibosPorMes.get(mes) ?? [];
@@ -448,14 +485,16 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
   const estimadas = tracks
     .filter((trackMonth) => trackMonth.totals.length === 0)
     .map(({ track }) => estimatedCard(ctx, track, mes));
-  const tarjetas = sum(reales.map((total) => total.monto)) + sum(estimadas.map((estimada) => estimada.monto));
+  const tarjetas = sum(reales.map((total) => total.tarjeta)) + sum(estimadas.map((estimada) => estimada.cuotas));
+  const suscripciones = sum(reales.map((total) => total.suscripciones)) + sum(estimadas.map((estimada) => estimada.suscripciones));
+  const suscripcionesEstimadas = estimadas.some((estimada) => estimada.conSuscripciones);
   const sinCotizacion = reales.some((total) => total.sinCotizacion) || estimadas.some((estimada) => estimada.sinCotizacion);
   const hipoteca = projectedPlanMonth(ctx.mortgage, mes);
   const auto = projectedPlanMonth(ctx.auto, mes);
   const ingreso = sueldo + sac;
   const aumentoServicios = expectedInflation(ctx);
   const servicios = sum(servicesDue(ctx, mes).map((service) => projectServiceAmount(service, mes, aumentoServicios)));
-  const egresos = tarjetas + hipoteca.monto + auto.monto + servicios;
+  const egresos = tarjetas + hipoteca.monto + auto.monto + servicios + suscripciones;
   const margen = ingreso - egresos;
   return {
     mes,
@@ -466,6 +505,7 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
     hipoteca: hipoteca.monto,
     auto: auto.monto,
     servicios,
+    suscripciones,
     egresos,
     margen,
     tasaAhorro: savingsRate(margen, ingreso),
@@ -473,10 +513,11 @@ function projectedMonth(ctx: FlowContext, mes: string): CashFlowMonthDTO {
     estimados: [
       ...onlyIf(sueldoEstimado, estimadoSueldo(raises)),
       ...onlyIf(sacEstimado, estimadoSac(raises)),
-      ...estimadas.map(estimatedCardNote),
+      ...estimadas.map(({ cardLabel }) => estimadoTarjeta(cardLabel)),
       ...onlyIf(hipoteca.estimado, estimadoHipoteca(ctx.mortgage.aumentoMensual)),
       ...onlyIf(auto.estimado, estimadoAuto(ctx.auto.aumentoMensual)),
       ...onlyIf(servicios > 0, estimadoServicios(aumentoServicios)),
+      ...onlyIf(suscripcionesEstimadas, ESTIMADO_SUSCRIPCIONES),
     ],
   };
 }

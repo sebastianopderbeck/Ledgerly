@@ -30,6 +30,7 @@ export async function loadSubscriptionInputs(hoy: string): Promise<SubscriptionI
     category: t.category,
     issuer: t.issuer as Issuer,
     cardLabel: t.cardLabel,
+    statementId: String(t.statementId),
   }));
   return {
     txs,

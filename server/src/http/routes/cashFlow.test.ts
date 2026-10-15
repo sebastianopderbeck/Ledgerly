@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
+import { Types } from "mongoose";
 import { cashFlowDtoSchema, type CashFlowDTO } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
 import { createApp } from "../app.js";
@@ -84,8 +85,8 @@ describe("GET /api/cash-flow", () => {
     vi.useRealTimers();
   });
 
-  const suscripcionVisa = async (statementId: unknown) => {
-    await TransactionModel.insertMany(["2026-07-20", "2026-08-20", "2026-09-20"].map((fecha, index) => ({
+  const suscripcionVisa = async (cobros: [string, unknown][]) => {
+    await TransactionModel.insertMany(cobros.map(([fecha, statementId], index) => ({
       statementId, issuer: "visa_signature", cardLabel: "Visa Signature", date: new Date(fecha),
       descriptionRaw: "STREAMBOX", merchant: "STREAMBOX", category: "Suscripciones", categorySource: "rule",
       amount: 5_000, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
@@ -112,24 +113,43 @@ describe("GET /api/cash-flow", () => {
     expect(mesDe(flow, "2026-11")?.estimados).toContain("Servicios (último monto)");
   });
 
-  it("suma las suscripciones activas de la tarjeta en los meses estimados", async () => {
+  const cobrosEnSusResumenes = (statements: { _id: unknown }[]): [string, unknown][] => [
+    ["2026-07-20", statements[0]._id], ["2026-08-20", statements[1]._id], ["2026-09-20", statements[2]._id],
+  ];
+
+  it("separa las suscripciones de cada resumen y las proyecta en su columna", async () => {
     const statements = await seed();
-    await suscripcionVisa(statements[2]._id);
+    await suscripcionVisa(cobrosEnSusResumenes(statements));
     const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
-    expect(mesDe(flow, "2026-10")?.tarjetas).toBe(500_000);
-    expect(mesDe(flow, "2026-11")?.tarjetas).toBe(35_000);
-    expect(mesDe(flow, "2026-12")?.tarjetas).toBe(35_000);
-    expect(mesDe(flow, "2027-01")?.tarjetas).toBe(5_000);
-    expect(mesDe(flow, "2026-11")?.estimados).toContain("Visa Signature (cuotas y suscripciones)");
+    expect(mesDe(flow, "2026-08")).toMatchObject({ tarjetas: 395_000, suscripciones: 5_000, egresos: 400_000 });
+    expect(mesDe(flow, "2026-09")).toMatchObject({ tarjetas: 473_000, suscripciones: 5_000 });
+    expect(mesDe(flow, "2026-10")).toMatchObject({ tarjetas: 495_000, suscripciones: 5_000 });
+    expect(mesDe(flow, "2026-11")).toMatchObject({ tarjetas: 30_000, suscripciones: 5_000 });
+    expect(mesDe(flow, "2026-12")).toMatchObject({ tarjetas: 30_000, suscripciones: 5_000 });
+    expect(mesDe(flow, "2027-01")).toMatchObject({ tarjetas: 0, suscripciones: 5_000 });
+    expect(mesDe(flow, "2026-11")?.estimados).toEqual(expect.arrayContaining([
+      "Visa Signature (solo cuotas)", "Suscripciones (último cobro)",
+    ]));
   });
 
-  it("no suma una suscripción oculta", async () => {
+  it("deja una suscripción oculta en Tarjetas", async () => {
     const statements = await seed();
-    await suscripcionVisa(statements[2]._id);
+    await suscripcionVisa(cobrosEnSusResumenes(statements));
     await HiddenSubscriptionModel.create({ key: merchantKey("STREAMBOX") });
     const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
-    expect(mesDe(flow, "2026-11")?.tarjetas).toBe(30_000);
-    expect(mesDe(flow, "2026-11")?.estimados).toContain("Visa Signature (solo cuotas)");
+    expect(mesDe(flow, "2026-10")).toMatchObject({ tarjetas: 500_000, suscripciones: 0 });
+    expect(mesDe(flow, "2026-11")).toMatchObject({ tarjetas: 30_000, suscripciones: 0 });
+    expect(mesDe(flow, "2026-11")?.estimados).not.toContain("Suscripciones (último cobro)");
+  });
+
+  it("separa una cortada en los meses en que se cobró y no la proyecta", async () => {
+    const statements = await seed();
+    await suscripcionVisa([
+      ["2026-05-20", new Types.ObjectId()], ["2026-06-20", new Types.ObjectId()], ["2026-07-20", statements[0]._id],
+    ]);
+    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    expect(mesDe(flow, "2026-08")).toMatchObject({ tarjetas: 395_000, suscripciones: 5_000 });
+    expect(mesDe(flow, "2026-11")).toMatchObject({ tarjetas: 30_000, suscripciones: 0 });
   });
 
   it("con la base vacía no hay flujo", async () => {

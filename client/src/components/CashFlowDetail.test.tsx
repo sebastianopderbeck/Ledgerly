@@ -23,7 +23,8 @@ const completo: CashFlowMonthDTO = {
   hipoteca: 300_000,
   auto: 100_000,
   servicios: 45_000,
-  egresos: 945_000,
+  suscripciones: 12_000,
+  egresos: 957_000,
   margen: 100_000,
   tasaAhorro: 0.1,
   faltantes: [],
@@ -70,13 +71,16 @@ describe("CashFlowTable", () => {
     expect(within(diciembre).getByText("Proyectado")).toBeInTheDocument();
   });
 
-  it("muestra los servicios entre el auto y los egresos", () => {
+  it("muestra los servicios y las suscripciones entre el auto y los egresos", () => {
     renderWithProviders(<CashFlowTable meses={meses} />);
     const table = screen.getByRole("table", { name: "Detalle del flujo de caja" });
     const headers = within(table).getAllByRole("columnheader").map((header) => header.textContent);
-    expect(headers.slice(headers.indexOf("Auto"), headers.indexOf("Egresos") + 1)).toEqual(["Auto", "Servicios", "Egresos"]);
+    expect(headers.slice(headers.indexOf("Auto"), headers.indexOf("Egresos") + 1))
+      .toEqual(["Auto", "Servicios", "Suscripciones", "Egresos"]);
     const agosto = within(table).getByRole("row", { name: /Agosto de 2026/ });
-    expect(within(agosto).getByText(money(45_000))).toBeInTheDocument();
+    const montos = within(agosto).getAllByRole("cell").map((cell) => cell.textContent?.replace(/\s/g, " "));
+    expect(montos.slice(montos.indexOf(money(45_000)), montos.indexOf(money(957_000)) + 1))
+      .toEqual([money(45_000), money(12_000), money(957_000)]);
   });
 
   it("sin meses no muestra la tabla", () => {
@@ -111,12 +115,14 @@ describe("CashFlowCards", () => {
     expect(within(diciembre).getByText("Sueldo (último neto), SAC (½ del último neto)")).toBeInTheDocument();
   });
 
-  it("en el detalle muestra los servicios", async () => {
+  it("en el detalle muestra los servicios y las suscripciones", async () => {
     renderWithProviders(<CashFlowCards meses={meses} />);
     const agosto = screen.getByRole("article", { name: "Agosto de 2026" });
     await userEvent.click(within(agosto).getByRole("button", { name: "Ver detalle" }));
     expect(within(agosto).getByText("Servicios")).toBeInTheDocument();
     expect(within(agosto).getByText(money(45_000))).toBeInTheDocument();
+    expect(within(agosto).getByText("Suscripciones")).toBeInTheDocument();
+    expect(within(agosto).getByText(money(12_000))).toBeInTheDocument();
   });
 
   it("pinta el margen negativo en rojo", () => {
