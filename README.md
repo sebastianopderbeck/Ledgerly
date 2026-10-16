@@ -11,6 +11,7 @@ Vite + React 18 + MUI · Express + MongoDB.
 bun install
 cp .env.example .env
 docker compose up -d       # MongoDB en localhost:27018
+bun run migrate:owner      # crea tu usuario (OWNER_EMAIL)
 bun run seed               # reglas de categoría base
 bun run dev                # API :4000 + SPA :5173
 ```
@@ -19,6 +20,7 @@ bun run dev                # API :4000 + SPA :5173
 - `bun run dev` — backend + frontend
 - `bun run test` — toda la suite (Vitest)
 - `bun run typecheck` — TypeScript de todo el monorepo
+- `bun run migrate:owner` — crea el usuario owner y le asigna los datos que no tienen dueño (se puede correr varias veces)
 - `bun run seed` — siembra reglas de categoría
 - `bun run build` — build del cliente (`client/dist`)
 - `bun run start` — server sin watch, sirviendo `client/dist`
@@ -26,6 +28,46 @@ bun run dev                # API :4000 + SPA :5173
 - `bun run deploy [ref]` — publica `origin/main` (o `ref`) en la versión publicada
 - `bun run test:scripts` — prueba `install-service.sh` / `deploy.sh` con `launchctl` y `lsof` simulados
 - `bun run gmail:auth` — autoriza a Ledgerly a leer tu Gmail (solo lectura) y guarda el refresh token en `.env`
+
+## Login
+
+Ledgerly pide entrar con Google. Solo entran el owner (`OWNER_EMAIL`) y los mails de `ALLOWED_EMAILS`; cada uno ve
+únicamente sus datos. La sesión dura 30 días en una cookie; «Salir», en el menú del avatar, la cierra. La sección
+«Mails» de Importar es solo del owner: la búsqueda automática de mails importa siempre a su nombre.
+Diseño: `docs/superpowers/specs/2026-10-16-login-multiusuario-design.md`.
+
+### Cliente de Google (una vez)
+1. [Google Cloud Console](https://console.cloud.google.com) → Google Auth Platform → **Desarrollo de la marca**:
+   nombre «Ledgerly» y tu mail.
+2. **Público**: tipo **Externo**. Mientras la app esté en estado «Prueba», solo entran los mails cargados en
+   **Usuarios de prueba** (la cuenta dueña del proyecto entra igual): sumá ahí a cada persona de `ALLOWED_EMAILS`,
+   o publicá la app.
+3. **Acceso a los datos**: solo `openid`, `email` y `profile`.
+4. **Clientes** → Crear cliente → **Aplicación web**, con las redirect URIs:
+   - `http://localhost:5173/api/auth/google/callback` (desarrollo)
+   - `https://ledger.<tailnet>.ts.net/api/auth/google/callback` (versión publicada)
+5. Copiar el ID y el secreto a `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` del `.env`.
+
+### Variables
+`SESSION_SECRET` (al menos 32 caracteres: `openssl rand -base64 48`), `OWNER_EMAIL`, `ALLOWED_EMAILS` (separados por
+coma) y `PUBLIC_URL` (`http://localhost:5173` en desarrollo, `https://ledger.<tailnet>.ts.net` en la publicada). Si
+falta alguna, el server no arranca y dice cuál.
+
+### Sumar o sacar a alguien
+Sumar: agregar su mail a `ALLOWED_EMAILS` (y como usuario de prueba en Google) y reiniciar. Arranca vacío, con las
+reglas de categoría del sistema. Sacar: borrar su mail de `ALLOWED_EMAILS` y reiniciar; pierde el acceso aunque tenga
+una sesión abierta. Sus datos quedan en la base.
+
+### Puesta en marcha en la versión publicada
+1. Backup: `docker exec ledgerly-mongo mongodump --archive=/data/db/backup-pre-login.archive`.
+2. Cliente de Google con la redirect URI de Tailscale (arriba).
+3. Las variables nuevas en `~/Services/ledgerly/.env`, con `PUBLIC_URL=https://ledger.<tailnet>.ts.net`.
+4. Merge a `main`: el auto-deploy publica. Si falta una variable el server no arranca y el auto-deploy vuelve solo
+   al commit anterior.
+5. `bun run migrate:owner` (desarrollo y publicada comparten el Mongo de Docker). Hasta correrlo, la app se ve vacía;
+   no se pierde nada.
+6. Entrar con la cuenta del owner.
+7. Sumar a la otra persona (arriba).
 
 ## Versión publicada (privada)
 
