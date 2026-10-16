@@ -2,6 +2,15 @@ import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 
 const moneyPair = { ars: { type: Number, required: true }, usd: { type: Number, required: true } };
 
+const userSchema = new Schema(
+  {
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    name: { type: String, required: true },
+    lastLoginAt: { type: Date, default: null },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+
 const statementSchema = new Schema(
   {
     issuer: { type: String, required: true, enum: ["visa_signature", "icbc"] },
@@ -243,6 +252,7 @@ const mailAttachmentSchema = new Schema({
 });
 mailAttachmentSchema.index({ source: 1, messageId: 1, partId: 1 }, { unique: true });
 
+export type UserDoc = InferSchemaType<typeof userSchema>;
 export type StatementDoc = InferSchemaType<typeof statementSchema>;
 export type TransactionDoc = InferSchemaType<typeof transactionSchema>;
 export type CategoryRuleDoc = InferSchemaType<typeof categoryRuleSchema>;
@@ -260,6 +270,7 @@ export type BudgetDoc = InferSchemaType<typeof budgetSchema>;
 export type MailSyncRunDoc = InferSchemaType<typeof mailSyncRunSchema>;
 export type MailAttachmentDoc = InferSchemaType<typeof mailAttachmentSchema>;
 
+export const UserModel: Model<UserDoc> = mongoose.models.User ?? mongoose.model("User", userSchema);
 export const StatementModel: Model<StatementDoc> =
   mongoose.models.Statement ?? mongoose.model("Statement", statementSchema);
 export const TransactionModel: Model<TransactionDoc> =
