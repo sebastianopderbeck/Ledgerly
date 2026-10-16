@@ -1,7 +1,7 @@
 import type { MailClient } from "../mail/mailClient.js";
 import type { MailSourceSetup } from "../mail/mailSourceSetup.js";
 import { createGmailClient, type GmailClient, type GmailPdfPart } from "./gmailClient.js";
-import { parseMailSchedule } from "../mail/mailSchedule.js";
+import { mailScheduleFor } from "../mail/mailSchedule.js";
 import { missingGmailVars, readGmailConfig } from "./gmailConfig.js";
 
 export function gmailMailClient(client: GmailClient, query: string): MailClient<GmailPdfPart> {
@@ -23,7 +23,7 @@ export function gmailSourceSetup(env: NodeJS.ProcessEnv): MailSourceSetup {
     source: "gmail",
     missing: [],
     scope: query,
-    schedule: parseMailSchedule(env).schedule,
+    schedule: mailScheduleFor("gmail", env),
     openClient: async () => gmailMailClient(createGmailClient(credentials), query),
   };
 }

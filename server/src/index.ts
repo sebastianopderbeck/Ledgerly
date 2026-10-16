@@ -1,7 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { readAuthConfig } from "./auth/authConfig.js";
-import { findOwnerId } from "./auth/owner.js";
 import { createApp } from "./http/app.js";
 import { serveClient } from "./http/serveClient.js";
 import { resolveListenOptions } from "./http/listenOptions.js";
@@ -9,8 +8,6 @@ import { connectMongo } from "./db/connection.js";
 import { describeGmailSetup } from "./gmail/gmailConfig.js";
 import { describeIcloudSource } from "./icloud/icloudSource.js";
 import { describeMailAutomation, parseMailSchedule } from "./mail/mailSchedule.js";
-import { startMailJob } from "./mail/mailJob.js";
-import { readMailSourceSetups } from "./mail/mailSources.js";
 
 const authConfig = readAuthConfig(process.env);
 const { port, host } = resolveListenOptions(process.env);
@@ -35,5 +32,3 @@ const mailSchedule = parseMailSchedule(process.env);
 console.log(describeMailAutomation(mailSchedule));
 console.log(describeGmailSetup(process.env));
 console.log(await describeIcloudSource(process.env));
-const resolveOwner = () => findOwnerId(authConfig.ownerEmail);
-for (const setup of await readMailSourceSetups(process.env)) await startMailJob(setup, resolveOwner);

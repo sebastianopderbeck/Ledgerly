@@ -32,7 +32,7 @@ const statementText = readFileSync(
 );
 const GMAIL_VARS = ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"];
 const ICLOUD_VARS = ["ICLOUD_USER", "ICLOUD_SINCE", "ICLOUD_MAILBOXES"];
-const SCHEDULE_VARS = ["MAIL_SYNC_DAYS", "MAIL_SYNC_HOUR"];
+const SCHEDULE_VARS = ["MAIL_SYNC_DAYS"];
 const SECRETS = ["secreto-sintetico", "refresh-sintetico", "clave-app-sintetica"];
 const ICLOUD_USER = "usuario-sintetico@icloud.com";
 
@@ -84,16 +84,16 @@ describe("GET /api/mail/status", () => {
   });
 
   it("habilitadas informan alcance y agenda sin leer ni exponer secretos", async () => {
-    enableIcloud({ ICLOUD_SINCE: "2026-09-01", MAIL_SYNC_DAYS: "25-5", MAIL_SYNC_HOUR: "9" });
+    enableIcloud({ ICLOUD_SINCE: "2026-09-01", MAIL_SYNC_DAYS: "25-5" });
     enableGmail({ GMAIL_QUERY: "from:banco has:attachment" });
     const res = await auth.api.get("/api/mail/status");
     const [icloud, gmail] = mailSourceStatusDtoSchema.array().parse(res.body);
     expect(icloud).toEqual({
       source: "icloud", enabled: true, missing: [], scope: "INBOX · desde el 01/09/2026",
-      schedule: "todos los días a las 9 h, del 25 al 5", lastRun: null,
+      schedule: "todos los días a las 21 h, del 25 al 5", lastRun: null,
     });
     expect(gmail).toMatchObject({ source: "gmail", enabled: true, scope: "from:banco has:attachment",
-      schedule: "todos los días a las 9 h, del 25 al 5",
+      schedule: "todos los días a las 22 h, del 25 al 5",
     });
     expect(readIcloudPassword).not.toHaveBeenCalled();
     for (const secret of SECRETS) expect(JSON.stringify(res.body)).not.toContain(secret);

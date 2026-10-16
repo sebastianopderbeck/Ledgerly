@@ -1,5 +1,5 @@
 import type { MailClient } from "../mail/mailClient.js";
-import { parseMailSchedule } from "../mail/mailSchedule.js";
+import { mailScheduleFor, parseMailSchedule } from "../mail/mailSchedule.js";
 import type { MailSourceSetup } from "../mail/mailSourceSetup.js";
 import { openIcloudClient, type IcloudClientOptions } from "./icloudClient.js";
 import {
@@ -27,7 +27,7 @@ export async function icloudSourceSetup(env: NodeJS.ProcessEnv, {
     source: "icloud",
     missing,
     scope: icloudScopeLabel(config),
-    schedule: parseMailSchedule(env).schedule,
+    schedule: mailScheduleFor("icloud", env),
     openClient: async () => open({
       user: config.user,
       password: await readPassword(config.user),
@@ -41,6 +41,6 @@ export async function describeIcloudSource(
   env: NodeJS.ProcessEnv, hasPassword: (user: string) => Promise<boolean> = hasIcloudPassword,
 ): Promise<string> {
   const config = readIcloudConfig(env);
-  const automatic = parseMailSchedule(env).schedule !== null;
+  const automatic = parseMailSchedule(env).days !== null;
   return describeIcloudSetup(config, config ? await hasPassword(config.user) : false, automatic);
 }
