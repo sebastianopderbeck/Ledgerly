@@ -16,6 +16,7 @@
     "deploy": "bash scripts/deploy.sh",
     "service:install": "bash scripts/install-service.sh",
     "test:scripts": "bash scripts/test-service-scripts.sh",
+    "migrate:owner": "tsx --env-file=.env server/src/db/migrateOwner.ts",
     "seed": "tsx --env-file=.env server/src/rules/seedRules.ts",
     "seed:coupons": "tsx --env-file=.env server/src/import/seedCoupons.ts",
     "seed:fx": "tsx --env-file=.env server/src/import/backfillRates.ts",
