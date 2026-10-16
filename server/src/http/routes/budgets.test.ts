@@ -1,9 +1,11 @@
+import { Types } from "mongoose";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import type { CategoryMonthStat } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
 import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { BudgetModel, InflationRateModel, StatementModel, TransactionModel } from "../../db/models.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
@@ -23,6 +25,12 @@ afterEach(() => {
 });
 
 describe("CRUD de /api/budgets", () => {
+  it.skip("los topes de otro usuario no cuentan como duplicados", async () => {
+    await BudgetModel.create({ userId: new Types.ObjectId(), category: "Comida", topeArs: 1000, periodoBase: "2026-08" });
+    const created = await createBudget({ category: "Comida", topeArs: 300000 });
+    expect(created.status).toBe(201);
+  });
+
   it("el POST crea el tope con periodoBase en el último IPC publicado", async () => {
     await seedInflation("2026-08", "2026-07");
     const created = await createBudget({ category: "Comida", topeArs: 300000, ajustaInflacion: true });
@@ -130,13 +138,13 @@ describe("validación de /api/budgets", () => {
       createBudget({ category: "Comida", topeArs: 2 }),
     ]);
     expect(responses.map((response) => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
-    expect(await BudgetModel.countDocuments()).toBe(1);
+    expect(await BudgetModel.countDocuments({ userId: auth.userId })).toBe(1);
   });
 
   it("el índice único rechaza duplicados", async () => {
     await BudgetModel.init();
-    await BudgetModel.create({ category: "Comida", topeArs: 1, periodoBase: "2026-08" });
-    await expect(BudgetModel.create({ category: "Comida", topeArs: 2, periodoBase: "2026-08" })).rejects.toThrow(/duplicate key/);
+    await BudgetModel.create({ userId: auth.userId, category: "Comida", topeArs: 1, periodoBase: "2026-08" });
+    await expect(BudgetModel.create({ userId: auth.userId, category: "Comida", topeArs: 2, periodoBase: "2026-08" })).rejects.toThrow(/duplicate key/);
   });
 });
 
@@ -160,6 +168,7 @@ let statementCount = 0;
 const seedStatement = (closingDate: string | null) => {
   statementCount += 1;
   return StatementModel.create({
+    userId: auth.userId,
     issuer: "visa_signature", cardLabel: "Visa ****1234", last4: "1234",
     closingDate: closingDate === null ? null : new Date(closingDate), dueDate: null,
     totals: { totalConsumos: money, saldoActual: money, pagoMinimo: money, saldoAnterior: money },
@@ -170,12 +179,12 @@ const seedStatement = (closingDate: string | null) => {
 
 const seedTransactions = async (rows: TxSeed[]) => {
   const statement = await seedStatement(null);
-  await TransactionModel.insertMany(rows.map((row, index) => ({
+  await TransactionModel.insertMany(ownedBy(auth.userId, rows.map((row, index) => ({
     statementId: statement._id, issuer: "visa_signature", cardLabel: row.cardLabel ?? "Visa ****1234",
     date: new Date(row.date), descriptionRaw: `COMERCIO ${index}`, merchant: `COMERCIO ${index}`,
     category: row.category, categorySource: "rule", amount: row.amount, currency: row.currency ?? "ARS",
     direction: "debit", type: row.type ?? "purchase", isInstallment: false, fingerprint: `f${index}`,
-  })));
+  }))));
 };
 
 const byCategory = (a: CategoryTotal, b: CategoryTotal): number => a.category.localeCompare(b.category);

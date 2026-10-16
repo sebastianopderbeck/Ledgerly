@@ -5,6 +5,7 @@ import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { StatementModel, TransactionModel } from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
@@ -12,13 +13,14 @@ const auth = withAuthedApi(app);
 
 beforeEach(async () => {
   const s = await StatementModel.create({
+    userId: auth.userId,
     issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-07-02"), dueDate: null,
     totals: { totalConsumos: { ars: 6000, usd: 0 }, saldoActual: { ars: 6000, usd: 0 },
       pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
     sourceFileName: "r.pdf", sourceHash: "h", pageCount: 1, parserVersion: "1.0.0",
     needsReview: false, reconciliation: { ok: true, entries: [] },
   });
-  await TransactionModel.insertMany([
+  await TransactionModel.insertMany(ownedBy(auth.userId, [
     { statementId: s._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-04"), descriptionRaw: "A",
       merchant: "MERCADOLIBRE", category: "Compras", categorySource: "rule", amount: 1500, currency: "ARS",
       direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 2, installmentTotal: 4, comprobante: "1", fingerprint: "f1" },
@@ -28,12 +30,13 @@ beforeEach(async () => {
     { statementId: s._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-06-08"), descriptionRaw: "PAGO",
       merchant: "SU PAGO", category: "Sin categoría", categorySource: "rule", amount: 9999, currency: "ARS",
       direction: "credit", type: "payment", isInstallment: false, installmentCurrent: null, installmentTotal: null, comprobante: null, fingerprint: "f3" },
-  ]);
+  ]));
 });
 
 async function addInstallmentCrossingYear() {
-  const s = await StatementModel.findOne({});
+  const s = await StatementModel.findOne({ userId: auth.userId });
   await TransactionModel.create({
+    userId: auth.userId,
     statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-11-10"), descriptionRaw: "F",
     merchant: "FRAVEGA", category: "Hogar", categorySource: "rule", amount: 300, currency: "ARS",
     direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 1, installmentTotal: 4,
@@ -78,6 +81,7 @@ describe("stats", () => {
 
   it("future-installments no duplica cuotas con varios resúmenes", async () => {
     const older = await StatementModel.create({
+      userId: auth.userId,
       issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-06-02"), dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
         pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
@@ -85,6 +89,7 @@ describe("stats", () => {
       needsReview: false, reconciliation: { ok: true, entries: [] },
     });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: older._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-04"),
       descriptionRaw: "MERCADOLIBRE", merchant: "MERCADOLIBRE", category: "Compras", categorySource: "rule",
       amount: 1500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
@@ -97,6 +102,7 @@ describe("stats", () => {
 
   it("future-installments/detail no duplica cuotas con varios resúmenes", async () => {
     const older = await StatementModel.create({
+      userId: auth.userId,
       issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-06-02"), dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
         pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
@@ -104,6 +110,7 @@ describe("stats", () => {
       needsReview: false, reconciliation: { ok: true, entries: [] },
     });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: older._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-04"),
       descriptionRaw: "MERCADOLIBRE", merchant: "MERCADOLIBRE", category: "Compras", categorySource: "rule",
       amount: 1500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
@@ -124,6 +131,7 @@ describe("stats", () => {
 
   it("by-category filtra por cardLabel", async () => {
     const other = await StatementModel.create({
+      userId: auth.userId,
       issuer: "visa_signature", cardLabel: "VISA1", last4: null, closingDate: new Date("2026-07-02"), dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
         pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
@@ -131,6 +139,7 @@ describe("stats", () => {
       needsReview: false, reconciliation: { ok: true, entries: [] },
     });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: other._id, issuer: "visa_signature", cardLabel: "VISA1", date: new Date("2026-05-04"),
       descriptionRaw: "X", merchant: "X", category: "Compras", categorySource: "rule", amount: 999, currency: "ARS",
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
@@ -143,6 +152,7 @@ describe("stats", () => {
 
   it("future-installments y summary respetan cardLabel", async () => {
     const other = await StatementModel.create({
+      userId: auth.userId,
       issuer: "visa_signature", cardLabel: "VISA1", last4: null, closingDate: new Date("2026-07-02"), dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
         pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
@@ -150,6 +160,7 @@ describe("stats", () => {
       needsReview: false, reconciliation: { ok: true, entries: [] },
     });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: other._id, issuer: "visa_signature", cardLabel: "VISA1", date: new Date("2026-05-04"),
       descriptionRaw: "Y", merchant: "Y", category: "Compras", categorySource: "rule", amount: 800, currency: "ARS",
       direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 1, installmentTotal: 3,
@@ -165,6 +176,7 @@ describe("stats", () => {
 
   it("summary: futureInstallmentTotal usa solo el último resumen (no duplica cuotas)", async () => {
     const older = await StatementModel.create({
+      userId: auth.userId,
       issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-06-02"), dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
         pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
@@ -172,6 +184,7 @@ describe("stats", () => {
       needsReview: false, reconciliation: { ok: true, entries: [] },
     });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: older._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-04"),
       descriptionRaw: "MERCADOLIBRE", merchant: "MERCADOLIBRE", category: "Compras", categorySource: "rule",
       amount: 1500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
@@ -183,6 +196,7 @@ describe("stats", () => {
 
   it("last-statement/by-category agrega solo el último resumen de cada issuer", async () => {
     const oldIcbc = await StatementModel.create({
+      userId: auth.userId,
       issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-05-02"), dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
         pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
@@ -190,6 +204,7 @@ describe("stats", () => {
       needsReview: false, reconciliation: { ok: true, entries: [] },
     });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: oldIcbc._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-04-04"),
       descriptionRaw: "OLD", merchant: "OLD", category: "Viejo", categorySource: "rule", amount: 777, currency: "ARS",
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
@@ -204,20 +219,21 @@ describe("stats", () => {
   it("last-statement/by-category respeta cardLabel y currency", async () => {
     vi.mocked(fetchOficialRate).mockResolvedValue(1000);
     const visa = await StatementModel.create({
+      userId: auth.userId,
       issuer: "visa_signature", cardLabel: "VISA1", last4: null, closingDate: new Date("2026-07-05"), dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
         pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
       sourceFileName: "v.pdf", sourceHash: "hv", pageCount: 1, parserVersion: "1.0.0",
       needsReview: false, reconciliation: { ok: true, entries: [] },
     });
-    await TransactionModel.insertMany([
+    await TransactionModel.insertMany(ownedBy(auth.userId, [
       { statementId: visa._id, issuer: "visa_signature", cardLabel: "VISA1", date: new Date("2026-06-04"),
         descriptionRaw: "V", merchant: "V", category: "VisaCat", categorySource: "rule", amount: 300, currency: "ARS",
         direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null, comprobante: "20", fingerprint: "f20" },
       { statementId: visa._id, issuer: "visa_signature", cardLabel: "VISA1", date: new Date("2026-06-05"),
         descriptionRaw: "U", merchant: "U", category: "Dolar", categorySource: "rule", amount: 40, currency: "USD",
         direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null, comprobante: "21", fingerprint: "f21" },
-    ]);
+    ]));
     const arsAll = await auth.api.get("/api/stats/last-statement/by-category?currency=ARS");
     expect(arsAll.body.map((c: { category: string }) => c.category).sort()).toEqual(["Compras", "Dolar", "Transporte", "VisaCat"]);
 
@@ -232,8 +248,9 @@ describe("stats", () => {
   });
 
   async function addUsdPurchaseToLastStatement() {
-    const s = await StatementModel.findOne({});
+    const s = await StatementModel.findOne({ userId: auth.userId });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-12"), descriptionRaw: "UBER USD",
       merchant: "UBER", category: "Transporte", categorySource: "rule", amount: 2, currency: "USD",
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
@@ -263,8 +280,9 @@ describe("stats", () => {
   });
 
   it("monthly y by-category con year dejan afuera los otros años", async () => {
-    const s = await StatementModel.findOne({});
+    const s = await StatementModel.findOne({ userId: auth.userId });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2024-03-01"), descriptionRaw: "C",
       merchant: "COTO", category: "Supermercado", categorySource: "rule", amount: 700, currency: "ARS",
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
@@ -277,8 +295,8 @@ describe("stats", () => {
   });
 
   it("year respeta el borde de año (31/12 vs 1/1)", async () => {
-    const s = await StatementModel.findOne({});
-    await TransactionModel.insertMany([
+    const s = await StatementModel.findOne({ userId: auth.userId });
+    await TransactionModel.insertMany(ownedBy(auth.userId, [
       { statementId: s!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2025-12-31"), descriptionRaw: "D",
         merchant: "FIN DE AÑO", category: "Compras", categorySource: "rule", amount: 100, currency: "ARS",
         direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
@@ -287,7 +305,7 @@ describe("stats", () => {
         merchant: "AÑO NUEVO", category: "Compras", categorySource: "rule", amount: 200, currency: "ARS",
         direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
         comprobante: "11", fingerprint: "f-0101" },
-    ]);
+    ]));
     const res = await auth.api.get("/api/stats/monthly?currency=ARS&year=2025");
     expect(res.body).toEqual([{ month: "2025-12", total: 100, count: 1 }]);
   });
@@ -333,6 +351,7 @@ describe("stats", () => {
 
 describe("installment-purchases", () => {
   const createStatement = (overrides: Record<string, unknown>) => StatementModel.create({
+    userId: auth.userId,
     issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: null, dueDate: null,
     totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
       pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
@@ -372,7 +391,7 @@ describe("installment-purchases", () => {
 
   it("usa el vencimiento del resumen cuando lo trae", async () => {
     const statement = await createStatement({ closingDate: new Date("2026-07-28"), dueDate: new Date("2026-08-10") });
-    await TransactionModel.create(installmentRow(statement._id, {}));
+    await TransactionModel.create({ ...installmentRow(statement._id, {}), userId: auth.userId });
     const res = await auth.api.get("/api/stats/installment-purchases");
     const fravega = res.body.find((purchase: { merchant: string }) => purchase.merchant === "FRAVEGA");
     expect(fravega.installments).toEqual([
@@ -382,18 +401,18 @@ describe("installment-purchases", () => {
   });
 
   it("deja afuera las cuotas en dólares y los créditos", async () => {
-    const statement = await StatementModel.findOne({});
-    await TransactionModel.insertMany([
+    const statement = await StatementModel.findOne({ userId: auth.userId });
+    await TransactionModel.insertMany(ownedBy(auth.userId, [
       installmentRow(statement!._id, { merchant: "AMAZON", currency: "USD" }),
       installmentRow(statement!._id, { merchant: "DEVOLUCION", direction: "credit" }),
-    ]);
+    ]));
     const res = await auth.api.get("/api/stats/installment-purchases");
     expect(res.body).toEqual([mercadolibre]);
   });
 
   it("descarta las cuotas de resúmenes sin cierre ni vencimiento", async () => {
     const statement = await createStatement({});
-    await TransactionModel.create(installmentRow(statement._id, {}));
+    await TransactionModel.create({ ...installmentRow(statement._id, {}), userId: auth.userId });
     const res = await auth.api.get("/api/stats/installment-purchases");
     expect(res.body).toEqual([mercadolibre]);
   });

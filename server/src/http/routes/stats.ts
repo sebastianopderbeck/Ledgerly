@@ -1,5 +1,6 @@
 import { Router } from "express";
-import type { FilterQuery } from "mongoose";
+import type { FilterQuery, Types } from "mongoose";
+import { userIdOf } from "../../auth/requireUser.js";
 import { asyncHandler } from "../errors.js";
 import { StatementModel, TransactionModel, type TransactionDoc, type StatementDoc } from "../../db/models.js";
 import { computeFutureInstallments, computeFutureInstallmentsDetail, remainingInstallmentDebt } from "../../stats/futureInstallments.js";
@@ -11,9 +12,9 @@ import { statementDueDate } from "../../stats/statementDueDate.js";
 import type { Currency, MonthlyUsdStat } from "@ledgerly/shared";
 import { monthInYears, parseYears, yearDateRanges } from "../yearFilter.js";
 
-function baseMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
+function baseMatch(q: Record<string, unknown>, userId: Types.ObjectId): FilterQuery<TransactionDoc> {
   const currency = q.currency === "USD" ? "USD" : "ARS";
-  const match: FilterQuery<TransactionDoc> = { type: "purchase", currency };
+  const match: FilterQuery<TransactionDoc> = { userId, type: "purchase", currency };
   if (typeof q.cardLabel === "string") match.cardLabel = q.cardLabel;
   if (typeof q.from === "string" || typeof q.to === "string") {
     match.date = {};
@@ -25,8 +26,8 @@ function baseMatch(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
   return match;
 }
 
-async function latestStatementInstallmentTxs(q: Record<string, unknown>) {
-  const statementFilter = typeof q.cardLabel === "string" ? { cardLabel: q.cardLabel } : {};
+async function latestStatementInstallmentTxs(q: Record<string, unknown>, userId: Types.ObjectId) {
+  const statementFilter = typeof q.cardLabel === "string" ? { userId, cardLabel: q.cardLabel } : { userId };
   const statements = await StatementModel.find(statementFilter).lean();
   const ids = latestStatementIdsPerIssuer(
     statements.map((s) => ({
@@ -36,19 +37,19 @@ async function latestStatementInstallmentTxs(q: Record<string, unknown>) {
       uploadedAt: (s as unknown as { uploadedAt: Date }).uploadedAt,
     })),
   );
-  return TransactionModel.find({ type: "purchase", isInstallment: true, statementId: { $in: ids } }).lean();
+  return TransactionModel.find({ userId, type: "purchase", isInstallment: true, statementId: { $in: ids } }).lean();
 }
 
 const isoDay = (date: Date | null | undefined): string | null => (date ? date.toISOString().slice(0, 10) : null);
 
-async function installmentOccurrences(cardLabel: unknown): Promise<InstallmentOccurrence[]> {
-  const statements = await StatementModel.find(typeof cardLabel === "string" ? { cardLabel } : {}).lean();
+async function installmentOccurrences(cardLabel: unknown, userId: Types.ObjectId): Promise<InstallmentOccurrence[]> {
+  const statements = await StatementModel.find(typeof cardLabel === "string" ? { userId, cardLabel } : { userId }).lean();
   const paymentDates = new Map(statements.map((s) => [
     String(s._id),
     statementDueDate({ dueDate: isoDay(s.dueDate), closingDate: isoDay(s.closingDate) }),
   ]));
   const txs = await TransactionModel.find({
-    type: "purchase", direction: "debit", currency: "ARS", isInstallment: true,
+    userId, type: "purchase", direction: "debit", currency: "ARS", isInstallment: true,
     statementId: { $in: statements.map((s) => s._id) },
   }).lean();
   return txs.flatMap((t) => {
@@ -74,7 +75,7 @@ export const statsRouter = Router();
 
 statsRouter.get("/by-category", asyncHandler(async (req, res) => {
   const rows = await TransactionModel.aggregate([
-    { $match: baseMatch(req.query as Record<string, unknown>) },
+    { $match: baseMatch(req.query as Record<string, unknown>, userIdOf(req)) },
     { $group: { _id: "$category", total: { $sum: "$amount" }, count: { $sum: 1 } } },
     { $project: { _id: 0, category: "$_id", total: 1, count: 1 } },
     { $sort: { total: -1 } },
@@ -85,7 +86,8 @@ statsRouter.get("/by-category", asyncHandler(async (req, res) => {
 statsRouter.get("/last-statement/by-category", asyncHandler(async (req, res) => {
   const q = req.query as Record<string, unknown>;
   const currency = q.currency === "USD" ? "USD" : "ARS";
-  const filter: FilterQuery<StatementDoc> = {};
+  const userId = userIdOf(req);
+  const filter: FilterQuery<StatementDoc> = { userId };
   if (typeof q.cardLabel === "string") filter.cardLabel = q.cardLabel;
   const statements = await StatementModel.find(filter).lean();
   const ids = latestStatementIdsPerIssuer(
@@ -106,7 +108,7 @@ statsRouter.get("/last-statement/by-category", asyncHandler(async (req, res) => 
     ? "$amount"
     : { $cond: [{ $eq: ["$currency", "USD"] }, { $multiply: ["$amount", usdToArs] }, "$amount"] };
   const rows = await TransactionModel.aggregate([
-    { $match: { type: "purchase", currency: { $in: currencies }, statementId: { $in: ids } } },
+    { $match: { userId, type: "purchase", currency: { $in: currencies }, statementId: { $in: ids } } },
     { $group: { _id: "$category", total: { $sum: amountInCurrency }, count: { $sum: 1 } } },
     { $project: { _id: 0, category: "$_id", total: 1, count: 1 } },
     { $sort: { total: -1 } },
@@ -116,7 +118,7 @@ statsRouter.get("/last-statement/by-category", asyncHandler(async (req, res) => 
 
 statsRouter.get("/monthly", asyncHandler(async (req, res) => {
   const rows = await TransactionModel.aggregate([
-    { $match: baseMatch(req.query as Record<string, unknown>) },
+    { $match: baseMatch(req.query as Record<string, unknown>, userIdOf(req)) },
     { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$date" } }, total: { $sum: "$amount" }, count: { $sum: 1 } } },
     { $project: { _id: 0, month: "$_id", total: 1, count: 1 } },
     { $sort: { month: 1 } },
@@ -126,7 +128,7 @@ statsRouter.get("/monthly", asyncHandler(async (req, res) => {
 
 statsRouter.get("/monthly-usd", asyncHandler(async (req, res) => {
   const q = req.query as Record<string, unknown>;
-  const filter: FilterQuery<StatementDoc> = {};
+  const filter: FilterQuery<StatementDoc> = { userId: userIdOf(req) };
   if (typeof q.cardLabel === "string") filter.cardLabel = q.cardLabel;
   const fromMonth = typeof q.from === "string" ? q.from.slice(0, 7) : null;
   const toMonth = typeof q.to === "string" ? q.to.slice(0, 7) : null;
@@ -154,7 +156,7 @@ statsRouter.get("/monthly-usd", asyncHandler(async (req, res) => {
 statsRouter.get("/top-merchants", asyncHandler(async (req, res) => {
   const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 10)));
   const rows = await TransactionModel.aggregate([
-    { $match: baseMatch(req.query as Record<string, unknown>) },
+    { $match: baseMatch(req.query as Record<string, unknown>, userIdOf(req)) },
     { $group: { _id: "$merchant", total: { $sum: "$amount" }, count: { $sum: 1 } } },
     { $project: { _id: 0, merchant: "$_id", total: 1, count: 1 } },
     { $sort: { total: -1 } },
@@ -165,7 +167,7 @@ statsRouter.get("/top-merchants", asyncHandler(async (req, res) => {
 
 statsRouter.get("/future-installments", asyncHandler(async (req, res) => {
   const currency: Currency = req.query.currency === "USD" ? "USD" : "ARS";
-  const txs = await latestStatementInstallmentTxs(req.query as Record<string, unknown>);
+  const txs = await latestStatementInstallmentTxs(req.query as Record<string, unknown>, userIdOf(req));
   const mapped = txs.map((t) => ({
     date: t.date.toISOString().slice(0, 10),
     amount: t.amount, currency: t.currency as Currency,
@@ -177,7 +179,7 @@ statsRouter.get("/future-installments", asyncHandler(async (req, res) => {
 
 statsRouter.get("/future-installments/detail", asyncHandler(async (req, res) => {
   const currency: Currency = req.query.currency === "USD" ? "USD" : "ARS";
-  const txs = await latestStatementInstallmentTxs(req.query as Record<string, unknown>);
+  const txs = await latestStatementInstallmentTxs(req.query as Record<string, unknown>, userIdOf(req));
   const mapped = txs.map((t) => ({
     date: t.date.toISOString().slice(0, 10),
     amount: t.amount, currency: t.currency as Currency,
@@ -191,12 +193,13 @@ statsRouter.get("/future-installments/detail", asyncHandler(async (req, res) => 
 statsRouter.get("/summary", asyncHandler(async (req, res) => {
   const q = req.query as Record<string, unknown>;
   const currency: Currency = q.currency === "USD" ? "USD" : "ARS";
+  const userId = userIdOf(req);
   const [agg] = await TransactionModel.aggregate([
-    { $match: baseMatch(q) },
+    { $match: baseMatch(q, userId) },
     { $group: { _id: null, totalPurchases: { $sum: "$amount" }, transactionCount: { $sum: 1 } } },
   ]);
   const cardLabel = q.cardLabel;
-  const installmentTxs = await latestStatementInstallmentTxs(q);
+  const installmentTxs = await latestStatementInstallmentTxs(q, userId);
   const installments = installmentTxs.map((t) => ({
     date: t.date.toISOString().slice(0, 10),
     amount: t.amount, currency: t.currency as Currency,
@@ -212,13 +215,13 @@ statsRouter.get("/summary", asyncHandler(async (req, res) => {
     currency,
     totalPurchases: agg?.totalPurchases ?? 0,
     transactionCount: agg?.transactionCount ?? 0,
-    statementCount: await StatementModel.countDocuments(typeof cardLabel === "string" ? { cardLabel } : {}),
+    statementCount: await StatementModel.countDocuments(typeof cardLabel === "string" ? { userId, cardLabel } : { userId }),
     futureInstallmentTotal,
   });
 }));
 
 statsRouter.get("/installment-purchases", asyncHandler(async (req, res) => {
   const years = parseYears(req.query.year);
-  const purchases = buildInstallmentPurchases(await installmentOccurrences(req.query.cardLabel));
+  const purchases = buildInstallmentPurchases(await installmentOccurrences(req.query.cardLabel, userIdOf(req)));
   res.json(purchases.filter((purchase) => monthInYears(purchase.purchaseDate.slice(0, 7), years)));
 }));
