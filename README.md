@@ -125,12 +125,19 @@ Se hace una sola vez. Entre los pasos 1 y 6 nadie escribe en ninguna base.
    alerta de presupuesto de USD 1; la key va en `GOOGLE_VISION_API_KEY`.
 6. Merge a `main` → deploy de producción.
 7. Verificar:
-   1. Login del owner en la web y en la PWA instalada en el iPhone; ver los datos migrados.
+   1. Login del owner en la web y en la PWA del iPhone, reinstalada desde la URL nueva (Compartir →
+      Agregar a inicio); ver los datos migrados.
    2. Importar un PDF de resumen y un cupón en imagen.
    3. «Buscar» en iCloud y en Gmail a mano.
    4. Disparar cada cron a mano (abajo) y ver el resumen; ver el punto en Importar y que se apaga
       al entrar.
    5. Login de la otra persona: arranca vacía y no ve «Mails».
+
+   Si algo falla y no se arregla en el momento, volver a la Mac mientras tanto (los `.plist` siguen
+   ahí hasta el paso 9):
+   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ledgerly.server.plist`. Levanta la
+   versión que estaba publicada antes del corte, con la base local; lo cargado en Vercel entre medio
+   no vuelve a la Mac. El auto-deploy queda apagado hasta terminar el corte.
 8. Sumar a la otra persona: su mail en `ALLOWED_EMAILS` (redeploy) y como usuario de prueba en Google.
 9. Limpiar la Mac:
    ```bash
