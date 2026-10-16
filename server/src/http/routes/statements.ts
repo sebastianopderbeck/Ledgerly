@@ -1,20 +1,19 @@
 import { Router } from "express";
-import multer from "multer";
 import { HttpError, asyncHandler } from "../errors.js";
 import { importStatement } from "../../import/importStatement.js";
 import { StatementModel, TransactionModel } from "../../db/models.js";
 import { userIdOf } from "../../auth/requireUser.js";
+import { uploadSingleFile } from "../uploadFile.js";
 import { toStatementDTO, toTransactionDTO } from "../mappers.js";
 import {
   NoTextError, NoTransactionsError, UnsupportedFormatError,
 } from "../../ingestion/errors.js";
 
-const upload = multer({ storage: multer.memoryStorage() });
 export const statementsRouter = Router();
 
 statementsRouter.post(
   "/",
-  upload.single("file"),
+  uploadSingleFile(),
   asyncHandler(async (req, res) => {
     if (!req.file) throw new HttpError(400, "Falta el archivo (campo 'file')");
     const userId = userIdOf(req);

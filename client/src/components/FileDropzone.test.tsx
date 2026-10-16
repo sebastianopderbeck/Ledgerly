@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE } from "@ledgerly/shared";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { emulateMobile } from "../testing/viewport.js";
 import { FileDropzone } from "./FileDropzone.js";
@@ -20,6 +21,18 @@ const heicWithoutType = () => new File(["x"], "IMG_0001.HEIC", { type: "" });
 const txt = () => new File(["x"], "notas.txt", { type: "text/plain" });
 
 describe("FileDropzone", () => {
+  it("avisa sin subir un archivo de más de 4 MB y deja pasar uno de exactamente 4 MB", () => {
+    const onFile = vi.fn();
+    renderWithProviders(<FileDropzone onFile={onFile} />);
+    drop(new File([new Uint8Array(MAX_UPLOAD_BYTES + 1)], "grande.pdf", { type: "application/pdf" }));
+    expect(screen.getByText(UPLOAD_TOO_LARGE)).toBeInTheDocument();
+    expect(onFile).not.toHaveBeenCalled();
+    const exact = new File([new Uint8Array(MAX_UPLOAD_BYTES)], "justo.pdf", { type: "application/pdf" });
+    drop(exact);
+    expect(onFile).toHaveBeenCalledWith(exact);
+    expect(screen.queryByText(UPLOAD_TOO_LARGE)).not.toBeInTheDocument();
+  });
+
   it("acepta un PDF soltado", () => {
     const onFile = vi.fn();
     renderWithProviders(<FileDropzone onFile={onFile} />);

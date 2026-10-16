@@ -1,12 +1,11 @@
-import { Router, type NextFunction, type Request, type Response } from "express";
-import multer, { MulterError } from "multer";
+import { Router } from "express";
+import type { Options } from "multer";
 import { HttpError, asyncHandler } from "../errors.js";
-import { importPdf, MAX_PDF_BYTES } from "../../import/importPdf.js";
+import { importPdf } from "../../import/importPdf.js";
 import { importCouponImage } from "../../import/importCouponImage.js";
 import { IngestionError } from "../../ingestion/errors.js";
 import { userIdOf } from "../../auth/requireUser.js";
-
-export const MAX_UPLOAD_BYTES = MAX_PDF_BYTES;
+import { uploadSingleFile } from "../uploadFile.js";
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/heic"]);
 const IMAGE_EXTENSION = /\.(png|jpe?g|heic)$/i;
@@ -18,35 +17,17 @@ const isPdf = (file: Express.Multer.File): boolean =>
 const isImage = (file: Express.Multer.File): boolean =>
   IMAGE_TYPES.has(file.mimetype) || IMAGE_EXTENSION.test(file.originalname);
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
-  fileFilter: (_req, file, cb) => {
-    if (!isPdf(file) && !isImage(file)) {
-      cb(new HttpError(400, UNSUPPORTED_FILE));
-      return;
-    }
-    cb(null, true);
-  },
-});
-
-const uploadFile = (req: Request, res: Response, next: NextFunction): void => {
-  upload.single("file")(req, res, (err: unknown) => {
-    if (err instanceof MulterError) {
-      if (err.code === "LIMIT_FILE_SIZE") {
-        next(new HttpError(413, `El archivo supera el máximo de ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`));
-        return;
-      }
-      next(new HttpError(400, "Subida inválida"));
-      return;
-    }
-    next(err);
-  });
+const acceptsPdfOrImage: Options["fileFilter"] = (_req, file, cb) => {
+  if (!isPdf(file) && !isImage(file)) {
+    cb(new HttpError(400, UNSUPPORTED_FILE));
+    return;
+  }
+  cb(null, true);
 };
 
 export const importRouter = Router();
 
-importRouter.post("/", uploadFile, asyncHandler(async (req, res) => {
+importRouter.post("/", uploadSingleFile(acceptsPdfOrImage), asyncHandler(async (req, res) => {
   if (!req.file) throw new HttpError(400, "Falta el archivo (campo 'file')");
   const importFile = isPdf(req.file) ? importPdf : importCouponImage;
   try {

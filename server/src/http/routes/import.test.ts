@@ -10,7 +10,7 @@ vi.mock("../../ocr/recognizeImage.js", () => ({ recognizeImage: vi.fn() }));
 import { recognizeImage } from "../../ocr/recognizeImage.js";
 import { MortgageCouponModel } from "../../db/models.js";
 import { createApp } from "../app.js";
-import { MAX_UPLOAD_BYTES } from "./import.js";
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE } from "@ledgerly/shared";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
@@ -116,7 +116,13 @@ describe("POST /api/import (validación de archivo)", () => {
       .post("/api/import")
       .attach("file", tooBig, { filename: "enorme.pdf", contentType: "application/pdf" });
     expect(res.status).toBe(413);
-    expect(res.body.error).toMatch(/supera/i);
+    expect(res.body.error).toBe(UPLOAD_TOO_LARGE);
+  });
+
+  it("un archivo de exactamente 4 MB pasa el límite", async () => {
+    mocked.mockResolvedValue({ text: "documento cualquiera sin marcadores conocidos", meta });
+    const res = await auth.api.post("/api/import").attach("file", Buffer.alloc(MAX_UPLOAD_BYTES, 0x20), "x.pdf");
+    expect(res.status).toBe(422);
   });
 
   it("acepta un PDF justo por debajo del límite", async () => {

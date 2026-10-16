@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { withDb } from "../../testing/withDb.js";
 import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
-import type { ParsedStatement } from "@ledgerly/shared";
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE, type ParsedStatement } from "@ledgerly/shared";
 
 vi.mock("../../ingestion/parseStatement.js", () => ({ parseStatement: vi.fn() }));
 import { parseStatement } from "../../ingestion/parseStatement.js";
@@ -62,6 +62,12 @@ describe("POST /api/statements", () => {
   it("sin archivo → 400", async () => {
     const res = await auth.api.post("/api/statements");
     expect(res.status).toBe(400);
+  });
+
+  it("un archivo de más de 4 MB → 413", async () => {
+    const res = await auth.api.post("/api/statements").attach("file", Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0x20), "r.pdf");
+    expect(res.status).toBe(413);
+    expect(res.body).toEqual({ error: UPLOAD_TOO_LARGE });
   });
 });
 
