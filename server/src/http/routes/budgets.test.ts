@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe("CRUD de /api/budgets", () => {
-  it.skip("los topes de otro usuario no cuentan como duplicados", async () => {
+  it("los topes de otro usuario no cuentan como duplicados", async () => {
     await BudgetModel.create({ userId: new Types.ObjectId(), category: "Comida", topeArs: 1000, periodoBase: "2026-08" });
     const created = await createBudget({ category: "Comida", topeArs: 300000 });
     expect(created.status).toBe(201);

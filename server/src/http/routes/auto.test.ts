@@ -39,7 +39,7 @@ describe("GET /api/auto/summary", () => {
   });
 
   it("devuelve 204 sin cupones", async () => {
-    await AutoCouponModel.deleteMany({});
+    await AutoCouponModel.deleteMany({ userId: auth.userId });
     const res = await auth.api.get("/api/auto/summary");
     expect(res.status).toBe(204);
   });

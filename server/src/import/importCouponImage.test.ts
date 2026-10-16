@@ -87,7 +87,7 @@ describe("importCouponImage", () => {
   });
 
   it("sin cupones previos falla con MissingPreviousCouponError y no guarda nada", async () => {
-    await MortgageCouponModel.deleteMany({});
+    await MortgageCouponModel.deleteMany({ userId: USER_ID });
     await expect(importCouponImage({ userId: USER_ID, data: png, fileName: "cuota-3.png" }))
       .rejects.toBeInstanceOf(MissingPreviousCouponError);
     expect(await MortgageCouponModel.countDocuments({ userId: USER_ID })).toBe(0);

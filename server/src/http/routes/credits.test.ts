@@ -56,7 +56,7 @@ describe("GET /api/credits/summary", () => {
   });
 
   it("devuelve 204 sin cupones", async () => {
-    await MortgageCouponModel.deleteMany({});
+    await MortgageCouponModel.deleteMany({ userId: auth.userId });
     const res = await auth.api.get("/api/credits/summary");
     expect(res.status).toBe(204);
   });

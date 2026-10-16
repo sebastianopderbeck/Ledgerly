@@ -161,7 +161,7 @@ describe("PATCH /api/net-worth/assets/:id", () => {
     const { id } = await createdAhorros();
     const res = await patchAsset(id, { moneda: "ARS" });
     expect(res.status).toBe(400);
-    expect((await ManualAssetModel.findById(id))?.moneda).toBe("USD");
+    expect((await ManualAssetModel.findOne({ _id: id, userId: auth.userId }))?.moneda).toBe("USD");
   });
 
   it("rechaza una fecha futura", async () => {
