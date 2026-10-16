@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { UnscopedQueryError } from "../db/userScoped.js";
 
 export class HttpError extends Error {
   status: number;
@@ -20,6 +21,11 @@ export function asyncHandler(fn: Handler) {
 export function errorMiddleware(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message });
+    return;
+  }
+  if (err instanceof UnscopedQueryError) {
+    console.error(err.message);
+    res.status(500).json({ error: "Error interno" });
     return;
   }
   res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
