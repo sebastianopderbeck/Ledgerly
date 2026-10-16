@@ -7,6 +7,7 @@ vi.mock("../../ingestion/parseStatement.js", () => ({ parseStatement: vi.fn() })
 import { parseStatement } from "../../ingestion/parseStatement.js";
 import { createApp } from "../app.js";
 import { NoTextError } from "../../ingestion/errors.js";
+import { StatementModel, TransactionModel } from "../../db/models.js";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
@@ -35,6 +36,13 @@ describe("POST /api/statements", () => {
     expect(res.body.status).toBe("imported");
     expect(res.body.statement.cardLabel).toBe("Visa ****1234");
     expect(res.body.transactionCount).toBe(1);
+  });
+
+  it("guarda el resumen con el userId de la sesión", async () => {
+    const res = await auth.api.post("/api/statements").attach("file", Buffer.from("pdf"), "r.pdf");
+    const stored = await StatementModel.findOne({ _id: res.body.statement.id, userId: auth.userId });
+    expect(stored).not.toBeNull();
+    expect(await TransactionModel.countDocuments({ statementId: stored?._id, userId: auth.userId })).toBe(res.body.transactionCount);
   });
 
   it("reimportar devuelve 200 duplicate", async () => {

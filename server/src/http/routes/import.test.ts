@@ -30,7 +30,7 @@ const UNSUPPORTED_FILE = "Sólo se aceptan PDF o imágenes (PNG, JPG, HEIC)";
 
 const seedPreviousCoupon = () =>
   MortgageCouponModel.create({
-    prestamoNro: "0000000001", cuotaNro: 2, fechaDebito: new Date("2025-10-17"), capital: 1, intereses: 1,
+    userId: auth.userId, prestamoNro: "0000000001", cuotaNro: 2, fechaDebito: new Date("2025-10-17"), capital: 1, intereses: 1,
     seguroIncendio: 1, totalDebitado: 3, cuotaPuraUva: 499.9, cotizacionUva: 2200, tea: 9.5, tna: 9.1, cft: 11.2,
     sourceFileName: "cupon-2.pdf", sourceHash: "hash-2",
   });

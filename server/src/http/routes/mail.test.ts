@@ -144,7 +144,7 @@ describe("POST /api/mail/:source/sync", () => {
     expect(openIcloudClient).toHaveBeenCalledWith({
       user: ICLOUD_USER, password: "clave-app-sintetica", mailboxes: ["INBOX", "Bancos"], since: new Date(2026, 8, 1),
     });
-    expect(await StatementModel.countDocuments()).toBe(1);
+    expect(await StatementModel.countDocuments({ userId: auth.userId })).toBe(1);
     const [icloud, gmail] = await statuses();
     expect(icloud.lastRun).toEqual(res.body);
     expect(gmail.lastRun).toBeNull();
@@ -177,7 +177,7 @@ describe("POST /api/mail/:source/sync", () => {
     const run = mailSyncRunDtoSchema.parse(res.body);
     expect(run).toMatchObject({ source: "gmail", trigger: "manual", status: "ok", messagesChecked: 1 });
     expect(run.items).toMatchObject([{ fileName: "resumen-sintetico.pdf", outcome: "imported", kind: "statement" }]);
-    expect(run.items[0].documentId).toBe((await StatementModel.findOne())?._id.toString());
+    expect(run.items[0].documentId).toBe((await StatementModel.findOne({ userId: auth.userId }))?._id.toString());
     const [, gmail] = await statuses();
     expect(gmail.lastRun).toEqual(res.body);
   });

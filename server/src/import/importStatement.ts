@@ -22,20 +22,21 @@ interface ImportStatementResult {
   transactionCount: number;
 }
 
-const duplicateOf = async (statementId: Types.ObjectId): Promise<ImportStatementResult> => ({
+const duplicateOf = async (userId: Types.ObjectId, statementId: Types.ObjectId): Promise<ImportStatementResult> => ({
   status: "duplicate",
   statementId: statementId.toString(),
-  transactionCount: await TransactionModel.countDocuments({ statementId }),
+  transactionCount: await TransactionModel.countDocuments({ userId, statementId }),
 });
 
-const removeStatement = async (statementId: Types.ObjectId): Promise<void> => {
-  await TransactionModel.deleteMany({ statementId });
-  await StatementModel.deleteOne({ _id: statementId });
+const removeStatement = async (userId: Types.ObjectId, statementId: Types.ObjectId): Promise<void> => {
+  await TransactionModel.deleteMany({ userId, statementId });
+  await StatementModel.deleteOne({ _id: statementId, userId });
 };
 
-const findSameStatement = async (header: ParsedStatement["header"]) => {
+const findSameStatement = async (userId: Types.ObjectId, header: ParsedStatement["header"]) => {
   if (!header.closingDate) return null;
   return StatementModel.findOne({
+    userId,
     issuer: header.issuer,
     cardLabel: header.cardLabel,
     closingDate: new Date(header.closingDate),
@@ -48,25 +49,28 @@ const assertValid = (doc: object, model: typeof StatementModel | typeof Transact
 };
 
 export async function importStatement(input: {
+  userId: Types.ObjectId;
   data: Uint8Array;
   fileName: string;
   replace?: boolean;
   extracted?: ExtractedPdf;
 }): Promise<ImportStatementResult> {
+  const { userId } = input;
   const sourceHash = createHash("sha256").update(input.data).digest("hex");
 
-  const sameFile = await StatementModel.findOne({ sourceHash });
-  if (sameFile && !input.replace) return duplicateOf(sameFile._id);
+  const sameFile = await StatementModel.findOne({ userId, sourceHash });
+  if (sameFile && !input.replace) return duplicateOf(userId, sameFile._id);
 
   const { statement, reconciliation, meta } = await parseStatement(input.data, input.extracted);
-  const sameStatement = await findSameStatement(statement.header);
-  if (sameStatement && !input.replace) return duplicateOf(sameStatement._id);
+  const sameStatement = await findSameStatement(userId, statement.header);
+  if (sameStatement && !input.replace) return duplicateOf(userId, sameStatement._id);
 
   const rules = (await CategoryRuleModel.find({ enabled: true }).lean()) as unknown as RuleInput[];
   const statementId = new Types.ObjectId();
 
   const statementDoc = {
     _id: statementId,
+    userId,
     issuer: statement.header.issuer,
     cardLabel: statement.header.cardLabel,
     last4: statement.header.last4,
@@ -84,6 +88,7 @@ export async function importStatement(input: {
   const docs = statement.rows.map((row) => {
     const { category, source } = categorize(row.descriptionRaw, row.merchant, rules);
     return {
+      userId,
       statementId,
       issuer: statement.header.issuer,
       cardLabel: statement.header.cardLabel,
@@ -110,14 +115,14 @@ export async function importStatement(input: {
   assertValid(statementDoc, StatementModel);
   docs.forEach((doc) => assertValid(doc, TransactionModel));
 
-  if (sameFile) await removeStatement(sameFile._id);
-  if (sameStatement && !sameStatement._id.equals(sameFile?._id)) await removeStatement(sameStatement._id);
+  if (sameFile) await removeStatement(userId, sameFile._id);
+  if (sameStatement && !sameStatement._id.equals(sameFile?._id)) await removeStatement(userId, sameStatement._id);
 
   try {
     await StatementModel.create(statementDoc);
 
     const existingFingerprints = new Set(
-      (await TransactionModel.find({ fingerprint: { $in: docs.map((d) => d.fingerprint) } }).distinct("fingerprint")) as string[],
+      (await TransactionModel.find({ userId, fingerprint: { $in: docs.map((d) => d.fingerprint) } }).distinct("fingerprint")) as string[],
     );
     const seen = new Set<string>();
     const toInsert = docs.filter((doc) => {
@@ -129,7 +134,7 @@ export async function importStatement(input: {
 
     return { status: "imported", statementId: statementId.toString(), transactionCount: toInsert.length };
   } catch (error) {
-    await removeStatement(statementId);
+    await removeStatement(userId, statementId);
     throw error;
   }
 }

@@ -4,6 +4,7 @@ import { HttpError, asyncHandler } from "../errors.js";
 import { importPdf, MAX_PDF_BYTES } from "../../import/importPdf.js";
 import { importCouponImage } from "../../import/importCouponImage.js";
 import { IngestionError } from "../../ingestion/errors.js";
+import { userIdOf } from "../../auth/requireUser.js";
 
 export const MAX_UPLOAD_BYTES = MAX_PDF_BYTES;
 
@@ -50,6 +51,7 @@ importRouter.post("/", uploadFile, asyncHandler(async (req, res) => {
   const importFile = isPdf(req.file) ? importPdf : importCouponImage;
   try {
     const { result } = await importFile({
+      userId: userIdOf(req),
       data: req.file.buffer,
       fileName: req.file.originalname,
       replace: req.query.replace === "true",

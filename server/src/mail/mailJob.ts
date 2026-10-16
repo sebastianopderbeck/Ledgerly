@@ -1,6 +1,8 @@
 import {
   MAIL_SOURCE_LABELS, type MailSource, type MailSyncOutcome, type MailSyncRunDTO, type MailSyncTrigger,
 } from "@ledgerly/shared";
+import type { Types } from "mongoose";
+import { MISSING_OWNER } from "../auth/owner.js";
 import { MAX_TIMER_MS, nextMailRunDelayMs, nextScheduledRun } from "./mailSchedule.js";
 import type { MailSourceSetup } from "./mailSourceSetup.js";
 import { notifyRun } from "./notifyRun.js";
@@ -36,22 +38,26 @@ const logRun = (run: MailSyncRunDTO): void => {
   else console.log(line);
 };
 
-const previousRun = async (source: MailSource): Promise<MailSyncRunDTO | null> => {
+export type ResolveOwner = () => Promise<Types.ObjectId | null>;
+
+const previousRun = async (ownerId: Types.ObjectId | null, source: MailSource): Promise<MailSyncRunDTO | null> => {
+  if (!ownerId) return null;
   try {
-    return await findLastMailRun(source);
+    return await findLastMailRun(ownerId, source);
   } catch {
     return null;
   }
 };
 
-export async function startMailJob(setup: MailSourceSetup): Promise<() => void> {
+export async function startMailJob(setup: MailSourceSetup, resolveOwner: ResolveOwner): Promise<() => void> {
   const { source, schedule: mailSchedule, openClient } = setup;
   if (mailSchedule === null || openClient === null) return () => {};
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
   const jobStartedAt = new Date();
-  const last = await previousRun(source);
+  const ownerOrNull = (): Promise<Types.ObjectId | null> => resolveOwner().catch(() => null);
+  const last = await previousRun(await ownerOrNull(), source);
   let lastStartedAt: Date | null = last ? new Date(last.startedAt) : null;
 
   const arm = (delayMs: number): void => {
@@ -60,17 +66,27 @@ export async function startMailJob(setup: MailSourceSetup): Promise<() => void> 
     timer.unref();
   };
 
-  const runOnce = async (slot: Date): Promise<void> => {
-    const previous = await previousRun(source);
-    const startedAt = new Date();
-    lastStartedAt = startedAt.getTime() >= slot.getTime() ? startedAt : slot;
-    let run: MailSyncRunDTO | null = null;
+  const runAsOwner = async (ownerId: Types.ObjectId | null): Promise<MailSyncRunDTO | null> => {
+    if (!ownerId) {
+      console.error(`${logPrefix(source, "job")}: error — ${MISSING_OWNER}`);
+      return null;
+    }
     try {
-      run = await runMailSync(source, openClient, "job");
+      const run = await runMailSync(ownerId, source, openClient, "job");
       logRun(run);
+      return run;
     } catch (err) {
       console.error(`${logPrefix(source, "job")}: error — ${err instanceof Error ? err.message : UNEXPECTED_ERROR}`);
+      return null;
     }
+  };
+
+  const runOnce = async (slot: Date): Promise<void> => {
+    const ownerId = await ownerOrNull();
+    const previous = await previousRun(ownerId, source);
+    const startedAt = new Date();
+    lastStartedAt = startedAt.getTime() >= slot.getTime() ? startedAt : slot;
+    const run = await runAsOwner(ownerId);
     arm(nextMailRunDelayMs(mailSchedule, lastStartedAt, new Date()));
     if (run) await notifyRun(run, previous);
   };

@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { StatementDTO } from "@ledgerly/shared";
 import { withDb } from "../testing/withDb.js";
@@ -13,10 +14,12 @@ import {
   classifyImportError, findLastMailRun, MAIL_LIST_LIMIT, NO_PDF_PART_ID, runMailSync, selectPendingMessages, syncMail,
 } from "./syncMail.js";
 
+const USER_ID = new Types.ObjectId();
+
 withDb();
 
-const gmail = (client: MailClient) => ({ source: "gmail" as const, openClient: async () => client });
-const icloud = (client: MailClient) => ({ source: "icloud" as const, openClient: async () => client });
+const gmail = (client: MailClient) => ({ userId: USER_ID, source: "gmail" as const, openClient: async () => client });
+const icloud = (client: MailClient) => ({ userId: USER_ID, source: "icloud" as const, openClient: async () => client });
 
 const statementDto = (id: string): StatementDTO => ({
   id, issuer: "visa_signature", cardLabel: "Visa Signature ****1234", last4: "1234",
@@ -130,9 +133,9 @@ describe("syncMail", () => {
     ]);
     expect(run.items[0].receivedAt).toBe(FAKE_RECEIVED_AT);
     expect(client.listMessageIds).toHaveBeenCalledWith(MAIL_LIST_LIMIT);
-    expect(importPdf).toHaveBeenCalledWith({ data: fakePdfBytes("msg-1", "1"), fileName: "resumen-sintetico.pdf" });
-    expect(await MailAttachmentModel.countDocuments()).toBe(3);
-    expect(await MailSyncRunModel.countDocuments()).toBe(1);
+    expect(importPdf).toHaveBeenCalledWith({ userId: USER_ID, data: fakePdfBytes("msg-1", "1"), fileName: "resumen-sintetico.pdf" });
+    expect(await MailAttachmentModel.countDocuments({ userId: USER_ID })).toBe(3);
+    expect(await MailSyncRunModel.countDocuments({ userId: USER_ID })).toBe(1);
   });
 
   it("una segunda corrida no vuelve a leer los mails ya procesados", async () => {
@@ -143,7 +146,7 @@ describe("syncMail", () => {
     const second = await syncMail({ ...gmail(client), trigger: "job", importPdf });
     expect(client.getMessage).not.toHaveBeenCalled();
     expect(second).toMatchObject({ trigger: "job", status: "ok", messagesChecked: 0, items: [] });
-    expect(await MailSyncRunModel.countDocuments()).toBe(2);
+    expect(await MailSyncRunModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 
   it("un adjunto que falló se reintenta y pasa a importado", async () => {
@@ -157,7 +160,7 @@ describe("syncMail", () => {
     const second = await syncMail({ ...gmail(client), trigger: "manual", importPdf });
     expect(second.items).toMatchObject([{ outcome: "imported", documentId: "stmt-1" }]);
     expect(client.getMessage).toHaveBeenCalledTimes(2);
-    expect(await MailAttachmentModel.countDocuments()).toBe(1);
+    expect(await MailAttachmentModel.countDocuments({ userId: USER_ID })).toBe(1);
   });
 
   it("un adjunto de más de 15 MB queda omitido sin bajarlo", async () => {
@@ -173,7 +176,7 @@ describe("syncMail", () => {
     const client = fakeMailClient([{ id: "msg-1", pdfParts: [] }]);
     const run = await syncMail({ ...gmail(client), trigger: "manual", importPdf: importByName({}) });
     expect(run.items).toMatchObject([{ fileName: "(sin PDF adjunto)", outcome: "skipped", detail: "El mail no trae un PDF adjunto" }]);
-    expect((await MailAttachmentModel.findOne())?.partId).toBe(NO_PDF_PART_ID);
+    expect((await MailAttachmentModel.findOne({ userId: USER_ID }))?.partId).toBe(NO_PDF_PART_ID);
     client.getMessage.mockClear();
     await syncMail({ ...gmail(client), trigger: "manual", importPdf: importByName({}) });
     expect(client.getMessage).not.toHaveBeenCalled();
@@ -194,7 +197,7 @@ describe("syncMail", () => {
     expect(run).toMatchObject({
       status: "error", error: "Gmail rechazó el refresh token (venció o fue revocado).", messagesChecked: 0, items: [],
     });
-    expect(await MailSyncRunModel.countDocuments()).toBe(1);
+    expect(await MailSyncRunModel.countDocuments({ userId: USER_ID })).toBe(1);
   });
 
   it("un error inesperado fuera de la importación también termina en corrida con error", async () => {
@@ -255,7 +258,7 @@ describe("syncMail", () => {
     const client = fakeMailClient([{ id: "msg-1", pdfParts: [pdfPart("1", "factura.pdf")] }]);
     const run = await syncMail({ ...icloud(client), trigger: "manual", importPdf: importByName({}) });
     expect(run.source).toBe("icloud");
-    expect((await MailAttachmentModel.findOne())?.source).toBe("icloud");
+    expect((await MailAttachmentModel.findOne({ userId: USER_ID }))?.source).toBe("icloud");
     expect(client.close).toHaveBeenCalledTimes(1);
   });
 
@@ -267,12 +270,12 @@ describe("syncMail", () => {
     const run = await syncMail({ ...icloud(icloudClient), trigger: "manual", importPdf });
     expect(icloudClient.getMessage).toHaveBeenCalledWith("msg-1");
     expect(run.messagesChecked).toBe(1);
-    expect(await MailAttachmentModel.countDocuments()).toBe(2);
+    expect(await MailAttachmentModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 
   it("si no se puede abrir el cliente, la corrida queda en error", async () => {
     const run = await syncMail({
-      source: "icloud", trigger: "job", importPdf: importByName({}),
+      userId: USER_ID, source: "icloud", trigger: "job", importPdf: importByName({}),
       openClient: async () => {
         throw new Error("iCloud rechazó el usuario o la contraseña de app.");
       },
@@ -294,7 +297,7 @@ describe("syncMail", () => {
 
 describe("findLastMailRun", () => {
   it("sin corridas devuelve null", async () => {
-    expect(await findLastMailRun("gmail")).toBeNull();
+    expect(await findLastMailRun(USER_ID, "gmail")).toBeNull();
   });
 
   it("devuelve la corrida más nueva con sus ítems", async () => {
@@ -302,29 +305,29 @@ describe("findLastMailRun", () => {
     const clock = ticking();
     await syncMail({ ...gmail(client), trigger: "job", importPdf: importByName({}), now: clock });
     const latest = await syncMail({ ...gmail(client), trigger: "manual", importPdf: importByName({}), now: clock });
-    expect(await findLastMailRun("gmail")).toEqual(latest);
+    expect(await findLastMailRun(USER_ID, "gmail")).toEqual(latest);
   });
 
   it("solo mira las corridas de la fuente pedida", async () => {
     await syncMail({ ...icloud(fakeMailClient([])), trigger: "manual", importPdf: importByName({}) });
-    expect(await findLastMailRun("gmail")).toBeNull();
-    expect((await findLastMailRun("icloud"))?.source).toBe("icloud");
+    expect(await findLastMailRun(USER_ID, "gmail")).toBeNull();
+    expect((await findLastMailRun(USER_ID, "icloud"))?.source).toBe("icloud");
   });
 });
 
 describe("runMailSync", () => {
   it("une las llamadas concurrentes de la misma fuente en una sola corrida", async () => {
     const openClient = vi.fn(async () => fakeMailClient([]));
-    const manual = runMailSync("gmail", openClient, "manual");
-    const job = runMailSync("gmail", openClient, "job");
+    const manual = runMailSync(USER_ID, "gmail", openClient, "manual");
+    const job = runMailSync(USER_ID, "gmail", openClient, "job");
     expect(job).toBe(manual);
     expect((await manual).trigger).toBe("manual");
     expect(openClient).toHaveBeenCalledTimes(1);
   });
 
   it("las corridas de fuentes distintas no se unen", async () => {
-    const gmailRun = runMailSync("gmail", vi.fn(async () => fakeMailClient([])), "manual");
-    const icloudRun = runMailSync("icloud", vi.fn(async () => fakeMailClient([])), "manual");
+    const gmailRun = runMailSync(USER_ID, "gmail", vi.fn(async () => fakeMailClient([])), "manual");
+    const icloudRun = runMailSync(USER_ID, "icloud", vi.fn(async () => fakeMailClient([])), "manual");
     expect(icloudRun).not.toBe(gmailRun);
     expect((await gmailRun).source).toBe("gmail");
     expect((await icloudRun).source).toBe("icloud");
@@ -332,18 +335,18 @@ describe("runMailSync", () => {
 
   it("cuando termina, la próxima llamada arranca otra corrida", async () => {
     const openClient = vi.fn(async () => fakeMailClient([]));
-    await runMailSync("gmail", openClient, "manual");
-    await runMailSync("gmail", openClient, "manual");
+    await runMailSync(USER_ID, "gmail", openClient, "manual");
+    await runMailSync(USER_ID, "gmail", openClient, "manual");
     expect(openClient).toHaveBeenCalledTimes(2);
-    expect(await MailSyncRunModel.countDocuments()).toBe(2);
+    expect(await MailSyncRunModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 
   it("después de un rechazo, la próxima llamada arranca otra corrida", async () => {
     const openClient = vi.fn(async () => fakeMailClient([]));
     const create = vi.spyOn(MailSyncRunModel, "create").mockRejectedValueOnce(new Error("Mongo caído"));
-    await expect(runMailSync("gmail", openClient, "manual")).rejects.toThrow("Mongo caído");
+    await expect(runMailSync(USER_ID, "gmail", openClient, "manual")).rejects.toThrow("Mongo caído");
     create.mockRestore();
-    const run = await runMailSync("gmail", openClient, "manual");
+    const run = await runMailSync(USER_ID, "gmail", openClient, "manual");
     expect(run.status).toBe("ok");
     expect(openClient).toHaveBeenCalledTimes(2);
   });

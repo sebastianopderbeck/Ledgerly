@@ -5,10 +5,12 @@ import { withDb } from "../testing/withDb.js";
 import { MailAttachmentModel, MailSyncRunModel } from "../db/models.js";
 import { toMailSyncItemDTO, toMailSyncRunDTO } from "./mailMappers.js";
 
+const USER_ID = new Types.ObjectId();
+
 withDb();
 
 const attachment = (overrides: Record<string, unknown> = {}) => MailAttachmentModel.create({
-  source: "gmail", messageId: "msg-1", partId: "1", runId: new Types.ObjectId(), fileName: "resumen-sintetico.pdf",
+  userId: USER_ID, source: "gmail", messageId: "msg-1", partId: "1", runId: new Types.ObjectId(), fileName: "resumen-sintetico.pdf",
   receivedAt: new Date("2026-09-28T12:00:00.000Z"), outcome: "imported", kind: "statement", documentId: "stmt-1",
   detail: "ICBC · 3 movimientos", processedAt: new Date("2026-10-03T12:00:01.000Z"), ...overrides,
 });
@@ -31,7 +33,7 @@ describe("toMailSyncItemDTO", () => {
 describe("toMailSyncRunDTO", () => {
   it("arma la corrida con sus ítems y cumple el schema", async () => {
     const run = await MailSyncRunModel.create({
-      source: "gmail", trigger: "job", startedAt: new Date("2026-10-03T12:00:00.000Z"), finishedAt: new Date("2026-10-03T12:00:05.000Z"),
+      userId: USER_ID, source: "gmail", trigger: "job", startedAt: new Date("2026-10-03T12:00:00.000Z"), finishedAt: new Date("2026-10-03T12:00:05.000Z"),
       status: "error", error: "Gmail respondió 500.", messagesChecked: 1, hasMore: true,
     });
     const item = await attachment({ runId: run._id });

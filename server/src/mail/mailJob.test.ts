@@ -8,6 +8,8 @@ import { notifyRun } from "./notifyRun.js";
 import type { MailSourceSetup } from "./mailSourceSetup.js";
 import { formatMailRunLog, startMailJob } from "./mailJob.js";
 import { MAIL_STARTUP_DELAY_MS, MAX_TIMER_MS, type MailSchedule } from "./mailSchedule.js";
+import { Types } from "mongoose";
+import { MISSING_OWNER } from "../auth/owner.js";
 
 const HOUR = 3_600_000;
 const SCHEDULE: MailSchedule = { fromDay: 25, toDay: 5, hour: 21 };
@@ -16,6 +18,10 @@ const hoursBefore = (hours: number) => new Date(NOW.getTime() - hours * HOUR);
 const SLOT_DELAY = 11 * HOUR;
 
 const openClient = vi.fn();
+
+const OWNER_ID = new Types.ObjectId();
+const resolveOwner = vi.fn(async (): Promise<Types.ObjectId | null> => OWNER_ID);
+const start = (mailSetup: MailSourceSetup) => startMailJob(mailSetup, resolveOwner);
 
 const setup = (schedule: MailSchedule | null, overrides: Partial<MailSourceSetup> = {}): MailSourceSetup => ({
   source: "gmail", missing: [], scope: "has:attachment", schedule, openClient, ...overrides,
@@ -64,6 +70,8 @@ describe("startMailJob", () => {
     vi.mocked(runMailSync).mockReset();
     vi.mocked(findLastMailRun).mockReset();
     vi.mocked(findLastMailRun).mockResolvedValue(null);
+    resolveOwner.mockReset();
+    resolveOwner.mockResolvedValue(OWNER_ID);
     vi.mocked(runMailSync).mockResolvedValue(runOf());
     vi.mocked(notifyRun).mockReset();
     vi.mocked(notifyRun).mockResolvedValue(undefined);
@@ -75,13 +83,25 @@ describe("startMailJob", () => {
     vi.restoreAllMocks();
   });
 
+  it("sin usuario owner no corre, avisa y vuelve a intentar en el próximo slot", async () => {
+    resolveOwner.mockResolvedValue(null);
+    const stop = await start(setup(SCHEDULE));
+    await vi.advanceTimersByTimeAsync(SLOT_DELAY);
+    expect(runMailSync).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(`Gmail (automática): error — ${MISSING_OWNER}`);
+    resolveOwner.mockResolvedValue(OWNER_ID);
+    await vi.advanceTimersByTimeAsync(24 * HOUR);
+    expect(runMailSync).toHaveBeenCalledWith(OWNER_ID, "gmail", openClient, "job");
+    stop();
+  });
+
   it("corre en el próximo slot, loguea y encadena el del día siguiente", async () => {
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY - 1);
     expect(runMailSync).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(runMailSync).toHaveBeenCalledTimes(1);
-    expect(runMailSync).toHaveBeenCalledWith("gmail", openClient, "job");
+    expect(runMailSync).toHaveBeenCalledWith(OWNER_ID, "gmail", openClient, "job");
     expect(console.log).toHaveBeenCalledWith(formatMailRunLog(runOf()));
     await vi.advanceTimersByTimeAsync(24 * HOUR - 1);
     expect(runMailSync).toHaveBeenCalledTimes(1);
@@ -92,7 +112,7 @@ describe("startMailJob", () => {
 
   it("después de la corrida del 5 salta al 25", async () => {
     vi.setSystemTime(new Date(2026, 10, 5, 10));
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(11 * HOUR);
     expect(runMailSync).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(19 * 24 * HOUR + 23 * HOUR);
@@ -105,7 +125,7 @@ describe("startMailJob", () => {
 
   it("se pone al día si la última corrida quedó vieja", async () => {
     vi.mocked(findLastMailRun).mockResolvedValue(runOf({ startedAt: new Date(2026, 9, 3, 21).toISOString() }));
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(MAIL_STARTUP_DELAY_MS - 1);
     expect(runMailSync).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -115,7 +135,7 @@ describe("startMailJob", () => {
 
   it("respeta la última corrida registrada", async () => {
     vi.mocked(findLastMailRun).mockResolvedValue(runOf({ startedAt: hoursBefore(13).toISOString() }));
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY - 1);
     expect(runMailSync).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -125,7 +145,7 @@ describe("startMailJob", () => {
 
   it("loguea con console.error una corrida que terminó en error", async () => {
     vi.mocked(runMailSync).mockResolvedValue(runOf({ status: "error", error: "Gmail respondió 403." }));
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY);
     expect(console.error).toHaveBeenCalledWith("Gmail (automática): error — Gmail respondió 403.");
     stop();
@@ -133,7 +153,7 @@ describe("startMailJob", () => {
 
   it("sigue programando aunque una corrida rechace", async () => {
     vi.mocked(runMailSync).mockRejectedValueOnce(new Error("Mongo caído"));
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY);
     expect(console.error).toHaveBeenCalledWith("Gmail (automática): error — Mongo caído");
     await vi.advanceTimersByTimeAsync(24 * HOUR);
@@ -143,7 +163,7 @@ describe("startMailJob", () => {
 
   it("una notificación colgada no frena la próxima corrida", async () => {
     vi.mocked(notifyRun).mockReturnValue(new Promise<void>(() => {}));
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY);
     expect(runMailSync).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(24 * HOUR);
@@ -153,38 +173,38 @@ describe("startMailJob", () => {
 
   it("si no puede leer la última corrida espera el próximo slot", async () => {
     vi.mocked(findLastMailRun).mockRejectedValue(new Error("Mongo caído"));
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY);
     expect(runMailSync).toHaveBeenCalledTimes(1);
     stop();
   });
 
   it("la función devuelta cancela la próxima corrida", async () => {
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     stop();
     await vi.advanceTimersByTimeAsync(SLOT_DELAY + 48 * HOUR);
     expect(runMailSync).not.toHaveBeenCalled();
   });
 
   it("sin agenda no programa nada", async () => {
-    await startMailJob(setup(null));
+    await start(setup(null));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY + 48 * HOUR);
     expect(runMailSync).not.toHaveBeenCalled();
     expect(findLastMailRun).not.toHaveBeenCalled();
   });
 
   it("una fuente sin configurar no programa nada", async () => {
-    await startMailJob(setup(SCHEDULE, { openClient: null, missing: ["GMAIL_REFRESH_TOKEN"] }));
+    await start(setup(SCHEDULE, { openClient: null, missing: ["GMAIL_REFRESH_TOKEN"] }));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY + 48 * HOUR);
     expect(runMailSync).not.toHaveBeenCalled();
     expect(findLastMailRun).not.toHaveBeenCalled();
   });
 
   it("mira la última corrida de su propia fuente y corre esa fuente", async () => {
-    const stop = await startMailJob(setup(SCHEDULE, { source: "icloud" }));
-    expect(findLastMailRun).toHaveBeenCalledWith("icloud");
+    const stop = await start(setup(SCHEDULE, { source: "icloud" }));
+    expect(findLastMailRun).toHaveBeenCalledWith(OWNER_ID, "icloud");
     await vi.advanceTimersByTimeAsync(SLOT_DELAY);
-    expect(runMailSync).toHaveBeenCalledWith("icloud", openClient, "job");
+    expect(runMailSync).toHaveBeenCalledWith(OWNER_ID, "icloud", openClient, "job");
     stop();
   });
 
@@ -193,7 +213,7 @@ describe("startMailJob", () => {
     const run = runOf({ status: "error", error: "x" });
     vi.mocked(findLastMailRun).mockResolvedValue(previous);
     vi.mocked(runMailSync).mockResolvedValue(run);
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY);
     expect(notifyRun).toHaveBeenCalledWith(run, previous);
     stop();
@@ -201,7 +221,7 @@ describe("startMailJob", () => {
 
   it("si no puede leer la corrida anterior avisa igual, sin anterior", async () => {
     vi.mocked(findLastMailRun).mockRejectedValue(new Error("Mongo caído"));
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     await vi.advanceTimersByTimeAsync(SLOT_DELAY);
     expect(notifyRun).toHaveBeenCalledWith(runOf(), null);
     stop();
@@ -210,7 +230,7 @@ describe("startMailJob", () => {
   it("con una ventana de huecos largos no arma timers por encima del tope y corre una sola vez en el slot", async () => {
     vi.setSystemTime(new Date(2026, 10, 3, 22));
     const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
-    const stop = await startMailJob(setup({ fromDay: 1, toDay: 3, hour: 21 }));
+    const stop = await start(setup({ fromDay: 1, toDay: 3, hour: 21 }));
     const slot = new Date(2026, 11, 1, 21);
     await vi.advanceTimersByTimeAsync(slot.getTime() - Date.now() - 1);
     expect(runMailSync).not.toHaveBeenCalled();
@@ -231,7 +251,7 @@ describe("startMailJob", () => {
       callbacks.push(callback);
       return realSetTimeout(callback, delay);
     }) as typeof setTimeout);
-    const stop = await startMailJob(setup(SCHEDULE));
+    const stop = await start(setup(SCHEDULE));
     const slot = new Date(2026, 9, 27, 21);
     vi.setSystemTime(new Date(slot.getTime() - 5));
     callbacks[0]();

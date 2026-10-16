@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { describe, it, expect, beforeAll } from "vitest";
 import { copyFileSync, existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { withDb } from "../testing/withDb.js";
 import { seedPayslips } from "./seedPayslips.js";
 import { PayslipModel } from "../db/models.js";
+
+const USER_ID = new Types.ObjectId();
 
 const dir = fileURLToPath(new URL("../../../examples/recibos/", import.meta.url));
 const hasReal = existsSync(dir);
@@ -25,15 +28,15 @@ describe.skipIf(!hasReal)("seedPayslips", () => {
   });
 
   it("omite los recibos que no puede parsear en vez de cortar la corrida", async () => {
-    const result = await seedPayslips(subset);
+    const result = await seedPayslips(subset, USER_ID);
     expect(result.imported).toBe(2);
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0]).toContain("Anticipos_de_sueldo");
   }, 30000);
 
   it("guarda el aguinaldo junto al recibo mensual del mismo período", async () => {
-    await seedPayslips(subset);
-    expect(await PayslipModel.countDocuments({ periodo: "2026-06" })).toBe(2);
-    expect(await PayslipModel.countDocuments({ tipo: "sac" })).toBe(1);
+    await seedPayslips(subset, USER_ID);
+    expect(await PayslipModel.countDocuments({ userId: USER_ID, periodo: "2026-06" })).toBe(2);
+    expect(await PayslipModel.countDocuments({ userId: USER_ID, tipo: "sac" })).toBe(1);
   }, 30000);
 });
