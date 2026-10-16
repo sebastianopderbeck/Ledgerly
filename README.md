@@ -72,7 +72,8 @@ Diseño: `docs/superpowers/specs/2026-10-16-deploy-vercel-design.md`.
 
 ### Variables de producción
 Se cargan en el proyecto de Vercel → Settings → Environment Variables, **solo en Production** y
-marcadas como **Sensitive**. Después de cambiar una, redeployar.
+marcadas como **Sensitive**, salvo `PUBLIC_URL`: Vercel no deja marcar como secreta una variable que
+empieza con `PUBLIC_`, y su valor es la URL pública de la app. Después de cambiar una, redeployar.
 
 | Variable | Valor |
 |---|---|
