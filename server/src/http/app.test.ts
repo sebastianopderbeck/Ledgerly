@@ -42,6 +42,12 @@ describe("createApp", () => {
     expect(res.body).toEqual({ error: OWNER_ONLY });
   });
 
+  it("el cron no pide sesión: sin su secreto responde su propio 401", async () => {
+    const res = await request(local.server).get("/api/cron/mail/gmail");
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "No autorizado" });
+  });
+
   it("rechaza un POST desde otro origen", async () => {
     const res = await owner.api.post("/api/budgets").set("Origin", "https://otro.example").send({});
     expect(res.status).toBe(403);

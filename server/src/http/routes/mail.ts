@@ -1,9 +1,9 @@
 import { Router } from "express";
 import type { Types } from "mongoose";
-import { MAIL_SOURCE_LABELS, mailSourceSchema, type MailSourceStatusDTO } from "@ledgerly/shared";
+import { mailSourceSchema, type MailSourceStatusDTO } from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
 import { describeMailSchedule } from "../../mail/mailSchedule.js";
-import { readMailSourceSetup, readMailSourceSetups } from "../../mail/mailSources.js";
+import { describeMissing, readMailSourceSetup, readMailSourceSetups } from "../../mail/mailSources.js";
 import type { MailSourceSetup } from "../../mail/mailSourceSetup.js";
 import { findLastMailRun, runMailSync } from "../../mail/syncMail.js";
 import { userIdOf } from "../../auth/requireUser.js";
@@ -21,8 +21,6 @@ const toStatus = (userId: Types.ObjectId) => async (
   lastRun: await findLastMailRun(userId, source),
 });
 
-const missingText = (missing: string[]): string => `${missing.length === 1 ? "falta" : "faltan"} ${missing.join(", ")}`;
-
 mailRouter.get("/status", asyncHandler(async (req, res) => {
   const setups = await readMailSourceSetups(process.env);
   res.json(await Promise.all(setups.map(toStatus(userIdOf(req)))));
@@ -34,7 +32,7 @@ mailRouter.post("/:source/sync", asyncHandler(async (req, res) => {
   const source = parsed.data;
   const setup = await readMailSourceSetup(source, process.env);
   if (setup.missing.length > 0 || !setup.openClient) {
-    throw new HttpError(409, `${MAIL_SOURCE_LABELS[source]} no está configurado: ${missingText(setup.missing)}`);
+    throw new HttpError(409, describeMissing(source, setup.missing));
   }
   res.json(await runMailSync(userIdOf(req), source, setup.openClient, "manual"));
 }));

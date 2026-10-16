@@ -19,5 +19,9 @@
         { "key": "Content-Security-Policy", "value": "frame-ancestors 'none'" }
       ]
     }
+  ],
+  "crons": [
+    { "path": "/api/cron/mail/icloud", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/mail/gmail", "schedule": "0 1 * * *" }
   ]
 }

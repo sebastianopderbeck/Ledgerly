@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { mailSourceSchema } from "@ledgerly/shared";
+import { MAIL_CRON_HOURS } from "../mail/mailSchedule.js";
 
 interface VercelConfig {
   outputDirectory: string;
@@ -44,5 +46,17 @@ describe("vercel.json", () => {
       { key: "Referrer-Policy", value: "same-origin" },
       { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
     ]));
+  });
+
+  it("hay un cron por fuente de mail, a la hora del spec en Argentina (UTC-3)", () => {
+    const crons = config.crons ?? [];
+    expect(crons.map(({ path }) => path).sort()).toEqual(["/api/cron/mail/gmail", "/api/cron/mail/icloud"]);
+    for (const { path, schedule } of crons) {
+      const source = mailSourceSchema.parse(path.split("/").at(-1));
+      const [minute, hour, ...rest] = schedule.split(" ");
+      expect(minute).toBe("0");
+      expect(Number(hour)).toBe((MAIL_CRON_HOURS[source] + 3) % 24);
+      expect(rest).toEqual(["*", "*", "*"]);
+    }
   });
 });

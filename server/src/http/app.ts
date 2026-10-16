@@ -20,6 +20,7 @@ import { netWorthRouter } from "./routes/netWorth.js";
 import { mailRouter } from "./routes/mail.js";
 import { budgetsRouter } from "./routes/budgets.js";
 import { fixedServicesRouter } from "./routes/fixedServices.js";
+import { createCronRouter } from "./routes/cron.js";
 import type { AuthConfig } from "../auth/authConfig.js";
 import { createAuthRouter } from "../auth/authRouter.js";
 import { createGoogleAuthClient, type GoogleAuthClient } from "../auth/googleClient.js";
@@ -43,6 +44,7 @@ export function createApp(
     res.json({ status: "ok" });
   });
   app.use("/api/auth", createAuthRouter({ config, google }));
+  app.use("/api/cron", createCronRouter({ env, ownerEmail: config.ownerEmail, now }));
   app.use("/api", requireUser(config));
   app.use("/api/statements/:id/review", statementReviewRouter);
   app.use("/api/statements", statementsRouter);
