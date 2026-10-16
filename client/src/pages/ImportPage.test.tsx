@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { importResultUnionSchema, mailSourceStatusDtoSchema, statementReviewDtoSchema } from "@ledgerly/shared";
+import { QueryClient } from "@tanstack/react-query";
+import { importResultUnionSchema, mailSourceStatusDtoSchema, statementReviewDtoSchema, type MeDTO } from "@ledgerly/shared";
+import { ME_QUERY_KEY } from "../auth/useMe.js";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { emulateMobile } from "../testing/viewport.js";
 import { ImportPage } from "./ImportPage.js";
+
+const OWNER_ME: MeDTO = { email: "owner@test.dev", name: "Owner", isOwner: true };
+
+const clientWithMe = (me: MeDTO): QueryClient => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(ME_QUERY_KEY, me);
+  return client;
+};
 
 const MAIL_DISABLED = [
   { source: "icloud", enabled: false, missing: ["ICLOUD_USER"], scope: null, schedule: null, lastRun: null },
@@ -52,6 +62,7 @@ const REVIEW_URL = /\/statements\/([^/?]+)\/review/;
 
 const sharedDefaults = (url: string, init?: RequestInit): unknown => {
   if ((init?.method ?? "GET") !== "GET") return undefined;
+  if (url.endsWith("/auth/me")) return OWNER_ME;
   if (url.includes("/mail/status")) return MAIL_DISABLED;
   const review = REVIEW_URL.exec(url);
   if (review) return reviewOf(review[1]);
@@ -89,10 +100,16 @@ describe("ImportPage", () => {
   });
 
   it("la sección Mails va después del resultado de la subida y antes de «Archivos importados»", () => {
-    renderWithProviders(<ImportPage />);
+    renderWithProviders(<ImportPage />, { client: clientWithMe(OWNER_ME) });
     const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
     expect(headings).toContain("Mails");
     expect(headings.indexOf("Mails")).toBeLessThan(headings.indexOf("Archivos importados"));
+  });
+
+  it("a quien no es owner no le muestra la sección Mails", () => {
+    renderWithProviders(<ImportPage />, { client: clientWithMe({ ...OWNER_ME, isOwner: false }) });
+    expect(screen.getByRole("heading", { name: "Archivos importados" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Mails" })).not.toBeInTheDocument();
   });
 
   it("lista los archivos importados de todos los tipos", async () => {

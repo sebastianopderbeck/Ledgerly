@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { apiFetch } from "./client.js";
+import { apiFetch, UnauthorizedError } from "./client.js";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -18,5 +18,14 @@ describe("apiFetch", () => {
       new Response(JSON.stringify({ error: "Formato no reconocido" }), { status: 422 }),
     ));
     await expect(apiFetch("/statements")).rejects.toThrow("Formato no reconocido");
+  });
+
+  it("un 401 lanza UnauthorizedError con el mensaje del backend", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: "Sesión vencida o inexistente" }), { status: 401 }),
+    ));
+    const error = await apiFetch("/statements").catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(UnauthorizedError);
+    expect((error as Error).message).toBe("Sesión vencida o inexistente");
   });
 });

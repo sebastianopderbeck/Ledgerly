@@ -7,6 +7,7 @@ import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import { useColorMode } from "../../theme.js";
 import { RefreshDataButton } from "../RefreshDataButton.js";
 import { useNavSearch } from "./useNavSearch.js";
+import { UserMenu } from "./UserMenu.js";
 
 export const TopActionsPill = () => {
   const { mode, toggle } = useColorMode();
@@ -54,6 +55,7 @@ export const TopActionsPill = () => {
           <ThemeIcon />
         </IconButton>
       </Tooltip>
+      <UserMenu />
     </Box>
   );
 };

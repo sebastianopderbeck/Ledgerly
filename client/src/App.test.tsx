@@ -11,8 +11,12 @@ const NEW_SECTIONS = [
   { path: "/vencimientos", title: "Vencimientos" },
 ];
 
+const OWNER_ME = { email: "owner@test.dev", name: "Owner", isOwner: true };
+
 beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+  vi.stubGlobal("fetch", vi.fn((url: string) => (url.endsWith("/auth/me")
+    ? Promise.resolve(new Response(JSON.stringify(OWNER_ME), { status: 200, headers: { "Content-Type": "application/json" } }))
+    : new Promise<Response>(() => undefined))));
 });
 
 afterEach(() => {
