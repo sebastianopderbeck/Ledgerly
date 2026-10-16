@@ -8,12 +8,14 @@ import { TEST_AUTH_CONFIG, TEST_OWNER_EMAIL } from "../testing/auth.js";
 import { CategoryRuleModel, UserModel } from "../db/models.js";
 import { SEED_RULES } from "../rules/categorize.js";
 import { errorMiddleware } from "../http/errors.js";
+import { withLocalServers } from "../testing/localServer.js";
 import type { AuthConfig } from "./authConfig.js";
 import type { GoogleAuthUrlInput, GoogleExchangeInput, GoogleIdentity } from "./googleClient.js";
 import { LOGIN_FAILED_REDIRECT, LOGIN_NOT_ALLOWED_REDIRECT, createAuthRouter } from "./authRouter.js";
 import { OAUTH_COOKIE, SESSION_COOKIE, verifyOAuthState, verifySession } from "./sessionToken.js";
 
 withDb();
+const serve = withLocalServers();
 
 const OWNER: GoogleIdentity = { email: TEST_OWNER_EMAIL, emailVerified: true, name: "Owner" };
 const REDIRECT_URI = "http://localhost:5173/api/auth/google/callback";
@@ -52,10 +54,11 @@ const cookieHeader = (headers: Record<string, unknown>, name: string): string =>
 const cookiePair = (headers: Record<string, unknown>, name: string): string => cookieHeader(headers, name).split(";")[0];
 
 const login = async (app: Express, stateOverride?: string) => {
-  const start = await request(app).get("/api/auth/google");
+  const server = await serve(app);
+  const start = await request(server).get("/api/auth/google");
   const oauthCookie = cookiePair(start.headers, OAUTH_COOKIE);
   const state = stateOverride ?? new URL(String(start.headers.location)).searchParams.get("state") ?? "";
-  const callback = await request(app)
+  const callback = await request(server)
     .get(`/api/auth/google/callback?code=codigo-sintetico&state=${state}`)
     .set("Cookie", oauthCookie);
   return { start, oauthCookie, callback };
@@ -64,7 +67,7 @@ const login = async (app: Express, stateOverride?: string) => {
 describe("GET /api/auth/google", () => {
   it("redirige a Google con state, PKCE S256 y la redirect URI, y guarda el state en una cookie corta", async () => {
     const google = fakeGoogle(OWNER);
-    const start = await request(buildApp(google)).get("/api/auth/google");
+    const start = await request(await serve(buildApp(google))).get("/api/auth/google");
     expect(start.status).toBe(302);
     const header = cookieHeader(start.headers, OAUTH_COOKIE);
     expect(header).toContain("HttpOnly");
@@ -146,7 +149,7 @@ describe("GET /api/auth/google/callback", () => {
   });
 
   it("sin cookie de OAuth es login fallido", async () => {
-    const res = await request(buildApp(fakeGoogle(OWNER))).get("/api/auth/google/callback?code=x&state=y");
+    const res = await request(await serve(buildApp(fakeGoogle(OWNER)))).get("/api/auth/google/callback?code=x&state=y");
     expect(res.headers.location).toBe(LOGIN_FAILED_REDIRECT);
   });
 
@@ -160,17 +163,17 @@ describe("GET /api/auth/me y POST /api/auth/logout", () => {
   it("me devuelve al usuario de la sesión", async () => {
     const app = buildApp(fakeGoogle(OWNER));
     const { callback } = await login(app);
-    const res = await request(app).get("/api/auth/me").set("Cookie", cookiePair(callback.headers, SESSION_COOKIE));
+    const res = await request(await serve(app)).get("/api/auth/me").set("Cookie", cookiePair(callback.headers, SESSION_COOKIE));
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ email: TEST_OWNER_EMAIL, name: "Owner", isOwner: true });
   });
 
   it("me sin sesión responde 401", async () => {
-    expect((await request(buildApp(fakeGoogle(OWNER))).get("/api/auth/me")).status).toBe(401);
+    expect((await request(await serve(buildApp(fakeGoogle(OWNER)))).get("/api/auth/me")).status).toBe(401);
   });
 
   it("logout borra la cookie de sesión", async () => {
-    const res = await request(buildApp(fakeGoogle(OWNER))).post("/api/auth/logout");
+    const res = await request(await serve(buildApp(fakeGoogle(OWNER)))).post("/api/auth/logout");
     expect(res.status).toBe(204);
     expect(cookieHeader(res.headers, SESSION_COOKIE)).toMatch(/^ledgerly_session=;.*Expires=Thu, 01 Jan 1970/);
   });

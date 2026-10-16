@@ -3,8 +3,10 @@ import express from "express";
 import request from "supertest";
 import { UnscopedQueryError } from "../db/userScoped.js";
 import { errorMiddleware } from "./errors.js";
+import { withLocalServers } from "../testing/localServer.js";
 
 afterEach(() => vi.restoreAllMocks());
+const serve = withLocalServers();
 
 describe("errorMiddleware", () => {
   it("una consulta sin userId es un 500 genérico y se loguea", async () => {
@@ -12,7 +14,7 @@ describe("errorMiddleware", () => {
     const app = express();
     app.get("/x", (_req, _res, next) => next(new UnscopedQueryError("Statement", "find")));
     app.use(errorMiddleware);
-    const res = await request(app).get("/x");
+    const res = await request(await serve(app)).get("/x");
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: "Error interno" });
     expect(log).toHaveBeenCalledWith("Consulta sin userId sobre Statement (find)");

@@ -15,10 +15,10 @@ export const testDbPorts = (runId: number, workerId: number): number[] =>
 
 const isPortInUse = (error: unknown): boolean => error instanceof Error && /already in use/i.test(error.message);
 
-const startTestDb = async (): Promise<MongoMemoryServer> => {
+export const startTestDb = async (): Promise<MongoMemoryServer> => {
   for (const port of testDbPorts(process.ppid, Number(process.env.VITEST_POOL_ID ?? 0))) {
     try {
-      return await MongoMemoryServer.create({ instance: { port } });
+      return await MongoMemoryServer.create({ instance: { port, portGeneration: false } });
     } catch (error) {
       if (!isPortInUse(error)) throw error;
     }

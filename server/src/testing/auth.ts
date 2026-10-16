@@ -1,10 +1,12 @@
 import type { Express } from "express";
+import type { Server } from "node:http";
 import type { Types } from "mongoose";
 import request from "supertest";
 import { beforeEach } from "vitest";
 import type { AuthConfig } from "../auth/authConfig.js";
 import { SESSION_COOKIE, signSession } from "../auth/sessionToken.js";
 import { UserModel } from "../db/models.js";
+import { withLocalServer } from "./localServer.js";
 
 export const TEST_OWNER_EMAIL = "owner@test.dev";
 export const TEST_OTHER_EMAIL = "otra@test.dev";
@@ -33,21 +35,22 @@ export interface AuthedSession {
   cookie: string;
 }
 
-export const authedApi = (app: Express, cookie: string): AuthedApi => ({
-  get: (url) => request(app).get(url).set("Cookie", cookie),
-  post: (url) => request(app).post(url).set("Cookie", cookie),
-  put: (url) => request(app).put(url).set("Cookie", cookie),
-  patch: (url) => request(app).patch(url).set("Cookie", cookie),
-  delete: (url) => request(app).delete(url).set("Cookie", cookie),
+export const authedApi = (server: Server, cookie: string): AuthedApi => ({
+  get: (url) => request(server).get(url).set("Cookie", cookie),
+  post: (url) => request(server).post(url).set("Cookie", cookie),
+  put: (url) => request(server).put(url).set("Cookie", cookie),
+  patch: (url) => request(server).patch(url).set("Cookie", cookie),
+  delete: (url) => request(server).delete(url).set("Cookie", cookie),
 });
 
 export function withAuthedApi(app: Express, email: string = TEST_OWNER_EMAIL): AuthedSession {
   const session = {} as AuthedSession;
+  const local = withLocalServer(app);
   beforeEach(async () => {
     const user = await UserModel.create({ email, name: email.split("@")[0] });
     session.userId = user._id;
     session.cookie = await sessionCookieFor(user._id);
-    session.api = authedApi(app, session.cookie);
+    session.api = authedApi(local.server, session.cookie);
   });
   return session;
 }

@@ -4,21 +4,23 @@ import { withDb } from "../testing/withDb.js";
 import { TEST_AUTH_CONFIG, TEST_OTHER_EMAIL, TEST_OWNER_EMAIL, withAuthedApi } from "../testing/auth.js";
 import { FOREIGN_ORIGIN, OWNER_ONLY, SESSION_REQUIRED } from "../auth/requireUser.js";
 import { createApp } from "./app.js";
+import { withLocalServer } from "../testing/localServer.js";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
 const owner = withAuthedApi(app, TEST_OWNER_EMAIL);
 const other = withAuthedApi(app, TEST_OTHER_EMAIL);
+const local = withLocalServer(app);
 
 describe("createApp", () => {
   it("GET /api/health responde ok sin sesión", async () => {
-    const res = await request(app).get("/api/health");
+    const res = await request(local.server).get("/api/health");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: "ok" });
   });
 
   it("sin sesión el resto de /api responde 401", async () => {
-    const res = await request(app).get("/api/statements");
+    const res = await request(local.server).get("/api/statements");
     expect(res.status).toBe(401);
     expect(res.body).toEqual({ error: SESSION_REQUIRED });
   });
