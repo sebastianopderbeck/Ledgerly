@@ -27,7 +27,9 @@
     "seed:inflation": "tsx --env-file=.env server/src/import/backfillInflation.ts",
     "seed:macro": "tsx --env-file=.env server/src/import/backfillMacro.ts",
     "seed:fingerprints": "tsx --env-file=.env server/src/import/backfillFingerprints.ts",
-    "gmail:auth": "tsx --env-file=.env server/src/gmail/authorizeGmail.ts"
+    "gmail:auth": "tsx --env-file=.env server/src/gmail/authorizeGmail.ts",
+    "backup": "bash scripts/backup-atlas.sh",
+    "backup:restore-local": "bash scripts/restore-local.sh"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
