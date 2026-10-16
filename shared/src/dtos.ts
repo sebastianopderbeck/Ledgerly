@@ -632,6 +632,12 @@ export const mailSourceStatusDtoSchema = z.object({
   lastRun: mailSyncRunDtoSchema.nullable(),
 });
 
+export const meDtoSchema = z.object({
+  email: z.string(),
+  name: z.string(),
+  isOwner: z.boolean(),
+});
+
 export type TransactionDTO = z.infer<typeof transactionDtoSchema>;
 export type StatementDTO = z.infer<typeof statementDtoSchema>;
 export type CategoryRuleDTO = z.infer<typeof categoryRuleDtoSchema>;
@@ -709,3 +715,4 @@ export type MailSyncTrigger = z.infer<typeof mailSyncTriggerSchema>;
 export type MailSyncItemDTO = z.infer<typeof mailSyncItemDtoSchema>;
 export type MailSyncRunDTO = z.infer<typeof mailSyncRunDtoSchema>;
 export type MailSourceStatusDTO = z.infer<typeof mailSourceStatusDtoSchema>;
+export type MeDTO = z.infer<typeof meDtoSchema>;

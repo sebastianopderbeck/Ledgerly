@@ -134,7 +134,7 @@ describe("macroRefreshDtoSchema", () => {
 
 import {
   budgetDtoSchema, budgetInputSchema, budgetPatchSchema, budgetSpendingDtoSchema, cashFlowDtoSchema,
-  inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSourceStatusDtoSchema, mailSyncRunDtoSchema,
+  inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSourceStatusDtoSchema, mailSyncRunDtoSchema, meDtoSchema,
   MANUAL_ASSET_TYPE_LABELS, manualAssetCreateSchema, manualAssetTypeSchema, manualAssetUpdateSchema,
   manualSubscriptionInputSchema, netWorthDtoSchema,
   statementReviewDtoSchema, statementReviewKeysDtoSchema, statementReviewPatchSchema, subscriptionCadenceInputSchema,
@@ -503,5 +503,16 @@ describe("schemas de servicios", () => {
     expect(fixedServiceUpdateSchema.parse({ hasta: null })).toEqual({ hasta: null });
     expect(fixedServiceUpdateSchema.parse({ hasta: "2026-12", monto: 15000 })).toEqual({ hasta: "2026-12", monto: 15000 });
     expect(fixedServiceUpdateSchema.safeParse({ montoDesde: "2026-01" }).success).toBe(false);
+  });
+});
+
+describe("meDtoSchema", () => {
+  it("valida al usuario logueado", () => {
+    const dto = { email: "owner@test.dev", name: "Owner", isOwner: true };
+    expect(meDtoSchema.parse(dto)).toEqual(dto);
+  });
+
+  it("rechaza un objeto sin mail", () => {
+    expect(meDtoSchema.safeParse({ name: "Owner", isOwner: true }).success).toBe(false);
   });
 });
