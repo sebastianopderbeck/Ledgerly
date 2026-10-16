@@ -106,6 +106,17 @@ describe("ImportPage", () => {
     expect(headings.indexOf("Mails")).toBeLessThan(headings.indexOf("Archivos importados"));
   });
 
+  it("al entrar, el owner marca vistas las novedades de mails", async () => {
+    renderWithProviders(<ImportPage />, { client: clientWithMe(OWNER_ME) });
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/mail/notice/seen", expect.objectContaining({ method: "POST" })));
+  });
+
+  it("quien no es owner no marca nada", async () => {
+    renderWithProviders(<ImportPage />, { client: clientWithMe({ ...OWNER_ME, isOwner: false }) });
+    await screen.findByRole("heading", { name: "Archivos importados" });
+    expect(fetch).not.toHaveBeenCalledWith("/api/mail/notice/seen", expect.anything());
+  });
+
   it("a quien no es owner no le muestra la sección Mails", () => {
     renderWithProviders(<ImportPage />, { client: clientWithMe({ ...OWNER_ME, isOwner: false }) });
     expect(screen.getByRole("heading", { name: "Archivos importados" })).toBeInTheDocument();

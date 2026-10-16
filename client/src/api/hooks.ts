@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type {
   AutoCouponDTO, AutoSummaryDTO, BudgetDTO, BudgetInput, BudgetPatch, BudgetSpendingDTO, CashFlowDTO, CategoryRuleDTO, CategoryStat,
-  CreditSummaryDTO, FixedServiceCreateDTO, FixedServiceDTO, FixedServiceUpdateDTO, FutureInstallmentStat, FutureInstallmentMonth, MailSource, MailSourceStatusDTO, MailSyncRunDTO, ImportResultUnionDTO,
+  CreditSummaryDTO, FixedServiceCreateDTO, FixedServiceDTO, FixedServiceUpdateDTO, FutureInstallmentStat, FutureInstallmentMonth, MailNoticeDTO, MailSource, MailSourceStatusDTO, MailSyncRunDTO, ImportResultUnionDTO,
   ImportedFileDTO, InboxRuleResultDTO, InflationRateDTO, InstallmentPurchaseDTO, MacroRefreshDTO, MacroSeriesDTO,
   ManualAssetCreateDTO, ManualAssetDTO, ManualAssetUpdateDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO,
   NetWorthDTO, OficialRateDTO, PayslipDTO, PayslipSummaryDTO, StatementDTO, StatementReviewDTO, StatementReviewKeysDTO,
@@ -433,6 +433,20 @@ export function useCreateInboxRule() {
     mutationFn: (body: { pattern: string; category: string }) =>
       apiFetch<InboxRuleResultDTO>("/category-rules/inbox/rules", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export const MAIL_NOTICE_KEY = ["mail-notice"] as const;
+
+export function useMailNotice(enabled: boolean) {
+  return useQuery({ queryKey: MAIL_NOTICE_KEY, queryFn: () => apiFetch<MailNoticeDTO>("/mail/notice"), enabled });
+}
+
+export function useMarkMailNoticeSeen() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<void>("/mail/notice/seen", { method: "POST" }),
+    onSuccess: () => qc.setQueryData<MailNoticeDTO>(MAIL_NOTICE_KEY, { pending: false }),
   });
 }
 

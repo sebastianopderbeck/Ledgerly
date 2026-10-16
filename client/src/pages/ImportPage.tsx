@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material";
 import type { ImportResultUnionDTO } from "@ledgerly/shared";
-import { useImportFile } from "../api/hooks.js";
+import { useImportFile, useMarkMailNoticeSeen } from "../api/hooks.js";
 import { useMe } from "../auth/useMe.js";
 import { FileDropzone } from "../components/FileDropzone.js";
 import { MailImportSection } from "../components/MailImportSection.js";
@@ -12,8 +12,14 @@ import { StatementReviewSection } from "../components/StatementReviewSection.js"
 export const ImportPage = () => {
   const upload = useImportFile();
   const { data: me } = useMe();
+  const { mutate: markMailNoticeSeen } = useMarkMailNoticeSeen();
+  const isOwner = me?.isOwner === true;
   const [last, setLast] = useState<ImportResultUnionDTO | null>(null);
   const [lastFile, setLastFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (isOwner) markMailNoticeSeen();
+  }, [isOwner, markMailNoticeSeen]);
 
   const handleFile = (file: File) => {
     setLastFile(file);
@@ -25,7 +31,7 @@ export const ImportPage = () => {
   };
 
   const focusStatement = last?.kind === "statement" ? last.statement : null;
-  const mailSection = me?.isOwner ? <MailImportSection /> : null;
+  const mailSection = isOwner ? <MailImportSection /> : null;
 
   const replaceAction = (
     <Button color="inherit" size="small" onClick={handleReplace} disabled={upload.isPending}>
