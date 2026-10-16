@@ -79,7 +79,7 @@ describe("GET /api/mail/status", () => {
   it("iCloud con cuenta pero sin contraseña en el Llavero dice qué falta", async () => {
     vi.stubEnv("ICLOUD_USER", ICLOUD_USER);
     const [icloud] = await statuses();
-    expect(icloud).toMatchObject({ source: "icloud", enabled: false, missing: ["la contraseña de app en el Llavero"] });
+    expect(icloud).toMatchObject({ source: "icloud", enabled: false, missing: ["ICLOUD_APP_PASSWORD (o la contraseña de app en el Llavero)"] });
     expect(hasIcloudPassword).toHaveBeenCalledWith(ICLOUD_USER);
   });
 
@@ -125,7 +125,7 @@ describe("POST /api/mail/:source/sync", () => {
     vi.stubEnv("ICLOUD_USER", ICLOUD_USER);
     const res = await auth.api.post("/api/mail/icloud/sync");
     expect(res.status).toBe(409);
-    expect(res.body.error).toBe("iCloud no está configurado: falta la contraseña de app en el Llavero");
+    expect(res.body.error).toBe("iCloud no está configurado: falta ICLOUD_APP_PASSWORD (o la contraseña de app en el Llavero)");
     expect(openIcloudClient).not.toHaveBeenCalled();
   });
 

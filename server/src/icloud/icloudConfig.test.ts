@@ -74,12 +74,12 @@ describe("describeIcloudSetup", () => {
   it("dice qué falta", () => {
     expect(describeIcloudSetup(null, false, true)).toBe("iCloud: deshabilitado (falta ICLOUD_USER)");
     expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER }), false, false))
-      .toBe("iCloud: deshabilitado (falta la contraseña de app en el Llavero)");
+      .toBe("iCloud: deshabilitado (falta ICLOUD_APP_PASSWORD (o la contraseña de app en el Llavero))");
   });
 
   it("con búsqueda automática y sin contraseña avisa que las corridas van a fallar", () => {
     expect(describeIcloudSetup(readIcloudConfig({ ICLOUD_USER: USER }), false, true)).toBe(
-      "iCloud: habilitado (INBOX · últimos 90 días); falta la contraseña de app en el Llavero, las corridas van a fallar hasta que la cargues",
+      "iCloud: habilitado (INBOX · últimos 90 días); falta ICLOUD_APP_PASSWORD (o la contraseña de app en el Llavero), las corridas van a fallar hasta que la cargues",
     );
   });
 
