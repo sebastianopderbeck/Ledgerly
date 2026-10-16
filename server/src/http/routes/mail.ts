@@ -1,12 +1,14 @@
 import { Router } from "express";
 import type { Types } from "mongoose";
-import { mailSourceSchema, type MailSourceStatusDTO } from "@ledgerly/shared";
+import { mailSourceSchema, type MailNoticeDTO, type MailSourceStatusDTO } from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
 import { describeMailSchedule } from "../../mail/mailSchedule.js";
 import { describeMissing, readMailSourceSetup, readMailSourceSetups } from "../../mail/mailSources.js";
 import type { MailSourceSetup } from "../../mail/mailSourceSetup.js";
 import { findLastMailRun, runMailSync } from "../../mail/syncMail.js";
 import { userIdOf } from "../../auth/requireUser.js";
+import { UserModel } from "../../db/models.js";
+import { hasPendingMailNotice } from "../../mail/mailNotice.js";
 
 export const mailRouter = Router();
 
@@ -24,6 +26,18 @@ const toStatus = (userId: Types.ObjectId) => async (
 mailRouter.get("/status", asyncHandler(async (req, res) => {
   const setups = await readMailSourceSetups(process.env);
   res.json(await Promise.all(setups.map(toStatus(userIdOf(req)))));
+}));
+
+mailRouter.get("/notice", asyncHandler(async (req, res) => {
+  const userId = userIdOf(req);
+  const user = await UserModel.findById(userId, { mailNoticeSeenAt: 1 }).lean();
+  const body: MailNoticeDTO = { pending: await hasPendingMailNotice(userId, user?.mailNoticeSeenAt ?? null) };
+  res.json(body);
+}));
+
+mailRouter.post("/notice/seen", asyncHandler(async (req, res) => {
+  await UserModel.updateOne({ _id: userIdOf(req) }, { $set: { mailNoticeSeenAt: new Date() } });
+  res.status(204).end();
 }));
 
 mailRouter.post("/:source/sync", asyncHandler(async (req, res) => {

@@ -636,6 +636,8 @@ export const mailSourceStatusDtoSchema = z.object({
   lastRun: mailSyncRunDtoSchema.nullable(),
 });
 
+export const mailNoticeDtoSchema = z.object({ pending: z.boolean() });
+
 export const meDtoSchema = z.object({
   email: z.string(),
   name: z.string(),
@@ -721,3 +723,4 @@ export type MailSyncRunDTO = z.infer<typeof mailSyncRunDtoSchema>;
 export type MailSourceStatusDTO = z.infer<typeof mailSourceStatusDtoSchema>;
 export type MeDTO = z.infer<typeof meDtoSchema>;
 export type CategoryRulePatch = z.infer<typeof categoryRulePatchSchema>;
+export type MailNoticeDTO = z.infer<typeof mailNoticeDtoSchema>;

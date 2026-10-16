@@ -134,7 +134,7 @@ describe("macroRefreshDtoSchema", () => {
 
 import {
   budgetDtoSchema, budgetInputSchema, budgetPatchSchema, budgetSpendingDtoSchema, cashFlowDtoSchema,
-  inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSourceStatusDtoSchema, mailSyncRunDtoSchema, meDtoSchema,
+  inboxRuleResultDtoSchema, installmentPurchaseDtoSchema, isoDateSchema, mailSourceStatusDtoSchema, mailNoticeDtoSchema, mailSyncRunDtoSchema, meDtoSchema,
   MANUAL_ASSET_TYPE_LABELS, manualAssetCreateSchema, manualAssetTypeSchema, manualAssetUpdateSchema,
   manualSubscriptionInputSchema, netWorthDtoSchema,
   statementReviewDtoSchema, statementReviewKeysDtoSchema, statementReviewPatchSchema, subscriptionCadenceInputSchema,
@@ -514,5 +514,12 @@ describe("meDtoSchema", () => {
 
   it("rechaza un objeto sin mail", () => {
     expect(meDtoSchema.safeParse({ name: "Owner", isOwner: true }).success).toBe(false);
+  });
+});
+
+describe("mailNoticeDtoSchema", () => {
+  it("valida el aviso", () => {
+    expect(mailNoticeDtoSchema.parse({ pending: true })).toEqual({ pending: true });
+    expect(mailNoticeDtoSchema.safeParse({}).success).toBe(false);
   });
 });
