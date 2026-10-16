@@ -17,6 +17,7 @@ import { fetchInflationSeries } from "../../fx/inflationRate.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import { InflationRateModel, MacroSeriesModel, MortgageCouponModel } from "../../db/models.js";
 import { createApp } from "../app.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
@@ -71,10 +72,10 @@ describe("POST /api/macro/refresh", () => {
   });
 
   it("devuelve el resumen de lo actualizado", async () => {
-    await MortgageCouponModel.insertMany([
+    await MortgageCouponModel.insertMany(ownedBy(auth.userId, [
       { ...cuponBase, cuotaNro: 1, sourceHash: "c1" },
       { ...cuponBase, cuotaNro: 2, sourceHash: "c2", tipoCambioUsd: 999, tipoCambioSource: "manual" },
-    ]);
+    ]));
 
     const res = await auth.api.post("/api/macro/refresh");
 
@@ -90,13 +91,13 @@ describe("POST /api/macro/refresh", () => {
   });
 
   it("persiste las series y el tipo de cambio traídos", async () => {
-    await MortgageCouponModel.create({ ...cuponBase, cuotaNro: 1, sourceHash: "c1" });
+    await MortgageCouponModel.create({ userId: auth.userId, ...cuponBase, cuotaNro: 1, sourceHash: "c1" });
 
     await auth.api.post("/api/macro/refresh");
 
     expect(await MacroSeriesModel.countDocuments()).toBe(5);
     expect(await InflationRateModel.countDocuments()).toBe(1);
-    const cupon = await MortgageCouponModel.findOne({ cuotaNro: 1 });
+    const cupon = await MortgageCouponModel.findOne({ userId: auth.userId, cuotaNro: 1 });
     expect(cupon?.tipoCambioUsd).toBe(1350);
     expect(cupon?.tipoCambioSource).toBe("api");
   });

@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("./backfillMacro.js", () => ({ backfillMacro: vi.fn() }));
@@ -6,6 +7,8 @@ vi.mock("./refreshRates.js", () => ({ refreshAllRates: vi.fn() }));
 import { backfillMacro } from "./backfillMacro.js";
 import { refreshAllRates } from "./refreshRates.js";
 import { refreshMacroData } from "./refreshMacroData.js";
+
+const USER_ID = new Types.ObjectId();
 
 const mockedMacro = vi.mocked(backfillMacro);
 const mockedRates = vi.mocked(refreshAllRates);
@@ -19,7 +22,7 @@ describe("refreshMacroData", () => {
       sueldos: { updated: 6, skipped: 0 },
     });
 
-    expect(await refreshMacroData()).toEqual({
+    expect(await refreshMacroData(USER_ID)).toEqual({
       series: { usdOficial: 232, uva: 232, tasa30: 221, rem12m: 21, inflacion: 19 },
       tipoCambio: {
         cupones: { updated: 12, skipped: 1 },
@@ -40,8 +43,9 @@ describe("refreshMacroData", () => {
       return { cupones: { updated: 0, skipped: 0 }, auto: { updated: 0, skipped: 0 }, sueldos: { updated: 0, skipped: 0 } };
     });
 
-    await refreshMacroData();
+    await refreshMacroData(USER_ID);
 
     expect(order).toEqual(["series", "tipoCambio"]);
+    expect(mockedRates).toHaveBeenCalledWith(USER_ID);
   });
 });

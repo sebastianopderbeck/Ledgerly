@@ -4,6 +4,7 @@ import { InflationRateModel, MacroSeriesModel } from "../../db/models.js";
 import { buildMonthlySeries } from "../../stats/macroSeries.js";
 import { MACRO_START } from "../../fx/macroSources.js";
 import { refreshMacroData } from "../../import/refreshMacroData.js";
+import { userIdOf } from "../../auth/requireUser.js";
 
 export const macroRouter = Router();
 
@@ -21,6 +22,6 @@ macroRouter.get("/series", asyncHandler(async (_req, res) => {
   ));
 }));
 
-macroRouter.post("/refresh", asyncHandler(async (_req, res) => {
-  res.json(await refreshMacroData());
+macroRouter.post("/refresh", asyncHandler(async (req, res) => {
+  res.json(await refreshMacroData(userIdOf(req)));
 }));

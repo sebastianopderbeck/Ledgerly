@@ -1,4 +1,5 @@
 import type { RateRefreshCount } from "@ledgerly/shared";
+import type { Types } from "mongoose";
 import { AutoCouponModel, MortgageCouponModel, PayslipModel } from "../db/models.js";
 import { createRateResolver, type RateResolver } from "../fx/rateCache.js";
 
@@ -45,11 +46,12 @@ export async function refreshDocRates<T extends RateBearingDoc>(
   return { updated, skipped };
 }
 
-export async function refreshAllRates(resolve: RateResolver = createRateResolver()): Promise<RatesRefreshResult> {
+export async function refreshAllRates(userId: Types.ObjectId, resolve: RateResolver = createRateResolver()): Promise<RatesRefreshResult> {
+  const filter = { userId, ...NOT_MANUAL };
   const [cupones, autos, sueldos] = await Promise.all([
-    MortgageCouponModel.find(NOT_MANUAL),
-    AutoCouponModel.find(NOT_MANUAL),
-    PayslipModel.find(NOT_MANUAL),
+    MortgageCouponModel.find(filter),
+    AutoCouponModel.find(filter),
+    PayslipModel.find(filter),
   ]);
   return {
     cupones: await refreshDocRates(cupones, (doc) => doc.fechaDebito, resolve),
