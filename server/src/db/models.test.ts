@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { withDb } from "../testing/withDb.js";
 import {
   AutoCouponModel,
@@ -12,6 +12,7 @@ import {
   StatementModel,
   SubscriptionCadenceModel,
   TransactionModel,
+  USER_SCOPED_MODEL_NAMES,
 } from "./models.js";
 
 withDb();
@@ -196,5 +197,20 @@ describe("modelos nuevos", () => {
     };
     await expect(MailSyncRunModel.create(base)).rejects.toThrow();
     await expect(MailSyncRunModel.create({ ...base, source: "yahoo" })).rejects.toThrow();
+  });
+});
+
+describe("colecciones por usuario", () => {
+  it("son exactamente las 14 del diseño", () => {
+    expect([...USER_SCOPED_MODEL_NAMES].sort()).toEqual([
+      "AutoCoupon", "Budget", "CategoryRule", "FixedService", "HiddenSubscription", "MailAttachment", "MailSyncRun",
+      "ManualAsset", "ManualSubscription", "MortgageCoupon", "Payslip", "Statement", "SubscriptionCadence", "Transaction",
+    ]);
+  });
+
+  it.each([...USER_SCOPED_MODEL_NAMES])("%s tiene userId indexado", (name) => {
+    const path = mongoose.model(name).schema.path("userId");
+    expect(path?.instance).toBe("ObjectId");
+    expect(path?.options.index).toBe(true);
   });
 });

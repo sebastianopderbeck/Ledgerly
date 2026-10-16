@@ -1,5 +1,7 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 
+const userIdPath = { type: Schema.Types.ObjectId, ref: "User", index: true };
+
 const moneyPair = { ars: { type: Number, required: true }, usd: { type: Number, required: true } };
 
 const userSchema = new Schema(
@@ -13,6 +15,7 @@ const userSchema = new Schema(
 
 const statementSchema = new Schema(
   {
+    userId: userIdPath,
     issuer: { type: String, required: true, enum: ["visa_signature", "icbc"] },
     cardLabel: { type: String, required: true },
     last4: { type: String, default: null },
@@ -36,6 +39,7 @@ const statementSchema = new Schema(
 );
 
 const transactionSchema = new Schema({
+  userId: userIdPath,
   statementId: { type: Schema.Types.ObjectId, ref: "Statement", required: true, index: true },
   issuer: { type: String, required: true },
   cardLabel: { type: String, required: true },
@@ -56,6 +60,7 @@ const transactionSchema = new Schema({
 });
 
 const categoryRuleSchema = new Schema({
+  userId: userIdPath,
   priority: { type: Number, required: true },
   matchType: { type: String, required: true, enum: ["contains", "regex"] },
   pattern: { type: String, required: true },
@@ -66,6 +71,7 @@ const categoryRuleSchema = new Schema({
 
 const mortgageCouponSchema = new Schema(
   {
+    userId: userIdPath,
     prestamoNro: { type: String, required: true, index: true },
     cuotaNro: { type: Number, required: true },
     fechaDebito: { type: Date, required: true },
@@ -94,6 +100,7 @@ const autoCouponConceptSchema = new Schema(
 
 const autoCouponSchema = new Schema(
   {
+    userId: userIdPath,
     grupo: { type: String, required: true, index: true },
     orden: { type: String, required: true },
     cuotaNro: { type: Number, required: true },
@@ -126,6 +133,7 @@ const payslipConceptoSchema = new Schema(
 
 const payslipSchema = new Schema(
   {
+    userId: userIdPath,
     periodo: { type: String, required: true, index: true },
     tipo: { type: String, required: true, enum: ["mensual", "sac"], default: "mensual" },
     fechaPago: { type: Date, required: true },
@@ -159,7 +167,7 @@ const macroSeriesSchema = new Schema({
 macroSeriesSchema.index({ serie: 1, fecha: 1 }, { unique: true });
 
 const hiddenSubscriptionSchema = new Schema(
-  { key: { type: String, required: true, unique: true } },
+  { userId: userIdPath, key: { type: String, required: true, unique: true } },
   { timestamps: { createdAt: "hiddenAt", updatedAt: false } },
 );
 
@@ -174,6 +182,7 @@ const markedChargeSchema = new Schema(
 
 const manualSubscriptionSchema = new Schema(
   {
+    userId: userIdPath,
     key: { type: String, required: true, unique: true },
     cobros: { type: [markedChargeSchema], default: [] },
   },
@@ -182,6 +191,7 @@ const manualSubscriptionSchema = new Schema(
 
 const subscriptionCadenceSchema = new Schema(
   {
+    userId: userIdPath,
     key: { type: String, required: true, unique: true },
     cadencia: { type: String, required: true, enum: ["bimestral", "anual"], default: "anual" },
   },
@@ -198,6 +208,7 @@ const assetValuationSchema = new Schema(
 
 const manualAssetSchema = new Schema(
   {
+    userId: userIdPath,
     nombre: { type: String, required: true },
     tipo: { type: String, required: true, enum: ["cuenta", "ahorro", "plazo_fijo", "inversion", "inmueble", "otro"] },
     moneda: { type: String, required: true, enum: ["ARS", "USD"] },
@@ -208,6 +219,7 @@ const manualAssetSchema = new Schema(
 
 const fixedServiceSchema = new Schema(
   {
+    userId: userIdPath,
     nombre: { type: String, required: true },
     monto: { type: Number, required: true, min: 0 },
     cadencia: { type: String, required: true, enum: ["mensual", "bimestral", "anual"], default: "mensual" },
@@ -219,6 +231,7 @@ const fixedServiceSchema = new Schema(
 );
 
 const budgetSchema = new Schema({
+  userId: userIdPath,
   category: { type: String, required: true, unique: true },
   topeArs: { type: Number, required: true },
   ajustaInflacion: { type: Boolean, default: false },
@@ -226,6 +239,7 @@ const budgetSchema = new Schema({
 });
 
 const mailSyncRunSchema = new Schema({
+  userId: userIdPath,
   source: { type: String, required: true, enum: ["gmail", "icloud"] },
   trigger: { type: String, required: true, enum: ["manual", "job"] },
   startedAt: { type: Date, required: true },
@@ -238,6 +252,7 @@ const mailSyncRunSchema = new Schema({
 mailSyncRunSchema.index({ source: 1, startedAt: -1 });
 
 const mailAttachmentSchema = new Schema({
+  userId: userIdPath,
   source: { type: String, required: true, enum: ["gmail", "icloud"] },
   messageId: { type: String, required: true },
   partId: { type: String, required: true },
@@ -304,3 +319,8 @@ export const MailSyncRunModel: Model<MailSyncRunDoc> =
   mongoose.models.MailSyncRun ?? mongoose.model("MailSyncRun", mailSyncRunSchema);
 export const MailAttachmentModel: Model<MailAttachmentDoc> =
   mongoose.models.MailAttachment ?? mongoose.model("MailAttachment", mailAttachmentSchema);
+
+export const USER_SCOPED_MODEL_NAMES = [
+  "Statement", "Transaction", "CategoryRule", "MortgageCoupon", "AutoCoupon", "Payslip", "HiddenSubscription",
+  "ManualSubscription", "SubscriptionCadence", "ManualAsset", "FixedService", "Budget", "MailSyncRun", "MailAttachment",
+] as const;
