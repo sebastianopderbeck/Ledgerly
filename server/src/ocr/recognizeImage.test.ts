@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
-import { OcrFailedError, OcrUnavailableError } from "../ingestion/errors.js";
+import { OcrFailedError, OcrUnavailableError, UnsupportedImageFormatError } from "../ingestion/errors.js";
 import { recognizeImage, type OcrObservation, type RecognizeImageDeps } from "./recognizeImage.js";
 
 const OBSERVATIONS: OcrObservation[] = [{ text: "Capital", x: 0.04, y: 0.38, height: 0.03 }];
 
-const darwin = (runScript: RecognizeImageDeps["runScript"]): RecognizeImageDeps => ({ platform: "darwin", runScript });
+const NO_GOOGLE = { googleApiKey: null, fetch: vi.fn() };
+
+const darwin = (runScript: RecognizeImageDeps["runScript"]): RecognizeImageDeps => ({ platform: "darwin", runScript, ...NO_GOOGLE });
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -15,7 +17,7 @@ afterEach(() => {
 describe("recognizeImage", () => {
   it("fuera de macOS falla con OcrUnavailableError sin correr el script", async () => {
     const runScript = vi.fn(async (_script: string, _imagePath: string): Promise<string> => "[]");
-    await expect(recognizeImage(new Uint8Array([1]), "a.png", { platform: "linux", runScript }))
+    await expect(recognizeImage(new Uint8Array([1]), "a.png", { platform: "linux", runScript, ...NO_GOOGLE }))
       .rejects.toBeInstanceOf(OcrUnavailableError);
     expect(runScript).not.toHaveBeenCalled();
   });
@@ -74,4 +76,24 @@ describe("recognizeImage, registro de fallas", () => {
       .rejects.toBeInstanceOf(OcrFailedError);
     expect(logged).toHaveBeenCalledWith(expect.stringContaining("Vision no pudo procesar la imagen"));
   }, 60_000);
+});
+
+describe("recognizeImage con Google Vision", () => {
+  const google = (fetch: typeof globalThis.fetch): RecognizeImageDeps =>
+    ({ platform: "linux", runScript: vi.fn(), googleApiKey: "clave", fetch });
+
+  it("con la key usa Google aunque no sea macOS", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ responses: [{
+      fullTextAnnotation: { pages: [{ width: 10, height: 10, blocks: [{ paragraphs: [{ words: [{
+        boundingBox: { vertices: [{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 3, y: 3 }, { x: 1, y: 3 }] }, symbols: [{ text: "Hola" }],
+      }] }] }] }] },
+    }] }), { status: 200 }));
+    expect(await recognizeImage(new Uint8Array([1]), "cupon.png", google(fetch))).toEqual([{ text: "Hola", x: 0.1, y: 0.2, height: 0.2 }]);
+  });
+
+  it.each(["foto.heic", "IMG_1234.HEIC", "foto.heif"])("rechaza %s sin llamar a Google", async (fileName) => {
+    const fetch = vi.fn();
+    await expect(recognizeImage(new Uint8Array([1]), fileName, google(fetch))).rejects.toBeInstanceOf(UnsupportedImageFormatError);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });
