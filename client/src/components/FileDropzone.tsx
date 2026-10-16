@@ -6,7 +6,8 @@ import { useIsMobile } from "../useIsMobile.js";
 
 interface FileDropzoneProps { onFile: (file: File) => void; disabled?: boolean; }
 
-const ACCEPTED_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/heic"];
+const PICKER_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+const ACCEPTED_TYPES = [...PICKER_TYPES, "image/heic"];
 const ACCEPTED_EXTENSIONS = /\.(pdf|png|jpe?g|heic)$/i;
 const UNSUPPORTED_FILE = "Sólo se aceptan PDF o imágenes (PNG, JPG, HEIC)";
 
@@ -67,7 +68,7 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPTED_TYPES.join(",")}
+        accept={PICKER_TYPES.join(",")}
         hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
       />

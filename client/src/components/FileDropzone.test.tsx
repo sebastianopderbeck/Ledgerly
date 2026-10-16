@@ -21,6 +21,13 @@ const heicWithoutType = () => new File(["x"], "IMG_0001.HEIC", { type: "" });
 const txt = () => new File(["x"], "notas.txt", { type: "text/plain" });
 
 describe("FileDropzone", () => {
+  it("el selector de archivos no pide HEIC, así el iPhone convierte las fotos a JPG", () => {
+    renderWithProviders(<FileDropzone onFile={vi.fn()} />);
+    const accepted = fileInput().accept.split(",");
+    expect(accepted).toEqual(expect.arrayContaining(["application/pdf", "image/png", "image/jpeg"]));
+    expect(accepted).not.toContain("image/heic");
+  });
+
   it("avisa sin subir un archivo de más de 4 MB y deja pasar uno de exactamente 4 MB", () => {
     const onFile = vi.fn();
     renderWithProviders(<FileDropzone onFile={onFile} />);
@@ -82,11 +89,6 @@ describe("FileDropzone", () => {
     renderWithProviders(<FileDropzone onFile={onFile} />);
     await userEvent.upload(fileInput(), pdf());
     expect(onFile).toHaveBeenCalledTimes(1);
-  });
-
-  it("el selector de archivos ofrece PDF e imágenes", () => {
-    renderWithProviders(<FileDropzone onFile={vi.fn()} />);
-    expect(fileInput().accept).toBe("application/pdf,image/png,image/jpeg,image/heic");
   });
 });
 
