@@ -59,13 +59,18 @@ reglas de categoría del sistema. Sacar: borrar su mail de `ALLOWED_EMAILS` y re
 una sesión abierta. Sus datos quedan en la base.
 
 ### Puesta en marcha en la versión publicada
-1. Backup: `docker exec ledgerly-mongo mongodump --archive=/data/db/backup-pre-login.archive`.
+**No entres a la app hasta terminar el paso 5.** Si el owner entra antes de migrar, la app lo crea vacío y escribe
+sobre un usuario sin datos.
+1. Backup, fuera del volumen de Mongo:
+   `docker exec ledgerly-mongo mongodump --archive=/tmp/backup-pre-login.archive && docker cp ledgerly-mongo:/tmp/backup-pre-login.archive ~/backup-pre-login.archive`.
 2. Cliente de Google con la redirect URI de Tailscale (arriba).
 3. Las variables nuevas en `~/Services/ledgerly/.env`, con `PUBLIC_URL=https://ledger.<tailnet>.ts.net`.
-4. Merge a `main`: el auto-deploy publica. Si falta una variable el server no arranca y el auto-deploy vuelve solo
-   al commit anterior.
-5. `bun run migrate:owner` (desarrollo y publicada comparten el Mongo de Docker). Hasta correrlo, la app se ve vacía;
-   no se pierde nada.
+4. Antes del merge, desde esta rama: `bun run migrate:owner` con el mismo `OWNER_EMAIL` y `MONGO_URL` que
+   `~/Services/ledgerly/.env` (si el `.env` de desarrollo difiere, correrlo con
+   `bunx tsx --env-file=$HOME/Services/ledgerly/.env server/src/db/migrateOwner.ts`). El código viejo que sigue
+   publicado ignora `userId`, así que migrar antes no rompe nada.
+5. Merge a `main`: el auto-deploy publica. Si falta una variable el server no arranca y el auto-deploy vuelve solo
+   al commit anterior. Volver a correr el paso 4: asigna lo que se haya cargado entre medio.
 6. Entrar con la cuenta del owner.
 7. Sumar a la otra persona (arriba).
 

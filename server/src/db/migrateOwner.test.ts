@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { withDb } from "../testing/withDb.js";
-import { StatementModel, TransactionModel, UserModel, USER_SCOPED_MODEL_NAMES } from "./models.js";
+import { CategoryRuleModel, StatementModel, TransactionModel, UserModel, USER_SCOPED_MODEL_NAMES } from "./models.js";
+import { SEED_RULES } from "../rules/categorize.js";
+import { seedCategoryRules } from "../rules/seedRules.js";
 import { migrateOwner } from "./migrateOwner.js";
 
 withDb();
@@ -53,5 +55,25 @@ describe("migrateOwner", () => {
     const { createdOwner, counts } = await migrateOwner("owner@test.dev");
     expect(createdOwner).toBe(true);
     expect(counts.every(({ updated }) => updated === 0)).toBe(true);
+  });
+});
+
+describe("migrateOwner si el owner entró antes de migrar", () => {
+  it("no duplica las reglas del sistema y respeta las que estaban apagadas", async () => {
+    const [apagada, ...resto] = SEED_RULES;
+    await CategoryRuleModel.collection.insertOne({ ...apagada, source: "system", enabled: false });
+    await CategoryRuleModel.collection.insertOne({ ...resto[0], source: "system", enabled: true });
+    await CategoryRuleModel.collection.insertOne({ priority: 100, matchType: "contains", pattern: "MIO", category: "Otros", source: "user", enabled: true });
+    const owner = await UserModel.create({ email: "owner@test.dev", name: "Owner" });
+    await seedCategoryRules(owner._id);
+
+    await migrateOwner("owner@test.dev");
+
+    const rules = await CategoryRuleModel.find({ userId: owner._id }).lean();
+    expect(rules.filter((rule) => rule.source === "system")).toHaveLength(SEED_RULES.length);
+    const sameAsApagada = rules.filter((rule) => rule.pattern === apagada.pattern);
+    expect(sameAsApagada).toHaveLength(1);
+    expect(sameAsApagada[0].enabled).toBe(false);
+    expect(rules.filter((rule) => rule.source === "user").map((rule) => rule.pattern)).toEqual(["MIO"]);
   });
 });

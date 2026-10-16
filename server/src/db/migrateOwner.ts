@@ -1,7 +1,7 @@
 import mongoose, { type Types } from "mongoose";
 import { normalizeEmail } from "../auth/authConfig.js";
 import { connectMongo, disconnectMongo } from "./connection.js";
-import { USER_SCOPED_MODEL_NAMES, UserModel } from "./models.js";
+import { CategoryRuleModel, USER_SCOPED_MODEL_NAMES, UserModel } from "./models.js";
 
 export interface MigrationCount {
   collection: string;
@@ -21,6 +21,12 @@ const ensureOwner = async (email: string): Promise<{ ownerId: Types.ObjectId; cr
   return { ownerId: owner._id, createdOwner: true };
 };
 
+const dropSeededDuplicates = async (ownerId: Types.ObjectId): Promise<void> => {
+  const legacyPatterns = await CategoryRuleModel.distinct("pattern", { userId: { $exists: false }, source: "system" });
+  if (legacyPatterns.length === 0) return;
+  await CategoryRuleModel.deleteMany({ userId: ownerId, source: "system", pattern: { $in: legacyPatterns } });
+};
+
 const migrateModel = async (name: string, ownerId: Types.ObjectId): Promise<MigrationCount> => {
   const model = mongoose.model(name);
   const { modifiedCount } = await model.updateMany({ userId: { $exists: false } }, { $set: { userId: ownerId } });
@@ -30,6 +36,7 @@ const migrateModel = async (name: string, ownerId: Types.ObjectId): Promise<Migr
 
 export async function migrateOwner(ownerEmail: string): Promise<MigrationResult> {
   const { ownerId, createdOwner } = await ensureOwner(normalizeEmail(ownerEmail));
+  await dropSeededDuplicates(ownerId);
   const counts: MigrationCount[] = [];
   for (const name of USER_SCOPED_MODEL_NAMES) counts.push(await migrateModel(name, ownerId));
   return { ownerId, createdOwner, counts };
