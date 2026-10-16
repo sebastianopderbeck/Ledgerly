@@ -10,6 +10,7 @@ import {
   signOAuthState, signSession, verifyOAuthState,
 } from "./sessionToken.js";
 import { recordLogin } from "./users.js";
+import { seedCategoryRules } from "../rules/seedRules.js";
 
 export interface AuthRouterDeps {
   config: AuthConfig;
@@ -59,7 +60,8 @@ export function createAuthRouter({ config, google }: AuthRouterDeps): Router {
       res.redirect(LOGIN_NOT_ALLOWED_REDIRECT);
       return;
     }
-    const { user } = await recordLogin(email, identity.name);
+    const { user, created } = await recordLogin(email, identity.name);
+    if (created) await seedCategoryRules(user._id);
     const token = await signSession(user._id.toString(), config.sessionSecret);
     res.cookie(SESSION_COOKIE, token, { ...sessionCookie, maxAge: SESSION_MAX_AGE_MS });
     res.redirect("/");

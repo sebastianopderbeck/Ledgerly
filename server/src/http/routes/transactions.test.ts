@@ -3,6 +3,7 @@ import { withDb } from "../../testing/withDb.js";
 import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { StatementModel, TransactionModel } from "../../db/models.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
@@ -10,13 +11,14 @@ const auth = withAuthedApi(app);
 
 async function seed() {
   const s = await StatementModel.create({
+    userId: auth.userId,
     issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-07-02"), dueDate: null,
     totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
       pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
     sourceFileName: "r.pdf", sourceHash: "h", pageCount: 1, parserVersion: "1.0.0",
     needsReview: false, reconciliation: { ok: true, entries: [] },
   });
-  await TransactionModel.insertMany([
+  await TransactionModel.insertMany(ownedBy(auth.userId, [
     { statementId: s._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-04"),
       descriptionRaw: "MERCADOLIBRE", merchant: "MERCADOLIBRE", category: "Compras", categorySource: "rule",
       amount: 1500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
@@ -25,7 +27,7 @@ async function seed() {
       descriptionRaw: "SU PAGO", merchant: "SU PAGO", category: "Sin categoría", categorySource: "rule",
       amount: 5000, currency: "ARS", direction: "credit", type: "payment", isInstallment: false,
       installmentCurrent: null, installmentTotal: null, comprobante: null, fingerprint: "f2" },
-  ]);
+  ]));
 }
 
 beforeEach(seed);
@@ -42,8 +44,9 @@ describe("GET /api/transactions", () => {
     expect(res.body.items[0].merchant).toBe("MERCADOLIBRE");
   });
   it("filtra por varias categorías (repetido)", async () => {
-    const base = await StatementModel.findOne({});
+    const base = await StatementModel.findOne({ userId: auth.userId });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-05"),
       descriptionRaw: "UBER", merchant: "UBER", category: "Transporte", categorySource: "rule", amount: 200, currency: "ARS",
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
@@ -60,16 +63,16 @@ describe("GET /api/transactions", () => {
     expect(res.body.items[0].merchant).toBe("MERCADOLIBRE");
   });
   it("busca los caracteres especiales tal cual y no como expresión regular", async () => {
-    const base = await StatementModel.findOne({});
+    const base = await StatementModel.findOne({ userId: auth.userId });
     const shared = {
       statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-06"), categorySource: "rule",
       category: "Impuestos", amount: 100, currency: "ARS", direction: "debit", type: "tax", isInstallment: false,
       installmentCurrent: null, installmentTotal: null, comprobante: null,
     };
-    await TransactionModel.insertMany([
+    await TransactionModel.insertMany(ownedBy(auth.userId, [
       { ...shared, descriptionRaw: "DB.RG 5617 30% ( )", merchant: "DB.RG 5617 30% ( )", fingerprint: "f4" },
       { ...shared, descriptionRaw: "DBXRG 5617", merchant: "DBXRG 5617", fingerprint: "f5" },
-    ]);
+    ]));
     const paren = await auth.api.get(`/api/transactions?search=${encodeURIComponent("(")}`);
     expect(paren.status).toBe(200);
     expect(paren.body.items.map((t: { merchant: string }) => t.merchant)).toEqual(["DB.RG 5617 30% ( )"]);
@@ -86,15 +89,13 @@ describe("GET /api/transactions", () => {
     expect(res.body.items[0].type).toBe("payment");
   });
   it("sin pageSize devuelve TODOS los movimientos (no sólo la primera página)", async () => {
-    const base = await StatementModel.findOne({});
-    await TransactionModel.insertMany(
-      Array.from({ length: 60 }, (_, i) => ({
+    const base = await StatementModel.findOne({ userId: auth.userId });
+    await TransactionModel.insertMany(ownedBy(auth.userId, Array.from({ length: 60 }, (_, i) => ({
         statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date(Date.UTC(2026, 0, (i % 27) + 1)),
         descriptionRaw: `M${i}`, merchant: `M${i}`, category: "Compras", categorySource: "rule",
         amount: 10, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
         installmentCurrent: null, installmentTotal: null, comprobante: null, fingerprint: `bulk-${i}`,
-      })),
-    );
+      }))));
     const res = await auth.api.get("/api/transactions");
     expect(res.body.total).toBe(62);
     expect(res.body.items).toHaveLength(62);
@@ -106,8 +107,9 @@ describe("GET /api/transactions", () => {
     expect(res.body.pageSize).toBe(1);
   });
   it("filtra por cuotas (installment=true / false)", async () => {
-    const base = await StatementModel.findOne({});
+    const base = await StatementModel.findOne({ userId: auth.userId });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-06-10"),
       descriptionRaw: "NOTEBOOK", merchant: "NOTEBOOK", category: "Tecnología", categorySource: "rule", amount: 45000,
       currency: "ARS", direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 3,
@@ -122,6 +124,7 @@ describe("GET /api/transactions", () => {
   });
   it("filtra por cardLabel", async () => {
     const other = await StatementModel.create({
+      userId: auth.userId,
       issuer: "visa_signature", cardLabel: "VISA1", last4: null, closingDate: new Date("2026-07-02"), dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
         pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
@@ -129,6 +132,7 @@ describe("GET /api/transactions", () => {
       needsReview: false, reconciliation: { ok: true, entries: [] },
     });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: other._id, issuer: "visa_signature", cardLabel: "VISA1", date: new Date("2026-05-04"),
       descriptionRaw: "X", merchant: "X", category: "Compras", categorySource: "rule", amount: 999, currency: "ARS",
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
@@ -139,8 +143,9 @@ describe("GET /api/transactions", () => {
   });
 
   it("filtra por años (repetido)", async () => {
-    const base = await StatementModel.findOne({});
+    const base = await StatementModel.findOne({ userId: auth.userId });
     await TransactionModel.create({
+      userId: auth.userId,
       statementId: base!._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2025-12-20"),
       descriptionRaw: "DIA", merchant: "DIA", category: "Supermercado", categorySource: "rule", amount: 300, currency: "ARS",
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
@@ -171,7 +176,7 @@ describe("POST /api/transactions/delete", () => {
     const res = await auth.api.post("/api/transactions/delete").send({ ids });
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(2);
-    expect(await TransactionModel.countDocuments()).toBe(0);
+    expect(await TransactionModel.countDocuments({ userId: auth.userId })).toBe(0);
   });
 
   it("borra sólo los ids indicados", async () => {
@@ -180,7 +185,7 @@ describe("POST /api/transactions/delete", () => {
     const res = await auth.api.post("/api/transactions/delete").send({ ids: [id] });
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(1);
-    expect(await TransactionModel.countDocuments()).toBe(1);
+    expect(await TransactionModel.countDocuments({ userId: auth.userId })).toBe(1);
   });
 
   it("rechaza ids vacío con 400", async () => {

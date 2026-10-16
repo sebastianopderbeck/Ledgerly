@@ -1,13 +1,15 @@
+import type { Types } from "mongoose";
 import { CategoryRuleModel } from "../db/models.js";
 import { connectMongo, disconnectMongo } from "../db/connection.js";
+import { requireOwnerId } from "../auth/owner.js";
 import { SEED_RULES } from "./categorize.js";
 
-export async function seedCategoryRules(): Promise<number> {
+export async function seedCategoryRules(userId: Types.ObjectId): Promise<number> {
   let inserted = 0;
   for (const rule of SEED_RULES) {
-    const exists = await CategoryRuleModel.findOne({ pattern: rule.pattern, source: "system" });
+    const exists = await CategoryRuleModel.findOne({ userId, pattern: rule.pattern, source: "system" });
     if (!exists) {
-      await CategoryRuleModel.create({ ...rule, source: "system", enabled: true });
+      await CategoryRuleModel.create({ ...rule, userId, source: "system", enabled: true });
       inserted += 1;
     }
   }
@@ -17,7 +19,7 @@ export async function seedCategoryRules(): Promise<number> {
 if (process.argv[1]?.endsWith("seedRules.ts")) {
   const url = process.env.MONGO_URL ?? "mongodb://localhost:27017/ledgerly";
   await connectMongo(url);
-  const n = await seedCategoryRules();
+  const n = await seedCategoryRules(await requireOwnerId(process.env));
   console.log(`Reglas insertadas: ${n}`);
   await disconnectMongo();
 }

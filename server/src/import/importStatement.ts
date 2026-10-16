@@ -65,7 +65,7 @@ export async function importStatement(input: {
   const sameStatement = await findSameStatement(userId, statement.header);
   if (sameStatement && !input.replace) return duplicateOf(userId, sameStatement._id);
 
-  const rules = (await CategoryRuleModel.find({ enabled: true }).lean()) as unknown as RuleInput[];
+  const rules = (await CategoryRuleModel.find({ userId, enabled: true }).lean()) as unknown as RuleInput[];
   const statementId = new Types.ObjectId();
 
   const statementDoc = {

@@ -37,7 +37,7 @@ beforeEach(() => {
 
 describe("importStatement", () => {
   it("importa statement + transacciones y categoriza", async () => {
-    await seedCategoryRules();
+    await seedCategoryRules(USER_ID);
     const res = await importStatement({ userId: USER_ID, data: new Uint8Array([1, 2, 3]), fileName: "r.pdf" });
     expect(res.status).toBe("imported");
     expect(res.transactionCount).toBe(2);

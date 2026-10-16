@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Types } from "mongoose";
 import type { Currency, InboxRuleResultDTO } from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
 import { CategoryRuleModel, TransactionModel } from "../../db/models.js";
@@ -7,6 +8,7 @@ import { idsMatchingRule, matchRule, UNCATEGORIZED, type RuleInput } from "../..
 import { MIN_RULE_PATTERN_LENGTH } from "../../rules/suggestPattern.js";
 import { buildUncategorizedInbox, type PendingPurchase } from "../../stats/uncategorizedInbox.js";
 import { latestUsdOficial } from "../../fx/latestUsdOficial.js";
+import { userIdOf } from "../../auth/requireUser.js";
 
 export const categoryRulesRouter = Router();
 
@@ -28,10 +30,10 @@ const toPendingPurchase = ({ merchant, amount, currency, date }: PendingRow): Pe
 
 const trimmedText = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
-const categorizePending = async (ids: string[], category: string): Promise<number> => {
+const categorizePending = async (userId: Types.ObjectId, ids: string[], category: string): Promise<number> => {
   if (ids.length === 0) return 0;
   const { modifiedCount } = await TransactionModel.updateMany(
-    { _id: { $in: ids }, category: UNCATEGORIZED },
+    { userId, _id: { $in: ids }, category: UNCATEGORIZED },
     { category, categorySource: "rule" },
   );
   return modifiedCount;
@@ -39,8 +41,8 @@ const categorizePending = async (ids: string[], category: string): Promise<numbe
 
 categoryRulesRouter.get(
   "/",
-  asyncHandler(async (_req, res) => {
-    const rules = await CategoryRuleModel.find().sort({ priority: 1 });
+  asyncHandler(async (req, res) => {
+    const rules = await CategoryRuleModel.find({ userId: userIdOf(req) }).sort({ priority: 1 });
     res.json(rules.map(toCategoryRuleDTO));
   }),
 );
@@ -53,6 +55,7 @@ categoryRulesRouter.post(
       throw new HttpError(400, "pattern y category son requeridos");
     }
     const doc = await CategoryRuleModel.create({
+      userId: userIdOf(req),
       priority: Number(priority ?? 100), matchType: matchType === "regex" ? "regex" : "contains",
       pattern, category, source: "user", enabled: true,
     });
@@ -63,7 +66,8 @@ categoryRulesRouter.post(
 categoryRulesRouter.patch(
   "/:id",
   asyncHandler(async (req, res) => {
-    const doc = await CategoryRuleModel.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const { userId: _ignored, ...changes } = req.body as Record<string, unknown>;
+    const doc = await CategoryRuleModel.findOneAndUpdate({ _id: req.params.id, userId: userIdOf(req) }, changes, { new: true });
     if (!doc) throw new HttpError(404, "Regla no encontrada");
     res.json(toCategoryRuleDTO(doc));
   }),
@@ -72,16 +76,17 @@ categoryRulesRouter.patch(
 categoryRulesRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    await CategoryRuleModel.deleteOne({ _id: req.params.id });
+    await CategoryRuleModel.deleteOne({ _id: req.params.id, userId: userIdOf(req) });
     res.status(204).end();
   }),
 );
 
 categoryRulesRouter.post(
   "/apply",
-  asyncHandler(async (_req, res) => {
-    const rules = (await CategoryRuleModel.find({ enabled: true }).lean()) as unknown as RuleInput[];
-    const txs = await TransactionModel.find({});
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    const rules = (await CategoryRuleModel.find({ userId, enabled: true }).lean()) as unknown as RuleInput[];
+    const txs = await TransactionModel.find({ userId });
     let updated = 0;
     for (const tx of txs) {
       const matched = matchRule(tx.descriptionRaw, tx.merchant, rules);
@@ -100,9 +105,9 @@ categoryRulesRouter.post(
 
 categoryRulesRouter.get(
   "/inbox",
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
     const [pending, usdRate] = await Promise.all([
-      TransactionModel.find({ category: UNCATEGORIZED, type: "purchase" })
+      TransactionModel.find({ userId: userIdOf(req), category: UNCATEGORIZED, type: "purchase" })
         .select({ merchant: 1, amount: 1, currency: 1, date: 1 })
         .lean(),
       latestUsdOficial(),
@@ -122,15 +127,16 @@ categoryRulesRouter.post(
     if (category === "" || category === UNCATEGORIZED) throw new HttpError(400, "Elegí una categoría");
 
     const rule: RuleInput = { priority: INBOX_RULE_PRIORITY, matchType: "contains", pattern, category, enabled: true };
-    const doc = await CategoryRuleModel.create({ ...rule, source: "user" });
-    const candidates = await TransactionModel.find({ category: UNCATEGORIZED })
+    const userId = userIdOf(req);
+    const doc = await CategoryRuleModel.create({ ...rule, userId, source: "user" });
+    const candidates = await TransactionModel.find({ userId, category: UNCATEGORIZED })
       .select({ descriptionRaw: 1, merchant: 1 })
       .lean();
     const ids = idsMatchingRule(
       candidates.map((tx) => ({ id: tx._id.toString(), descriptionRaw: tx.descriptionRaw, merchant: tx.merchant })),
       rule,
     );
-    const result: InboxRuleResultDTO = { rule: toCategoryRuleDTO(doc), categorized: await categorizePending(ids, category) };
+    const result: InboxRuleResultDTO = { rule: toCategoryRuleDTO(doc), categorized: await categorizePending(userId, ids, category) };
     res.status(201).json(result);
   }),
 );

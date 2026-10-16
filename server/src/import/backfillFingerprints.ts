@@ -1,9 +1,11 @@
+import type { Types } from "mongoose";
 import { connectMongo, disconnectMongo } from "../db/connection.js";
+import { requireOwnerId } from "../auth/owner.js";
 import { TransactionModel } from "../db/models.js";
 import { fingerprintOf } from "./importStatement.js";
 
-export async function backfillFingerprints(): Promise<{ updated: number }> {
-  const docs = await TransactionModel.find({});
+export async function backfillFingerprints(userId: Types.ObjectId): Promise<{ updated: number }> {
+  const docs = await TransactionModel.find({ userId });
   let updated = 0;
   for (const doc of docs) {
     const fingerprint = fingerprintOf(
@@ -22,7 +24,7 @@ export async function backfillFingerprints(): Promise<{ updated: number }> {
 if (process.argv[1]?.endsWith("backfillFingerprints.ts")) {
   const url = process.env.MONGO_URL ?? "mongodb://localhost:27017/ledgerly";
   await connectMongo(url);
-  const result = await backfillFingerprints();
+  const result = await backfillFingerprints(await requireOwnerId(process.env));
   console.log(`Fingerprints backfill: ${result.updated} actualizados`);
   await disconnectMongo();
 }

@@ -1,5 +1,6 @@
 import { Router } from "express";
-import type { FilterQuery } from "mongoose";
+import type { FilterQuery, Types } from "mongoose";
+import { userIdOf } from "../../auth/requireUser.js";
 import { HttpError, asyncHandler } from "../errors.js";
 import { TransactionModel, type TransactionDoc } from "../../db/models.js";
 import { toTransactionDTO } from "../mappers.js";
@@ -7,8 +8,8 @@ import { parseYears, yearDateRanges } from "../yearFilter.js";
 
 const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-function buildFilter(q: Record<string, unknown>): FilterQuery<TransactionDoc> {
-  const filter: FilterQuery<TransactionDoc> = {};
+function buildFilter(q: Record<string, unknown>, userId: Types.ObjectId): FilterQuery<TransactionDoc> {
+  const filter: FilterQuery<TransactionDoc> = { userId };
   if (typeof q.currency === "string") filter.currency = q.currency;
   if (typeof q.issuer === "string") filter.issuer = q.issuer;
   if (typeof q.cardLabel === "string") filter.cardLabel = q.cardLabel;
@@ -37,7 +38,7 @@ transactionsRouter.get(
     const paginated = req.query.pageSize !== undefined;
     const page = Math.max(1, Number(req.query.page ?? 1));
     const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize ?? 50)));
-    const filter = buildFilter(req.query as Record<string, unknown>);
+    const filter = buildFilter(req.query as Record<string, unknown>, userIdOf(req));
     const cursor = TransactionModel.find(filter).sort({ date: -1 });
     const [items, total] = await Promise.all([
       paginated ? cursor.skip((page - 1) * pageSize).limit(pageSize) : cursor,
@@ -49,8 +50,8 @@ transactionsRouter.get(
 
 transactionsRouter.get(
   "/categories",
-  asyncHandler(async (_req, res) => {
-    const categories = (await TransactionModel.distinct("category")) as string[];
+  asyncHandler(async (req, res) => {
+    const categories = (await TransactionModel.distinct("category", { userId: userIdOf(req) })) as string[];
     res.json([...categories].sort((a, b) => a.localeCompare(b)));
   }),
 );
@@ -64,7 +65,7 @@ transactionsRouter.patch(
       update.categorySource = "manual";
     }
     if (typeof req.body.type === "string") update.type = req.body.type;
-    const doc = await TransactionModel.findByIdAndUpdate(req.params.id, update, { new: true });
+    const doc = await TransactionModel.findOneAndUpdate({ _id: req.params.id, userId: userIdOf(req) }, update, { new: true });
     if (!doc) throw new HttpError(404, "Transacción no encontrada");
     res.json(toTransactionDTO(doc));
   }),
@@ -77,7 +78,7 @@ transactionsRouter.post(
     if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => typeof id === "string")) {
       throw new HttpError(400, "ids debe ser un array de strings no vacío");
     }
-    const result = await TransactionModel.deleteMany({ _id: { $in: ids } });
+    const result = await TransactionModel.deleteMany({ _id: { $in: ids }, userId: userIdOf(req) });
     res.json({ deleted: result.deletedCount });
   }),
 );

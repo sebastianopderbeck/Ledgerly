@@ -5,7 +5,8 @@ import cookieParser from "cookie-parser";
 import request from "supertest";
 import { withDb } from "../testing/withDb.js";
 import { TEST_AUTH_CONFIG, TEST_OWNER_EMAIL } from "../testing/auth.js";
-import { UserModel } from "../db/models.js";
+import { CategoryRuleModel, UserModel } from "../db/models.js";
+import { SEED_RULES } from "../rules/categorize.js";
 import { errorMiddleware } from "../http/errors.js";
 import type { AuthConfig } from "./authConfig.js";
 import type { GoogleAuthUrlInput, GoogleExchangeInput, GoogleIdentity } from "./googleClient.js";
@@ -96,6 +97,14 @@ describe("GET /api/auth/google/callback", () => {
     expect(google.exchange).toHaveBeenCalledWith({
       code: "codigo-sintetico", codeVerifier: pending?.codeVerifier, redirectUri: REDIRECT_URI,
     });
+  });
+
+  it("el primer login siembra las reglas del sistema una sola vez", async () => {
+    const app = buildApp(fakeGoogle(OWNER));
+    await login(app);
+    await login(app);
+    const user = await UserModel.findOne({ email: TEST_OWNER_EMAIL });
+    expect(await CategoryRuleModel.countDocuments({ userId: user?._id, source: "system" })).toBe(SEED_RULES.length);
   });
 
   it("borra la cookie de OAuth para que el state no se pueda reusar", async () => {
