@@ -20,6 +20,9 @@ const config = (existsSync(configPath) ? JSON.parse(readFileSync(configPath, "ut
 
 const spaRewrite = (config.rewrites ?? []).find(({ destination }) => destination === "/index.html");
 const spaPattern = new RegExp(`^${spaRewrite?.source ?? "$^"}$`);
+const apiRewrite = (config.rewrites ?? []).find(({ destination }) => destination === "/api");
+const apiPattern = new RegExp(`^${apiRewrite?.source ?? "$^"}$`);
+const repoPath = (relative: string) => fileURLToPath(new URL(`../../../${relative}`, import.meta.url));
 
 describe("vercel.json", () => {
   it("sirve el build de Vite como estático", () => {
@@ -27,7 +30,23 @@ describe("vercel.json", () => {
   });
 
   it("la función tiene 300 s", () => {
-    expect(config.functions?.["api/[...path].ts"]).toEqual({ maxDuration: 300 });
+    expect(config.functions?.["api/index.ts"]).toEqual({ maxDuration: 300 });
+  });
+
+  it("cada función de vercel.json existe y no usa catch-all, que Vercel fuera de Next.js trata como un solo segmento", () => {
+    const functions = Object.keys(config.functions ?? {});
+    expect(functions.length).toBeGreaterThan(0);
+    for (const path of functions) {
+      expect(existsSync(repoPath(path))).toBe(true);
+      expect(path).not.toContain("[...");
+    }
+  });
+
+  it("todas las rutas de /api, de cualquier profundidad, van a la función", () => {
+    for (const path of ["/api/health", "/api/auth/me", "/api/auth/google/callback", "/api/cron/mail/gmail", "/api/mail/notice/seen"]) {
+      expect(apiPattern.test(path)).toBe(true);
+    }
+    expect(apiPattern.test("/flujo")).toBe(false);
   });
 
   it("corre en una sola región", () => {

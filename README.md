@@ -65,7 +65,7 @@ Ver «Producción en Vercel» → «El corte».
 ## Producción en Vercel
 
 Ledgerly corre en Vercel: el cliente como sitio estático y la API de Express en una función
-(`api/[...path].ts`). La base es un cluster Free de MongoDB Atlas. Cada merge a `main` deploya
+(`api/index.ts`; `vercel.json` manda ahí todo `/api/*`). La base es un cluster Free de MongoDB Atlas. Cada merge a `main` deploya
 producción. Los preview deployments de las ramas no tienen variables: no tocan ninguna base (la API
 responde «Error interno») y quedan detrás del login de Vercel.
 Diseño: `docs/superpowers/specs/2026-10-16-deploy-vercel-design.md`.
