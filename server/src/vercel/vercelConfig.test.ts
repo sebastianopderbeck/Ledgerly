@@ -14,6 +14,8 @@ interface VercelConfig {
 }
 
 const configPath = fileURLToPath(new URL("../../../vercel.json", import.meta.url));
+const ignorePath = fileURLToPath(new URL("../../../.vercelignore", import.meta.url));
+const ignored = (existsSync(ignorePath) ? readFileSync(ignorePath, "utf8") : "").split("\n").map((line) => line.trim());
 const config = (existsSync(configPath) ? JSON.parse(readFileSync(configPath, "utf8")) : {}) as VercelConfig;
 
 const spaRewrite = (config.rewrites ?? []).find(({ destination }) => destination === "/index.html");
@@ -58,5 +60,9 @@ describe("vercel.json", () => {
       expect(Number(hour)).toBe((MAIL_CRON_HOURS[source] + 3) % 24);
       expect(rest).toEqual(["*", "*", "*"]);
     }
+  });
+
+  it("un deploy desde la CLI no sube secretos ni datos reales", () => {
+    expect(ignored).toEqual(expect.arrayContaining([".env", "examples", "backups", "*.pdf", ".superpowers"]));
   });
 });
