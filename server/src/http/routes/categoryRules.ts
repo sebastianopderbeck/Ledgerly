@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { Types } from "mongoose";
-import type { Currency, InboxRuleResultDTO } from "@ledgerly/shared";
+import { categoryRulePatchSchema, type Currency, type InboxRuleResultDTO } from "@ledgerly/shared";
 import { HttpError, asyncHandler } from "../errors.js";
 import { CategoryRuleModel, TransactionModel } from "../../db/models.js";
 import { toCategoryRuleDTO } from "../mappers.js";
@@ -66,8 +66,9 @@ categoryRulesRouter.post(
 categoryRulesRouter.patch(
   "/:id",
   asyncHandler(async (req, res) => {
-    const { userId: _ignored, ...changes } = req.body as Record<string, unknown>;
-    const doc = await CategoryRuleModel.findOneAndUpdate({ _id: req.params.id, userId: userIdOf(req) }, changes, { new: true });
+    const parsed = categoryRulePatchSchema.safeParse(req.body ?? {});
+    if (!parsed.success) throw new HttpError(400, "Regla inválida");
+    const doc = await CategoryRuleModel.findOneAndUpdate({ _id: req.params.id, userId: userIdOf(req) }, parsed.data, { new: true });
     if (!doc) throw new HttpError(404, "Regla no encontrada");
     res.json(toCategoryRuleDTO(doc));
   }),

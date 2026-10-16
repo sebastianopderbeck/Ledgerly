@@ -7,6 +7,7 @@ import { extractPdfText } from "../pdf/extract.js";
 import { withDb } from "../testing/withDb.js";
 import { TEST_AUTH_CONFIG, TEST_OTHER_EMAIL, TEST_OWNER_EMAIL, withAuthedApi, type AuthedSession } from "../testing/auth.js";
 import { OWNER_ONLY } from "../auth/requireUser.js";
+import { CategoryRuleModel } from "../db/models.js";
 import { createApp } from "./app.js";
 
 withDb();
@@ -75,6 +76,22 @@ describe("aislamiento entre usuarios", () => {
 
     expect((await beto.api.post("/api/budgets").send({ category: "Comida", topeArs: 1000 })).status).toBe(201);
     expect((await ana.api.get("/api/budgets")).body).toEqual([budget]);
+  });
+
+  it("un PATCH de regla con operadores de Mongo no mueve ni deja sin dueño la regla", async () => {
+    const rule = (await beto.api.post("/api/category-rules").send({ pattern: "SPOTIFY", category: "Ocio" })).body;
+    await beto.api.patch(`/api/category-rules/${rule.id}`).send({ $set: { userId: ana.userId.toString() } });
+    await beto.api.patch(`/api/category-rules/${rule.id}`).send({ $unset: { userId: 1 } });
+    const stored = await CategoryRuleModel.findOne({ _id: rule.id, userId: beto.userId });
+    expect(stored?.pattern).toBe("SPOTIFY");
+    expect((await ana.api.get("/api/category-rules")).body.map((r: { id: string }) => r.id)).not.toContain(rule.id);
+  });
+
+  it("un PATCH de regla solo cambia los campos editables", async () => {
+    const rule = (await beto.api.post("/api/category-rules").send({ pattern: "SPOTIFY", category: "Ocio" })).body;
+    const res = await beto.api.patch(`/api/category-rules/${rule.id}`).send({ category: "Suscripciones", enabled: false, source: "system" });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ category: "Suscripciones", enabled: false, source: "user" });
   });
 
   it("las suscripciones ocultas de uno no chocan con las del otro", async () => {
