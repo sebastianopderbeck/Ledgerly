@@ -1,14 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 vi.mock("../../fx/dollarRate.js", () => ({ fetchOficialRate: vi.fn() }));
-import request from "supertest";
 import { netWorthDtoSchema, type ManualAssetDTO } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { AutoCouponModel, MacroSeriesModel, ManualAssetModel, StatementModel, TransactionModel } from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 
 const NO_USD = "No hay cotización del dólar oficial. Actualizá los datos con el botón de la barra superior.";
 const INVALID = "Datos del activo inválidos";
@@ -25,8 +26,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const createAsset = (body: object) => request(app).post("/api/net-worth/assets").send(body);
-const patchAsset = (id: string, body: object) => request(app).patch(`/api/net-worth/assets/${id}`).send(body);
+const createAsset = (body: object) => auth.api.post("/api/net-worth/assets").send(body);
+const patchAsset = (id: string, body: object) => auth.api.patch(`/api/net-worth/assets/${id}`).send(body);
 const createdAhorros = async (): Promise<ManualAssetDTO> => (await createAsset(AHORROS)).body as ManualAssetDTO;
 
 const createAutoCoupon = (cuotaNro: number, fechaEmision: string, valorMovil: number) =>
@@ -56,7 +57,7 @@ const createStatementWithInstallment = async () => {
 
 describe("GET /api/net-worth", () => {
   it("sin nada responde 204 sin pedir el dólar", async () => {
-    const res = await request(app).get("/api/net-worth");
+    const res = await auth.api.get("/api/net-worth");
     expect(res.status).toBe(204);
     expect(fetchOficialRate).not.toHaveBeenCalled();
   });
@@ -70,7 +71,7 @@ describe("GET /api/net-worth", () => {
       { serie: "usd_oficial", fecha: "2026-10-02", valor: 1000 },
       { serie: "uva", fecha: "2026-10-03", valor: 2000 },
     ]);
-    const res = await request(app).get("/api/net-worth");
+    const res = await auth.api.get("/api/net-worth");
     expect(res.status).toBe(200);
     const dto = netWorthDtoSchema.parse(res.body);
     expect(dto).toMatchObject({ fecha: "2026-10-03", usdOficial: 1000, usdOficialFecha: "2026-10-02", uva: null, uvaFecha: null });
@@ -87,7 +88,7 @@ describe("GET /api/net-worth", () => {
   it("sin dólar en la serie lo pide para hoy", async () => {
     await createAsset(AHORROS);
     vi.mocked(fetchOficialRate).mockResolvedValue(1200);
-    const res = await request(app).get("/api/net-worth");
+    const res = await auth.api.get("/api/net-worth");
     expect(fetchOficialRate).toHaveBeenCalledWith("2026-10-03");
     expect(res.body).toMatchObject({ usdOficial: 1200, usdOficialFecha: "2026-10-03" });
   });
@@ -95,7 +96,7 @@ describe("GET /api/net-worth", () => {
   it("sin dólar en ningún lado responde 503 con el mensaje", async () => {
     await createAsset(AHORROS);
     vi.mocked(fetchOficialRate).mockResolvedValue(null);
-    const res = await request(app).get("/api/net-worth");
+    const res = await auth.api.get("/api/net-worth");
     expect(res.status).toBe(503);
     expect(res.body.error).toBe(NO_USD);
   });
@@ -178,14 +179,14 @@ describe("PATCH /api/net-worth/assets/:id", () => {
 describe("DELETE /api/net-worth/assets/:id", () => {
   it("borra el activo y deja de aparecer", async () => {
     const { id } = await createdAhorros();
-    expect((await request(app).delete(`/api/net-worth/assets/${id}`)).status).toBe(204);
+    expect((await auth.api.delete(`/api/net-worth/assets/${id}`)).status).toBe(204);
     expect(await ManualAssetModel.countDocuments()).toBe(0);
-    expect((await request(app).get("/api/net-worth")).status).toBe(204);
+    expect((await auth.api.get("/api/net-worth")).status).toBe(204);
   });
 
   it("con un id que no existe responde 204 igual", async () => {
-    expect((await request(app).delete(`/api/net-worth/assets/${MISSING_ID}`)).status).toBe(204);
-    expect((await request(app).delete("/api/net-worth/assets/no-es-un-id")).status).toBe(204);
+    expect((await auth.api.delete(`/api/net-worth/assets/${MISSING_ID}`)).status).toBe(204);
+    expect((await auth.api.delete("/api/net-worth/assets/no-es-un-id")).status).toBe(204);
   });
 });
 
@@ -198,27 +199,27 @@ describe("DELETE /api/net-worth/assets/:id/valuations/:fecha", () => {
 
   it("borra esa valuación", async () => {
     const id = await withTwoValuations();
-    const res = await request(app).delete(`/api/net-worth/assets/${id}/valuations/2026-09-01`);
+    const res = await auth.api.delete(`/api/net-worth/assets/${id}/valuations/2026-09-01`);
     expect(res.status).toBe(200);
     expect(res.body.valuaciones).toEqual([{ fecha: "2026-10-01", monto: 5000 }]);
   });
 
   it("no deja borrar la única", async () => {
     const { id } = await createdAhorros();
-    const res = await request(app).delete(`/api/net-worth/assets/${id}/valuations/2026-10-01`);
+    const res = await auth.api.delete(`/api/net-worth/assets/${id}/valuations/2026-10-01`);
     expect(res.status).toBe(409);
     expect(res.body.error).toBe("No se puede borrar la única valuación: borrá el activo");
   });
 
   it("con una fecha que no existe responde 404", async () => {
     const id = await withTwoValuations();
-    const res = await request(app).delete(`/api/net-worth/assets/${id}/valuations/2026-08-01`);
+    const res = await auth.api.delete(`/api/net-worth/assets/${id}/valuations/2026-08-01`);
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Valuación no encontrada");
   });
 
   it("con un activo inexistente o mal formado responde 404", async () => {
-    expect((await request(app).delete(`/api/net-worth/assets/${MISSING_ID}/valuations/2026-10-01`)).status).toBe(404);
-    expect((await request(app).delete("/api/net-worth/assets/x/valuations/2026-10-01")).status).toBe(404);
+    expect((await auth.api.delete(`/api/net-worth/assets/${MISSING_ID}/valuations/2026-10-01`)).status).toBe(404);
+    expect((await auth.api.delete("/api/net-worth/assets/x/valuations/2026-10-01")).status).toBe(404);
   });
 });

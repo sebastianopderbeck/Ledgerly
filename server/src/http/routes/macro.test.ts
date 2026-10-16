@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import request from "supertest";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 
 vi.mock("../../fx/macroSources.js", () => ({
   MACRO_START: "2025-01-01",
@@ -19,7 +19,8 @@ import { InflationRateModel, MacroSeriesModel, MortgageCouponModel } from "../..
 import { createApp } from "../app.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 
 const mockedUsd = vi.mocked(fetchOficialSeries);
 const mockedUva = vi.mocked(fetchUvaSeries);
@@ -37,7 +38,7 @@ describe("GET /api/macro/series", () => {
     ]);
     await InflationRateModel.create({ periodo: "2025-01", variacionMensual: 2.2 });
 
-    const res = await request(app).get("/api/macro/series");
+    const res = await auth.api.get("/api/macro/series");
     expect(res.status).toBe(200);
     expect(res.body.desde).toBe("2025-01");
     expect(res.body.meses).toEqual([
@@ -47,7 +48,7 @@ describe("GET /api/macro/series", () => {
   });
 
   it("sin series cargadas devuelve meses vacío", async () => {
-    const res = await request(app).get("/api/macro/series");
+    const res = await auth.api.get("/api/macro/series");
     expect(res.status).toBe(200);
     expect(res.body.meses).toEqual([]);
   });
@@ -75,7 +76,7 @@ describe("POST /api/macro/refresh", () => {
       { ...cuponBase, cuotaNro: 2, sourceHash: "c2", tipoCambioUsd: 999, tipoCambioSource: "manual" },
     ]);
 
-    const res = await request(app).post("/api/macro/refresh");
+    const res = await auth.api.post("/api/macro/refresh");
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
@@ -91,7 +92,7 @@ describe("POST /api/macro/refresh", () => {
   it("persiste las series y el tipo de cambio traídos", async () => {
     await MortgageCouponModel.create({ ...cuponBase, cuotaNro: 1, sourceHash: "c1" });
 
-    await request(app).post("/api/macro/refresh");
+    await auth.api.post("/api/macro/refresh");
 
     expect(await MacroSeriesModel.countDocuments()).toBe(5);
     expect(await InflationRateModel.countDocuments()).toBe(1);
@@ -101,8 +102,8 @@ describe("POST /api/macro/refresh", () => {
   });
 
   it("es idempotente: dos llamadas seguidas no duplican puntos de serie", async () => {
-    await request(app).post("/api/macro/refresh");
-    await request(app).post("/api/macro/refresh");
+    await auth.api.post("/api/macro/refresh");
+    await auth.api.post("/api/macro/refresh");
 
     expect(await MacroSeriesModel.countDocuments()).toBe(5);
   });

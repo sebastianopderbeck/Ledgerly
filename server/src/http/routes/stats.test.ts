@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 vi.mock("../../fx/dollarRate.js", () => ({ fetchOficialRate: vi.fn() }));
-import request from "supertest";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { StatementModel, TransactionModel } from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 
 beforeEach(async () => {
   const s = await StatementModel.create({
@@ -42,36 +43,36 @@ async function addInstallmentCrossingYear() {
 
 describe("stats", () => {
   it("by-category suma solo compras", async () => {
-    const res = await request(app).get("/api/stats/by-category?currency=ARS");
+    const res = await auth.api.get("/api/stats/by-category?currency=ARS");
     const compras = res.body.find((c: { category: string }) => c.category === "Compras");
     expect(compras.total).toBe(1500);
     expect(res.body.some((c: { category: string }) => c.category === "Sin categoría")).toBe(false);
   });
 
   it("monthly agrupa por mes (solo compras)", async () => {
-    const res = await request(app).get("/api/stats/monthly?currency=ARS");
+    const res = await auth.api.get("/api/stats/monthly?currency=ARS");
     expect(res.body).toEqual([{ month: "2026-05", total: 2000, count: 2 }]);
   });
 
   it("monthly-usd suma el saldo a pagar de los resúmenes por mes de consumo, en USD", async () => {
     vi.mocked(fetchOficialRate).mockResolvedValue(1000);
-    const res = await request(app).get("/api/stats/monthly-usd?currency=ARS");
+    const res = await auth.api.get("/api/stats/monthly-usd?currency=ARS");
     expect(res.body).toEqual([{ month: "2026-06", totalArs: 6000, rate: 1000, totalUsd: 6 }]);
   });
 
   it("monthly-usd deja totalUsd null si no hay cotización", async () => {
     vi.mocked(fetchOficialRate).mockResolvedValue(null);
-    const res = await request(app).get("/api/stats/monthly-usd?currency=ARS");
+    const res = await auth.api.get("/api/stats/monthly-usd?currency=ARS");
     expect(res.body).toEqual([{ month: "2026-06", totalArs: 6000, rate: null, totalUsd: null }]);
   });
 
   it("top-merchants ordena por gasto", async () => {
-    const res = await request(app).get("/api/stats/top-merchants?currency=ARS&limit=5");
+    const res = await auth.api.get("/api/stats/top-merchants?currency=ARS&limit=5");
     expect(res.body[0].merchant).toBe("MERCADOLIBRE");
   });
 
   it("future-installments proyecta cuotas", async () => {
-    const res = await request(app).get("/api/stats/future-installments?currency=ARS");
+    const res = await auth.api.get("/api/stats/future-installments?currency=ARS");
     expect(res.body).toEqual([{ month: "2026-06", total: 1500 }, { month: "2026-07", total: 1500 }]);
   });
 
@@ -89,7 +90,7 @@ describe("stats", () => {
       amount: 1500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
       installmentCurrent: 1, installmentTotal: 4, comprobante: "1b", fingerprint: "f1b",
     });
-    const res = await request(app).get("/api/stats/future-installments?currency=ARS");
+    const res = await auth.api.get("/api/stats/future-installments?currency=ARS");
     const total = res.body.reduce((acc: number, m: { total: number }) => acc + m.total, 0);
     expect(total).toBe(3000);
   });
@@ -108,13 +109,13 @@ describe("stats", () => {
       amount: 1500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
       installmentCurrent: 1, installmentTotal: 4, comprobante: "1c", fingerprint: "f1c",
     });
-    const res = await request(app).get("/api/stats/future-installments/detail?currency=ARS");
+    const res = await auth.api.get("/api/stats/future-installments/detail?currency=ARS");
     const count = res.body.reduce((acc: number, m: { count: number }) => acc + m.count, 0);
     expect(count).toBe(2);
   });
 
   it("summary", async () => {
-    const res = await request(app).get("/api/stats/summary?currency=ARS");
+    const res = await auth.api.get("/api/stats/summary?currency=ARS");
     expect(res.body.totalPurchases).toBe(2000);
     expect(res.body.transactionCount).toBe(2);
     expect(res.body.statementCount).toBe(1);
@@ -135,7 +136,7 @@ describe("stats", () => {
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
       comprobante: "9", fingerprint: "f9",
     });
-    const res = await request(app).get("/api/stats/by-category?currency=ARS&cardLabel=ICBC");
+    const res = await auth.api.get("/api/stats/by-category?currency=ARS&cardLabel=ICBC");
     const compras = res.body.find((c: { category: string }) => c.category === "Compras");
     expect(compras.total).toBe(1500);
   });
@@ -154,9 +155,9 @@ describe("stats", () => {
       direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 1, installmentTotal: 3,
       comprobante: "8", fingerprint: "f8",
     });
-    const future = await request(app).get("/api/stats/future-installments?currency=ARS&cardLabel=ICBC");
+    const future = await auth.api.get("/api/stats/future-installments?currency=ARS&cardLabel=ICBC");
     expect(future.body).toEqual([{ month: "2026-06", total: 1500 }, { month: "2026-07", total: 1500 }]);
-    const summary = await request(app).get("/api/stats/summary?currency=ARS&cardLabel=ICBC");
+    const summary = await auth.api.get("/api/stats/summary?currency=ARS&cardLabel=ICBC");
     expect(summary.body.totalPurchases).toBe(2000);
     expect(summary.body.statementCount).toBe(1);
     expect(summary.body.futureInstallmentTotal).toBe(3000);
@@ -176,7 +177,7 @@ describe("stats", () => {
       amount: 1500, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
       installmentCurrent: 1, installmentTotal: 4, comprobante: "1b", fingerprint: "f1b",
     });
-    const res = await request(app).get("/api/stats/summary?currency=ARS");
+    const res = await auth.api.get("/api/stats/summary?currency=ARS");
     expect(res.body.futureInstallmentTotal).toBe(3000);
   });
 
@@ -194,7 +195,7 @@ describe("stats", () => {
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
       comprobante: "10", fingerprint: "f10",
     });
-    const res = await request(app).get("/api/stats/last-statement/by-category?currency=ARS");
+    const res = await auth.api.get("/api/stats/last-statement/by-category?currency=ARS");
     expect(res.body.some((c: { category: string }) => c.category === "Viejo")).toBe(false);
     const compras = res.body.find((c: { category: string }) => c.category === "Compras");
     expect(compras.total).toBe(1500);
@@ -217,16 +218,16 @@ describe("stats", () => {
         descriptionRaw: "U", merchant: "U", category: "Dolar", categorySource: "rule", amount: 40, currency: "USD",
         direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null, comprobante: "21", fingerprint: "f21" },
     ]);
-    const arsAll = await request(app).get("/api/stats/last-statement/by-category?currency=ARS");
+    const arsAll = await auth.api.get("/api/stats/last-statement/by-category?currency=ARS");
     expect(arsAll.body.map((c: { category: string }) => c.category).sort()).toEqual(["Compras", "Dolar", "Transporte", "VisaCat"]);
 
-    const onlyVisa = await request(app).get("/api/stats/last-statement/by-category?currency=ARS&cardLabel=VISA1");
+    const onlyVisa = await auth.api.get("/api/stats/last-statement/by-category?currency=ARS&cardLabel=VISA1");
     expect(onlyVisa.body).toEqual([
       { category: "Dolar", total: 40_000, count: 1 },
       { category: "VisaCat", total: 300, count: 1 },
     ]);
 
-    const usd = await request(app).get("/api/stats/last-statement/by-category?currency=USD");
+    const usd = await auth.api.get("/api/stats/last-statement/by-category?currency=USD");
     expect(usd.body).toEqual([{ category: "Dolar", total: 40, count: 1 }]);
   });
 
@@ -243,7 +244,7 @@ describe("stats", () => {
   it("last-statement/by-category en ARS suma los consumos en USD al oficial de hoy dentro de su categoría", async () => {
     vi.mocked(fetchOficialRate).mockResolvedValue(1000);
     await addUsdPurchaseToLastStatement();
-    const res = await request(app).get("/api/stats/last-statement/by-category?currency=ARS");
+    const res = await auth.api.get("/api/stats/last-statement/by-category?currency=ARS");
     expect(res.body).toEqual([
       { category: "Transporte", total: 2500, count: 2 },
       { category: "Compras", total: 1500, count: 1 },
@@ -254,7 +255,7 @@ describe("stats", () => {
   it("last-statement/by-category en ARS sin cotización deja afuera los consumos en USD", async () => {
     vi.mocked(fetchOficialRate).mockResolvedValue(null);
     await addUsdPurchaseToLastStatement();
-    const res = await request(app).get("/api/stats/last-statement/by-category?currency=ARS");
+    const res = await auth.api.get("/api/stats/last-statement/by-category?currency=ARS");
     expect(res.body).toEqual([
       { category: "Compras", total: 1500, count: 1 },
       { category: "Transporte", total: 500, count: 1 },
@@ -269,9 +270,9 @@ describe("stats", () => {
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
       comprobante: "9", fingerprint: "f-2024",
     });
-    const monthly = await request(app).get("/api/stats/monthly?currency=ARS&year=2025&year=2026");
+    const monthly = await auth.api.get("/api/stats/monthly?currency=ARS&year=2025&year=2026");
     expect(monthly.body).toEqual([{ month: "2026-05", total: 2000, count: 2 }]);
-    const byCategory = await request(app).get("/api/stats/by-category?currency=ARS&year=2024");
+    const byCategory = await auth.api.get("/api/stats/by-category?currency=ARS&year=2024");
     expect(byCategory.body).toEqual([{ category: "Supermercado", total: 700, count: 1 }]);
   });
 
@@ -287,44 +288,44 @@ describe("stats", () => {
         direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
         comprobante: "11", fingerprint: "f-0101" },
     ]);
-    const res = await request(app).get("/api/stats/monthly?currency=ARS&year=2025");
+    const res = await auth.api.get("/api/stats/monthly?currency=ARS&year=2025");
     expect(res.body).toEqual([{ month: "2025-12", total: 100, count: 1 }]);
   });
 
   it("year inválido no filtra", async () => {
-    const res = await request(app).get("/api/stats/monthly?currency=ARS&year=abc");
+    const res = await auth.api.get("/api/stats/monthly?currency=ARS&year=abc");
     expect(res.body).toEqual([{ month: "2026-05", total: 2000, count: 2 }]);
   });
 
   it("future-installments y detail con year filtran por año de vencimiento", async () => {
     await addInstallmentCrossingYear();
-    const res = await request(app).get("/api/stats/future-installments?currency=ARS&year=2027");
+    const res = await auth.api.get("/api/stats/future-installments?currency=ARS&year=2027");
     expect(res.body).toEqual([{ month: "2027-01", total: 300 }, { month: "2027-02", total: 300 }]);
-    const detail = await request(app).get("/api/stats/future-installments/detail?currency=ARS&year=2027");
+    const detail = await auth.api.get("/api/stats/future-installments/detail?currency=ARS&year=2027");
     expect(detail.body.map((m: { month: string }) => m.month)).toEqual(["2027-01", "2027-02"]);
   });
 
   it("summary con year suma solo las cuotas que vencen en esos años", async () => {
     await addInstallmentCrossingYear();
-    const withYear = await request(app).get("/api/stats/summary?currency=ARS&year=2027");
+    const withYear = await auth.api.get("/api/stats/summary?currency=ARS&year=2027");
     expect(withYear.body.futureInstallmentTotal).toBe(600);
     expect(withYear.body.totalPurchases).toBe(0);
-    const withoutYear = await request(app).get("/api/stats/summary?currency=ARS");
+    const withoutYear = await auth.api.get("/api/stats/summary?currency=ARS");
     expect(withoutYear.body.futureInstallmentTotal).toBe(3900);
   });
 
   it("monthly-usd con Mes filtra por mes de consumo, no por fecha de cierre", async () => {
     vi.mocked(fetchOficialRate).mockResolvedValue(1000);
-    const june = await request(app).get("/api/stats/monthly-usd?currency=ARS&from=2026-06-01&to=2026-06-30&year=2026");
+    const june = await auth.api.get("/api/stats/monthly-usd?currency=ARS&from=2026-06-01&to=2026-06-30&year=2026");
     expect(june.body).toEqual([{ month: "2026-06", totalArs: 6000, rate: 1000, totalUsd: 6 }]);
-    const july = await request(app).get("/api/stats/monthly-usd?currency=ARS&from=2026-07-01&to=2026-07-31&year=2026");
+    const july = await auth.api.get("/api/stats/monthly-usd?currency=ARS&from=2026-07-01&to=2026-07-31&year=2026");
     expect(july.body).toEqual([]);
   });
 
   it("monthly-usd con year excluye meses de otros años sin pedir cotización", async () => {
     vi.mocked(fetchOficialRate).mockClear();
     vi.mocked(fetchOficialRate).mockResolvedValue(1000);
-    const res = await request(app).get("/api/stats/monthly-usd?currency=ARS&year=2025");
+    const res = await auth.api.get("/api/stats/monthly-usd?currency=ARS&year=2025");
     expect(res.body).toEqual([]);
     expect(fetchOficialRate).not.toHaveBeenCalled();
   });
@@ -364,7 +365,7 @@ describe("installment-purchases", () => {
   };
 
   it("arma el cronograma con el vencimiento estimado a 12 días del cierre y deja afuera lo que no es cuota", async () => {
-    const res = await request(app).get("/api/stats/installment-purchases");
+    const res = await auth.api.get("/api/stats/installment-purchases");
     expect(res.status).toBe(200);
     expect(res.body).toEqual([mercadolibre]);
   });
@@ -372,7 +373,7 @@ describe("installment-purchases", () => {
   it("usa el vencimiento del resumen cuando lo trae", async () => {
     const statement = await createStatement({ closingDate: new Date("2026-07-28"), dueDate: new Date("2026-08-10") });
     await TransactionModel.create(installmentRow(statement._id, {}));
-    const res = await request(app).get("/api/stats/installment-purchases");
+    const res = await auth.api.get("/api/stats/installment-purchases");
     const fravega = res.body.find((purchase: { merchant: string }) => purchase.merchant === "FRAVEGA");
     expect(fravega.installments).toEqual([
       { number: 1, amount: 700, paymentDate: "2026-08-10" },
@@ -386,33 +387,33 @@ describe("installment-purchases", () => {
       installmentRow(statement!._id, { merchant: "AMAZON", currency: "USD" }),
       installmentRow(statement!._id, { merchant: "DEVOLUCION", direction: "credit" }),
     ]);
-    const res = await request(app).get("/api/stats/installment-purchases");
+    const res = await auth.api.get("/api/stats/installment-purchases");
     expect(res.body).toEqual([mercadolibre]);
   });
 
   it("descarta las cuotas de resúmenes sin cierre ni vencimiento", async () => {
     const statement = await createStatement({});
     await TransactionModel.create(installmentRow(statement._id, {}));
-    const res = await request(app).get("/api/stats/installment-purchases");
+    const res = await auth.api.get("/api/stats/installment-purchases");
     expect(res.body).toEqual([mercadolibre]);
   });
 
   it("filtra por año de compra", async () => {
-    const other = await request(app).get("/api/stats/installment-purchases?year=2025");
+    const other = await auth.api.get("/api/stats/installment-purchases?year=2025");
     expect(other.body).toEqual([]);
-    const same = await request(app).get("/api/stats/installment-purchases?year=2025&year=2026");
+    const same = await auth.api.get("/api/stats/installment-purchases?year=2025&year=2026");
     expect(same.body).toEqual([mercadolibre]);
   });
 
   it("respeta la tarjeta", async () => {
-    const otherCard = await request(app).get("/api/stats/installment-purchases?cardLabel=VISA1");
+    const otherCard = await auth.api.get("/api/stats/installment-purchases?cardLabel=VISA1");
     expect(otherCard.body).toEqual([]);
-    const icbc = await request(app).get("/api/stats/installment-purchases?cardLabel=ICBC");
+    const icbc = await auth.api.get("/api/stats/installment-purchases?cardLabel=ICBC");
     expect(icbc.body).toEqual([mercadolibre]);
   });
 
   it("ignora la moneda del pedido: siempre son cuotas en pesos", async () => {
-    const res = await request(app).get("/api/stats/installment-purchases?currency=USD");
+    const res = await auth.api.get("/api/stats/installment-purchases?currency=USD");
     expect(res.body).toEqual([mercadolibre]);
   });
 });

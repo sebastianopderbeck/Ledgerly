@@ -1,5 +1,5 @@
 import express from "express";
-import cors from "cors";
+import cookieParser from "cookie-parser";
 import { errorMiddleware, HttpError } from "./errors.js";
 import { statementsRouter } from "./routes/statements.js";
 import { transactionsRouter } from "./routes/transactions.js";
@@ -20,15 +20,26 @@ import { netWorthRouter } from "./routes/netWorth.js";
 import { mailRouter } from "./routes/mail.js";
 import { budgetsRouter } from "./routes/budgets.js";
 import { fixedServicesRouter } from "./routes/fixedServices.js";
+import type { AuthConfig } from "../auth/authConfig.js";
+import { createAuthRouter } from "../auth/authRouter.js";
+import { createGoogleAuthClient, type GoogleAuthClient } from "../auth/googleClient.js";
+import { checkOrigin, requireOwner, requireUser } from "../auth/requireUser.js";
 
-export function createApp(): express.Express {
+export interface AppDeps {
+  google?: GoogleAuthClient;
+}
+
+export function createApp(config: AuthConfig, { google = createGoogleAuthClient(config) }: AppDeps = {}): express.Express {
   const app = express();
-  app.use(cors({ origin: "http://localhost:5173" }));
   app.use(express.json());
+  app.use(cookieParser());
+  app.use("/api", checkOrigin(config));
 
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
   });
+  app.use("/api/auth", createAuthRouter({ config, google }));
+  app.use("/api", requireUser(config));
   app.use("/api/statements/:id/review", statementReviewRouter);
   app.use("/api/statements", statementsRouter);
   app.use("/api/transactions", transactionsRouter);
@@ -45,7 +56,7 @@ export function createApp(): express.Express {
   app.use("/api/net-worth", netWorthRouter);
   app.use("/api/import", importRouter);
   app.use("/api/imports", importsRouter);
-  app.use("/api/mail", mailRouter);
+  app.use("/api/mail", requireOwner, mailRouter);
   app.use("/api/budgets", budgetsRouter);
   app.use("/api/fixed-services", fixedServicesRouter);
 

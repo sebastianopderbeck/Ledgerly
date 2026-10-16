@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import request from "supertest";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import type { ParsedStatement } from "@ledgerly/shared";
 
 vi.mock("../../ingestion/parseStatement.js", () => ({ parseStatement: vi.fn() }));
@@ -9,7 +9,8 @@ import { createApp } from "../app.js";
 import { NoTextError } from "../../ingestion/errors.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 const mocked = vi.mocked(parseStatement);
 
 const parsed: ParsedStatement = {
@@ -29,7 +30,7 @@ beforeEach(() => {
 
 describe("POST /api/statements", () => {
   it("importa un PDF y devuelve 201", async () => {
-    const res = await request(app).post("/api/statements").attach("file", Buffer.from("pdf"), "r.pdf");
+    const res = await auth.api.post("/api/statements").attach("file", Buffer.from("pdf"), "r.pdf");
     expect(res.status).toBe(201);
     expect(res.body.status).toBe("imported");
     expect(res.body.statement.cardLabel).toBe("Visa ****1234");
@@ -37,37 +38,37 @@ describe("POST /api/statements", () => {
   });
 
   it("reimportar devuelve 200 duplicate", async () => {
-    await request(app).post("/api/statements").attach("file", Buffer.from("pdf"), "r.pdf");
-    const res = await request(app).post("/api/statements").attach("file", Buffer.from("pdf"), "r.pdf");
+    await auth.api.post("/api/statements").attach("file", Buffer.from("pdf"), "r.pdf");
+    const res = await auth.api.post("/api/statements").attach("file", Buffer.from("pdf"), "r.pdf");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("duplicate");
   });
 
   it("error de parseo → 422", async () => {
     mocked.mockRejectedValueOnce(new NoTextError());
-    const res = await request(app).post("/api/statements").attach("file", Buffer.from("x"), "x.pdf");
+    const res = await auth.api.post("/api/statements").attach("file", Buffer.from("x"), "x.pdf");
     expect(res.status).toBe(422);
     expect(res.body.error).toMatch(/texto/i);
   });
 
   it("sin archivo → 400", async () => {
-    const res = await request(app).post("/api/statements");
+    const res = await auth.api.post("/api/statements");
     expect(res.status).toBe(400);
   });
 });
 
 describe("GET/DELETE /api/statements", () => {
   it("lista y borra", async () => {
-    await request(app).post("/api/statements").attach("file", Buffer.from("pdf"), "r.pdf");
-    const list = await request(app).get("/api/statements");
+    await auth.api.post("/api/statements").attach("file", Buffer.from("pdf"), "r.pdf");
+    const list = await auth.api.get("/api/statements");
     expect(list.body).toHaveLength(1);
     const id = list.body[0].id;
 
-    const one = await request(app).get(`/api/statements/${id}`);
+    const one = await auth.api.get(`/api/statements/${id}`);
     expect(one.body.transactions).toHaveLength(1);
 
-    const del = await request(app).delete(`/api/statements/${id}`);
+    const del = await auth.api.delete(`/api/statements/${id}`);
     expect(del.status).toBe(204);
-    expect((await request(app).get("/api/statements")).body).toHaveLength(0);
+    expect((await auth.api.get("/api/statements")).body).toHaveLength(0);
   });
 });

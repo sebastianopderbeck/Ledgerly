@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import request from "supertest";
 import { fixedServiceDtoSchema, type FixedServiceDTO } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { FixedServiceModel } from "../../db/models.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 
 const INVALID = "Servicio inválido";
 const NOT_FOUND = "Servicio no encontrado";
@@ -21,8 +22,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const create = (body: object) => request(app).post("/api/fixed-services").send(body);
-const patch = (id: string, body: object) => request(app).patch(`/api/fixed-services/${id}`).send(body);
+const create = (body: object) => auth.api.post("/api/fixed-services").send(body);
+const patch = (id: string, body: object) => auth.api.patch(`/api/fixed-services/${id}`).send(body);
 const created = async (body: object = { nombre: "Luz", monto: 30_000 }): Promise<FixedServiceDTO> =>
   fixedServiceDtoSchema.parse((await create(body)).body);
 
@@ -65,14 +66,14 @@ describe("GET /api/fixed-services", () => {
     const cable = await created({ nombre: "Cable", monto: 15_000, desde: "2026-01" });
     await patch(cable.id, { hasta: "2026-09" });
     await patch(internet.id, { hasta: "2026-10" });
-    const res = await request(app).get("/api/fixed-services");
+    const res = await auth.api.get("/api/fixed-services");
     expect(res.status).toBe(200);
     expect((res.body as FixedServiceDTO[]).map((servicio) => servicio.nombre)).toEqual(["Agua", "Internet", "Cable"]);
   });
 
   it("un documento viejo sin cadencia ni hasta se lee con los defaults", async () => {
     await FixedServiceModel.collection.insertOne({ nombre: "Luz", monto: 30_000, desde: "2026-10", montoDesde: "2026-10" });
-    const [servicio] = (await request(app).get("/api/fixed-services")).body as FixedServiceDTO[];
+    const [servicio] = (await auth.api.get("/api/fixed-services")).body as FixedServiceDTO[];
     expect(servicio).toMatchObject({ nombre: "Luz", cadencia: "mensual", hasta: null });
   });
 });
@@ -124,12 +125,12 @@ describe("PATCH /api/fixed-services/:id", () => {
 describe("DELETE /api/fixed-services/:id", () => {
   it("borra el servicio", async () => {
     const luz = await created();
-    expect((await request(app).delete(`/api/fixed-services/${luz.id}`)).status).toBe(204);
+    expect((await auth.api.delete(`/api/fixed-services/${luz.id}`)).status).toBe(204);
     expect(await FixedServiceModel.countDocuments()).toBe(0);
   });
 
   it("responde 404 con un id inexistente", async () => {
-    const res = await request(app).delete(`/api/fixed-services/${MISSING_ID}`);
+    const res = await auth.api.delete(`/api/fixed-services/${MISSING_ID}`);
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: NOT_FOUND });
   });

@@ -1,27 +1,28 @@
 import { describe, it, expect } from "vitest";
-import request from "supertest";
 import { inboxRuleResultDtoSchema, uncategorizedInboxDtoSchema } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { CategoryRuleModel, MacroSeriesModel, StatementModel, TransactionModel } from "../../db/models.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 
 describe("category-rules CRUD", () => {
   it("crea, lista, edita y borra", async () => {
-    const created = await request(app).post("/api/category-rules")
+    const created = await auth.api.post("/api/category-rules")
       .send({ priority: 5, matchType: "contains", pattern: "UBER", category: "Transporte" });
     expect(created.status).toBe(201);
     expect(created.body.source).toBe("user");
     const id = created.body.id;
 
-    expect((await request(app).get("/api/category-rules")).body).toHaveLength(1);
+    expect((await auth.api.get("/api/category-rules")).body).toHaveLength(1);
 
-    const patched = await request(app).patch(`/api/category-rules/${id}`).send({ enabled: false });
+    const patched = await auth.api.patch(`/api/category-rules/${id}`).send({ enabled: false });
     expect(patched.body.enabled).toBe(false);
 
-    expect((await request(app).delete(`/api/category-rules/${id}`)).status).toBe(204);
+    expect((await auth.api.delete(`/api/category-rules/${id}`)).status).toBe(204);
   });
 });
 
@@ -49,10 +50,10 @@ describe("POST /api/category-rules/apply", () => {
 
   it("pisa las manuales cuando una regla matchea y preserva las manuales sin match", async () => {
     await seedTx();
-    await request(app).post("/api/category-rules")
+    await auth.api.post("/api/category-rules")
       .send({ priority: 1, matchType: "contains", pattern: "UBER", category: "Transporte" });
 
-    await request(app).post("/api/category-rules/apply");
+    await auth.api.post("/api/category-rules/apply");
     expect((await TransactionModel.findOne({ comprobante: "1" }))?.category).toBe("Transporte");
     expect((await TransactionModel.findOne({ comprobante: "2" }))?.category).toBe("Transporte");
     expect((await TransactionModel.findOne({ comprobante: "2" }))?.categorySource).toBe("rule");
@@ -108,7 +109,7 @@ describe("GET /api/category-rules/inbox", () => {
       { serie: "uva", fecha: "2026-10-01", valor: 1700 },
     ]);
 
-    const res = await request(app).get("/api/category-rules/inbox");
+    const res = await auth.api.get("/api/category-rules/inbox");
 
     expect(res.status).toBe(200);
     const inbox = uncategorizedInboxDtoSchema.parse(res.body);
@@ -124,7 +125,7 @@ describe("GET /api/category-rules/inbox", () => {
 
   it("sin dólar oficial cargado devuelve usdRate null", async () => {
     await seedTransactions([{ merchant: "KIOSCO EL SOL" }]);
-    const res = await request(app).get("/api/category-rules/inbox");
+    const res = await auth.api.get("/api/category-rules/inbox");
     expect(res.status).toBe(200);
     expect(res.body.usdRate).toBeNull();
     expect(res.body.pendingCount).toBe(1);
@@ -142,7 +143,7 @@ describe("POST /api/category-rules/inbox/rules", () => {
       { merchant: "KIOSCO EL SOL" },
     ]);
 
-    const res = await request(app).post("/api/category-rules/inbox/rules").send({ pattern: "PANADERIA LA", category: "Comida" });
+    const res = await auth.api.post("/api/category-rules/inbox/rules").send({ pattern: "PANADERIA LA", category: "Comida" });
 
     expect(res.status).toBe(201);
     const result = inboxRuleResultDtoSchema.parse(res.body);
@@ -157,7 +158,7 @@ describe("POST /api/category-rules/inbox/rules", () => {
 
   it("recorta patrón y categoría", async () => {
     await seedTransactions([{ merchant: "KIOSCO EL SOL" }]);
-    const res = await request(app).post("/api/category-rules/inbox/rules").send({ pattern: "  kiosco el  ", category: " Comida " });
+    const res = await auth.api.post("/api/category-rules/inbox/rules").send({ pattern: "  kiosco el  ", category: " Comida " });
     expect(res.status).toBe(201);
     expect(res.body.rule).toMatchObject({ pattern: "kiosco el", category: "Comida" });
     expect(res.body.categorized).toBe(1);
@@ -165,21 +166,21 @@ describe("POST /api/category-rules/inbox/rules", () => {
 
   it("si la regla no coincide con ningún pendiente responde 201 con 0", async () => {
     await seedTransactions([{ merchant: "KIOSCO EL SOL" }]);
-    const res = await request(app).post("/api/category-rules/inbox/rules").send({ pattern: "FARMACIA", category: "Salud" });
+    const res = await auth.api.post("/api/category-rules/inbox/rules").send({ pattern: "FARMACIA", category: "Salud" });
     expect(res.status).toBe(201);
     expect(res.body.categorized).toBe(0);
     expect(await CategoryRuleModel.countDocuments()).toBe(1);
   });
 
   it("rechaza un patrón de menos de 3 caracteres sin crear la regla", async () => {
-    const res = await request(app).post("/api/category-rules/inbox/rules").send({ pattern: " ab ", category: "Comida" });
+    const res = await auth.api.post("/api/category-rules/inbox/rules").send({ pattern: " ab ", category: "Comida" });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("El patrón tiene que tener al menos 3 caracteres");
     expect(await CategoryRuleModel.countDocuments()).toBe(0);
   });
 
   it.each([[""], ["Sin categoría"], [undefined]])("rechaza la categoría «%s» sin crear la regla", async (category) => {
-    const res = await request(app).post("/api/category-rules/inbox/rules").send({ pattern: "PANADERIA", category });
+    const res = await auth.api.post("/api/category-rules/inbox/rules").send({ pattern: "PANADERIA", category });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("Elegí una categoría");
     expect(await CategoryRuleModel.countDocuments()).toBe(0);

@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import request from "supertest";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { StatementModel, TransactionModel } from "../../db/models.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 
 async function seed() {
   const s = await StatementModel.create({
@@ -31,12 +32,12 @@ beforeEach(seed);
 
 describe("GET /api/transactions", () => {
   it("lista con total y paginado", async () => {
-    const res = await request(app).get("/api/transactions");
+    const res = await auth.api.get("/api/transactions");
     expect(res.body.total).toBe(2);
     expect(res.body.items).toHaveLength(2);
   });
   it("filtra por category", async () => {
-    const res = await request(app).get("/api/transactions?category=Compras");
+    const res = await auth.api.get("/api/transactions?category=Compras");
     expect(res.body.total).toBe(1);
     expect(res.body.items[0].merchant).toBe("MERCADOLIBRE");
   });
@@ -48,13 +49,13 @@ describe("GET /api/transactions", () => {
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
       comprobante: "3", fingerprint: "f3",
     });
-    const res = await request(app).get("/api/transactions?category=Compras&category=Sin categoría");
+    const res = await auth.api.get("/api/transactions?category=Compras&category=Sin categoría");
     expect(res.body.total).toBe(2);
     const categories = res.body.items.map((t: { category: string }) => t.category).sort();
     expect(categories).toEqual(["Compras", "Sin categoría"]);
   });
   it("busca el comercio sin distinguir mayúsculas", async () => {
-    const res = await request(app).get("/api/transactions?search=mercado");
+    const res = await auth.api.get("/api/transactions?search=mercado");
     expect(res.body.total).toBe(1);
     expect(res.body.items[0].merchant).toBe("MERCADOLIBRE");
   });
@@ -69,18 +70,18 @@ describe("GET /api/transactions", () => {
       { ...shared, descriptionRaw: "DB.RG 5617 30% ( )", merchant: "DB.RG 5617 30% ( )", fingerprint: "f4" },
       { ...shared, descriptionRaw: "DBXRG 5617", merchant: "DBXRG 5617", fingerprint: "f5" },
     ]);
-    const paren = await request(app).get(`/api/transactions?search=${encodeURIComponent("(")}`);
+    const paren = await auth.api.get(`/api/transactions?search=${encodeURIComponent("(")}`);
     expect(paren.status).toBe(200);
     expect(paren.body.items.map((t: { merchant: string }) => t.merchant)).toEqual(["DB.RG 5617 30% ( )"]);
-    const dot = await request(app).get(`/api/transactions?search=${encodeURIComponent("DB.RG")}`);
+    const dot = await auth.api.get(`/api/transactions?search=${encodeURIComponent("DB.RG")}`);
     expect(dot.body.items.map((t: { merchant: string }) => t.merchant)).toEqual(["DB.RG 5617 30% ( )"]);
   });
   it("categories devuelve las categorías distintas ordenadas", async () => {
-    const res = await request(app).get("/api/transactions/categories");
+    const res = await auth.api.get("/api/transactions/categories");
     expect(res.body).toEqual(["Compras", "Sin categoría"]);
   });
   it("filtra por rango de fechas", async () => {
-    const res = await request(app).get("/api/transactions?from=2026-06-01&to=2026-06-30");
+    const res = await auth.api.get("/api/transactions?from=2026-06-01&to=2026-06-30");
     expect(res.body.total).toBe(1);
     expect(res.body.items[0].type).toBe("payment");
   });
@@ -94,12 +95,12 @@ describe("GET /api/transactions", () => {
         installmentCurrent: null, installmentTotal: null, comprobante: null, fingerprint: `bulk-${i}`,
       })),
     );
-    const res = await request(app).get("/api/transactions");
+    const res = await auth.api.get("/api/transactions");
     expect(res.body.total).toBe(62);
     expect(res.body.items).toHaveLength(62);
   });
   it("con pageSize explícito pagina", async () => {
-    const res = await request(app).get("/api/transactions?pageSize=1&page=1");
+    const res = await auth.api.get("/api/transactions?pageSize=1&page=1");
     expect(res.body.items).toHaveLength(1);
     expect(res.body.total).toBe(2);
     expect(res.body.pageSize).toBe(1);
@@ -112,10 +113,10 @@ describe("GET /api/transactions", () => {
       currency: "ARS", direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 3,
       installmentTotal: 12, comprobante: "3", fingerprint: "f-cuota",
     });
-    const solo = await request(app).get("/api/transactions?installment=true");
+    const solo = await auth.api.get("/api/transactions?installment=true");
     expect(solo.body.total).toBe(1);
     expect(solo.body.items[0].merchant).toBe("NOTEBOOK");
-    const sin = await request(app).get("/api/transactions?installment=false");
+    const sin = await auth.api.get("/api/transactions?installment=false");
     expect(sin.body.total).toBe(2);
     expect(sin.body.items.every((t: { isInstallment: boolean }) => !t.isInstallment)).toBe(true);
   });
@@ -133,7 +134,7 @@ describe("GET /api/transactions", () => {
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
       comprobante: "9", fingerprint: "f9",
     });
-    const res = await request(app).get("/api/transactions?cardLabel=ICBC");
+    const res = await auth.api.get("/api/transactions?cardLabel=ICBC");
     expect(res.body.total).toBe(2);
   });
 
@@ -145,18 +146,18 @@ describe("GET /api/transactions", () => {
       direction: "debit", type: "purchase", isInstallment: false, installmentCurrent: null, installmentTotal: null,
       comprobante: "4", fingerprint: "f-2025",
     });
-    const only2025 = await request(app).get("/api/transactions?year=2025");
+    const only2025 = await auth.api.get("/api/transactions?year=2025");
     expect(only2025.body.items.map((t: { merchant: string }) => t.merchant)).toEqual(["DIA"]);
-    const both = await request(app).get("/api/transactions?year=2025&year=2026");
+    const both = await auth.api.get("/api/transactions?year=2025&year=2026");
     expect(both.body.total).toBe(3);
   });
 });
 
 describe("PATCH /api/transactions/:id", () => {
   it("cambia la categoría y marca categorySource=manual", async () => {
-    const list = await request(app).get("/api/transactions?category=Compras");
+    const list = await auth.api.get("/api/transactions?category=Compras");
     const id = list.body.items[0].id;
-    const res = await request(app).patch(`/api/transactions/${id}`).send({ category: "Regalos" });
+    const res = await auth.api.patch(`/api/transactions/${id}`).send({ category: "Regalos" });
     expect(res.status).toBe(200);
     expect(res.body.category).toBe("Regalos");
     expect(res.body.categorySource).toBe("manual");
@@ -165,30 +166,30 @@ describe("PATCH /api/transactions/:id", () => {
 
 describe("POST /api/transactions/delete", () => {
   it("borra los movimientos por id y devuelve la cantidad", async () => {
-    const list = await request(app).get("/api/transactions");
+    const list = await auth.api.get("/api/transactions");
     const ids = list.body.items.map((t: { id: string }) => t.id);
-    const res = await request(app).post("/api/transactions/delete").send({ ids });
+    const res = await auth.api.post("/api/transactions/delete").send({ ids });
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(2);
     expect(await TransactionModel.countDocuments()).toBe(0);
   });
 
   it("borra sólo los ids indicados", async () => {
-    const list = await request(app).get("/api/transactions?category=Compras");
+    const list = await auth.api.get("/api/transactions?category=Compras");
     const id = list.body.items[0].id;
-    const res = await request(app).post("/api/transactions/delete").send({ ids: [id] });
+    const res = await auth.api.post("/api/transactions/delete").send({ ids: [id] });
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(1);
     expect(await TransactionModel.countDocuments()).toBe(1);
   });
 
   it("rechaza ids vacío con 400", async () => {
-    const res = await request(app).post("/api/transactions/delete").send({ ids: [] });
+    const res = await auth.api.post("/api/transactions/delete").send({ ids: [] });
     expect(res.status).toBe(400);
   });
 
   it("rechaza body sin ids con 400", async () => {
-    const res = await request(app).post("/api/transactions/delete").send({});
+    const res = await auth.api.post("/api/transactions/delete").send({});
     expect(res.status).toBe(400);
   });
 });

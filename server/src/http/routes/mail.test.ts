@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import request from "supertest";
 import { mailSourceStatusDtoSchema, mailSyncRunDtoSchema } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { fakeGmailClient, fakeMailClient, pdfPart } from "../../testing/mailFixtures.js";
 
 vi.mock("../../pdf/extract.js", () => ({ extractPdfText: vi.fn() }));
@@ -24,7 +24,8 @@ import { StatementModel } from "../../db/models.js";
 import { createApp } from "../app.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 const meta = { producer: null, creator: null, pageCount: 1, encrypted: false };
 const statementText = readFileSync(
   fileURLToPath(new URL("../../parsers/__fixtures__/icbc.sample.txt", import.meta.url)), "utf8",
@@ -49,7 +50,7 @@ const enableIcloud = (extra: Record<string, string> = {}) => {
   vi.mocked(readIcloudPassword).mockResolvedValue("clave-app-sintetica");
 };
 
-const statuses = async () => mailSourceStatusDtoSchema.array().parse((await request(app).get("/api/mail/status")).body);
+const statuses = async () => mailSourceStatusDtoSchema.array().parse((await auth.api.get("/api/mail/status")).body);
 
 beforeEach(() => {
   for (const key of [...GMAIL_VARS, "GMAIL_QUERY", ...SCHEDULE_VARS, ...ICLOUD_VARS]) vi.stubEnv(key, "");
@@ -66,7 +67,7 @@ afterEach(() => {
 
 describe("GET /api/mail/status", () => {
   it("sin configurar informa las dos fuentes deshabilitadas, iCloud primero", async () => {
-    const res = await request(app).get("/api/mail/status");
+    const res = await auth.api.get("/api/mail/status");
     expect(res.status).toBe(200);
     expect(mailSourceStatusDtoSchema.array().parse(res.body)).toEqual([
       { source: "icloud", enabled: false, missing: ["ICLOUD_USER"], scope: null, schedule: null, lastRun: null },
@@ -85,7 +86,7 @@ describe("GET /api/mail/status", () => {
   it("habilitadas informan alcance y agenda sin leer ni exponer secretos", async () => {
     enableIcloud({ ICLOUD_SINCE: "2026-09-01", MAIL_SYNC_DAYS: "25-5", MAIL_SYNC_HOUR: "9" });
     enableGmail({ GMAIL_QUERY: "from:banco has:attachment" });
-    const res = await request(app).get("/api/mail/status");
+    const res = await auth.api.get("/api/mail/status");
     const [icloud, gmail] = mailSourceStatusDtoSchema.array().parse(res.body);
     expect(icloud).toEqual({
       source: "icloud", enabled: true, missing: [], scope: "INBOX · desde el 01/09/2026",
@@ -101,20 +102,20 @@ describe("GET /api/mail/status", () => {
 
 describe("POST /api/mail/:source/sync", () => {
   it("una fuente desconocida responde 400", async () => {
-    const res = await request(app).post("/api/mail/yahoo/sync");
+    const res = await auth.api.post("/api/mail/yahoo/sync");
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("Fuente de mails desconocida: yahoo");
   });
 
   it("Gmail sin credenciales responde 409 sin intentar conectarse", async () => {
-    const res = await request(app).post("/api/mail/gmail/sync");
+    const res = await auth.api.post("/api/mail/gmail/sync");
     expect(res.status).toBe(409);
     expect(res.body.error).toBe("Gmail no está configurado: faltan GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN");
     expect(createGmailClient).not.toHaveBeenCalled();
   });
 
   it("iCloud sin cuenta responde 409 en singular", async () => {
-    const res = await request(app).post("/api/mail/icloud/sync");
+    const res = await auth.api.post("/api/mail/icloud/sync");
     expect(res.status).toBe(409);
     expect(res.body.error).toBe("iCloud no está configurado: falta ICLOUD_USER");
     expect(openIcloudClient).not.toHaveBeenCalled();
@@ -122,7 +123,7 @@ describe("POST /api/mail/:source/sync", () => {
 
   it("iCloud con cuenta y sin contraseña responde 409 sin abrir el cliente", async () => {
     vi.stubEnv("ICLOUD_USER", ICLOUD_USER);
-    const res = await request(app).post("/api/mail/icloud/sync");
+    const res = await auth.api.post("/api/mail/icloud/sync");
     expect(res.status).toBe(409);
     expect(res.body.error).toBe("iCloud no está configurado: falta la contraseña de app en el Llavero");
     expect(openIcloudClient).not.toHaveBeenCalled();
@@ -135,7 +136,7 @@ describe("POST /api/mail/:source/sync", () => {
       id: "resumen@banco.example",
       pdfParts: [{ kind: "attachment", partId: "2", fileName: "resumen-sintetico.pdf", size: 2048, mailbox: "INBOX", uid: 11 }],
     }]));
-    const res = await request(app).post("/api/mail/icloud/sync");
+    const res = await auth.api.post("/api/mail/icloud/sync");
     expect(res.status).toBe(200);
     const run = mailSyncRunDtoSchema.parse(res.body);
     expect(run).toMatchObject({ source: "icloud", trigger: "manual", status: "ok", messagesChecked: 1 });
@@ -152,7 +153,7 @@ describe("POST /api/mail/:source/sync", () => {
   it("si iCloud rechaza el login responde 200 con la corrida en error", async () => {
     enableIcloud();
     vi.mocked(openIcloudClient).mockRejectedValue(new IcloudAuthError(ICLOUD_AUTH_FAILED_MESSAGE));
-    const res = await request(app).post("/api/mail/icloud/sync");
+    const res = await auth.api.post("/api/mail/icloud/sync");
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ source: "icloud", status: "error", error: ICLOUD_AUTH_FAILED_MESSAGE });
   });
@@ -160,7 +161,7 @@ describe("POST /api/mail/:source/sync", () => {
   it("si la contraseña desaparece del Llavero, la corrida queda en error con los pasos", async () => {
     enableIcloud();
     vi.mocked(readIcloudPassword).mockRejectedValue(new IcloudAuthError(ICLOUD_MISSING_PASSWORD_MESSAGE));
-    const res = await request(app).post("/api/mail/icloud/sync");
+    const res = await auth.api.post("/api/mail/icloud/sync");
     expect(res.body).toMatchObject({ status: "error", error: ICLOUD_MISSING_PASSWORD_MESSAGE });
     expect(openIcloudClient).not.toHaveBeenCalled();
   });
@@ -171,7 +172,7 @@ describe("POST /api/mail/:source/sync", () => {
     vi.mocked(createGmailClient).mockReturnValue(
       fakeGmailClient([{ id: "msg-1", pdfParts: [pdfPart("1", "resumen-sintetico.pdf")] }]),
     );
-    const res = await request(app).post("/api/mail/gmail/sync");
+    const res = await auth.api.post("/api/mail/gmail/sync");
     expect(res.status).toBe(200);
     const run = mailSyncRunDtoSchema.parse(res.body);
     expect(run).toMatchObject({ source: "gmail", trigger: "manual", status: "ok", messagesChecked: 1 });
@@ -186,7 +187,7 @@ describe("POST /api/mail/:source/sync", () => {
     const client = fakeGmailClient([]);
     client.listMessageIds.mockRejectedValue(new GmailAuthError("Gmail rechazó el refresh token (venció o fue revocado)."));
     vi.mocked(createGmailClient).mockReturnValue(client);
-    const res = await request(app).post("/api/mail/gmail/sync");
+    const res = await auth.api.post("/api/mail/gmail/sync");
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: "error", error: "Gmail rechazó el refresh token (venció o fue revocado)." });
   });
