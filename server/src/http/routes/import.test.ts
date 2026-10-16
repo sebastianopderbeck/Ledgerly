@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import request from "supertest";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 
 vi.mock("../../pdf/extract.js", () => ({ extractPdfText: vi.fn() }));
 import { extractPdfText } from "../../pdf/extract.js";
@@ -10,10 +10,11 @@ vi.mock("../../ocr/recognizeImage.js", () => ({ recognizeImage: vi.fn() }));
 import { recognizeImage } from "../../ocr/recognizeImage.js";
 import { MortgageCouponModel } from "../../db/models.js";
 import { createApp } from "../app.js";
-import { MAX_UPLOAD_BYTES } from "./import.js";
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE } from "@ledgerly/shared";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 const mocked = vi.mocked(extractPdfText);
 const meta = { producer: null, creator: null, pageCount: 1, encrypted: false };
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
@@ -29,7 +30,7 @@ const UNSUPPORTED_FILE = "Sólo se aceptan PDF o imágenes (PNG, JPG, HEIC)";
 
 const seedPreviousCoupon = () =>
   MortgageCouponModel.create({
-    prestamoNro: "0000000001", cuotaNro: 2, fechaDebito: new Date("2025-10-17"), capital: 1, intereses: 1,
+    userId: auth.userId, prestamoNro: "0000000001", cuotaNro: 2, fechaDebito: new Date("2025-10-17"), capital: 1, intereses: 1,
     seguroIncendio: 1, totalDebitado: 3, cuotaPuraUva: 499.9, cotizacionUva: 2200, tea: 9.5, tna: 9.1, cft: 11.2,
     sourceFileName: "cupon-2.pdf", sourceHash: "hash-2",
   });
@@ -37,7 +38,7 @@ const seedPreviousCoupon = () =>
 describe("POST /api/import", () => {
   it("importa un cupón (kind coupon, 201)", async () => {
     mocked.mockResolvedValue({ text: couponText, meta });
-    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "c.pdf");
+    const res = await auth.api.post("/api/import").attach("file", Buffer.from("pdf"), "c.pdf");
     expect(res.status).toBe(201);
     expect(res.body.kind).toBe("coupon");
     expect(res.body.coupon.cuotaNro).toBe(1);
@@ -45,15 +46,15 @@ describe("POST /api/import", () => {
 
   it("reimportar el mismo cupón devuelve duplicate (200)", async () => {
     mocked.mockResolvedValue({ text: couponText, meta });
-    await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "c.pdf");
-    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "c.pdf");
+    await auth.api.post("/api/import").attach("file", Buffer.from("pdf"), "c.pdf");
+    const res = await auth.api.post("/api/import").attach("file", Buffer.from("pdf"), "c.pdf");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("duplicate");
   });
 
   it("importa un extracto (kind statement, 201)", async () => {
     mocked.mockResolvedValue({ text: statementText, meta });
-    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "s.pdf");
+    const res = await auth.api.post("/api/import").attach("file", Buffer.from("pdf"), "s.pdf");
     expect(res.status).toBe(201);
     expect(res.body.kind).toBe("statement");
     expect(res.body.transactionCount).toBeGreaterThan(0);
@@ -61,12 +62,12 @@ describe("POST /api/import", () => {
 
   it("documento no reconocido → 422", async () => {
     mocked.mockResolvedValue({ text: "documento cualquiera sin marcadores conocidos", meta });
-    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "x.pdf");
+    const res = await auth.api.post("/api/import").attach("file", Buffer.from("pdf"), "x.pdf");
     expect(res.status).toBe(422);
   });
 
   it("sin archivo → 400", async () => {
-    const res = await request(app).post("/api/import");
+    const res = await auth.api.post("/api/import");
     expect(res.status).toBe(400);
   });
 });
@@ -74,7 +75,7 @@ describe("POST /api/import", () => {
 describe("POST /api/import (auto)", () => {
   it("importa un cupón de auto (kind auto, 201)", async () => {
     mocked.mockResolvedValue({ text: autoText, meta });
-    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
+    const res = await auth.api.post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
     expect(res.status).toBe(201);
     expect(res.body.kind).toBe("auto");
     expect(res.body.coupon.cuotaNro).toBe(2);
@@ -82,8 +83,8 @@ describe("POST /api/import (auto)", () => {
 
   it("reimportar el mismo cupón de auto devuelve duplicate (200)", async () => {
     mocked.mockResolvedValue({ text: autoText, meta });
-    await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
-    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
+    await auth.api.post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
+    const res = await auth.api.post("/api/import").attach("file", Buffer.from("pdf"), "auto.pdf");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("duplicate");
   });
@@ -92,7 +93,7 @@ describe("POST /api/import (auto)", () => {
 describe("POST /api/import (validación de archivo)", () => {
   it("rechaza un archivo que no es PDF → 400", async () => {
     mocked.mockResolvedValue({ text: statementText, meta });
-    const res = await request(app)
+    const res = await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("no soy un pdf"), { filename: "notas.txt", contentType: "text/plain" });
     expect(res.status).toBe(400);
@@ -102,7 +103,7 @@ describe("POST /api/import (validación de archivo)", () => {
   it("no llega a extraer texto si el archivo no es PDF", async () => {
     mocked.mockClear();
     mocked.mockResolvedValue({ text: statementText, meta });
-    await request(app)
+    await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("no soy un pdf"), { filename: "notas.txt", contentType: "text/plain" });
     expect(mocked).not.toHaveBeenCalled();
@@ -111,16 +112,22 @@ describe("POST /api/import (validación de archivo)", () => {
   it("rechaza un archivo más grande que el límite → 413", async () => {
     mocked.mockResolvedValue({ text: statementText, meta });
     const tooBig = Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0x20);
-    const res = await request(app)
+    const res = await auth.api
       .post("/api/import")
       .attach("file", tooBig, { filename: "enorme.pdf", contentType: "application/pdf" });
     expect(res.status).toBe(413);
-    expect(res.body.error).toMatch(/supera/i);
+    expect(res.body.error).toBe(UPLOAD_TOO_LARGE);
+  });
+
+  it("un archivo de exactamente 4 MB pasa el límite", async () => {
+    mocked.mockResolvedValue({ text: "documento cualquiera sin marcadores conocidos", meta });
+    const res = await auth.api.post("/api/import").attach("file", Buffer.alloc(MAX_UPLOAD_BYTES, 0x20), "x.pdf");
+    expect(res.status).toBe(422);
   });
 
   it("acepta un PDF justo por debajo del límite", async () => {
     mocked.mockResolvedValue({ text: statementText, meta });
-    const res = await request(app)
+    const res = await auth.api
       .post("/api/import")
       .attach("file", Buffer.alloc(1024, 0x20), { filename: "chico.pdf", contentType: "application/pdf" });
     expect([200, 201]).toContain(res.status);
@@ -131,7 +138,7 @@ describe("POST /api/import (eficiencia)", () => {
   it("extrae el texto del PDF una sola vez por subida", async () => {
     mocked.mockClear();
     mocked.mockResolvedValue({ text: statementText, meta });
-    await request(app)
+    await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("statement-unico-para-conteo"), "s.pdf");
     expect(mocked).toHaveBeenCalledTimes(1);
@@ -140,7 +147,7 @@ describe("POST /api/import (eficiencia)", () => {
   it("extrae el texto una sola vez también para un cupón", async () => {
     mocked.mockClear();
     mocked.mockResolvedValue({ text: couponText, meta });
-    await request(app)
+    await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("cupon-unico-para-conteo"), "c.pdf");
     expect(mocked).toHaveBeenCalledTimes(1);
@@ -150,7 +157,7 @@ describe("POST /api/import (eficiencia)", () => {
 describe("POST /api/import (PDF con contraseña)", () => {
   it("responde 422 con un mensaje claro", async () => {
     mocked.mockRejectedValue(Object.assign(new Error("No password given"), { name: "PasswordException" }));
-    const res = await request(app).post("/api/import").attach("file", Buffer.from("pdf"), "protegido.pdf");
+    const res = await auth.api.post("/api/import").attach("file", Buffer.from("pdf"), "protegido.pdf");
     expect(res.status).toBe(422);
     expect(res.body.error).toBe("El PDF está protegido con contraseña");
   });
@@ -164,7 +171,7 @@ describe("POST /api/import (captura del crédito)", () => {
 
   it("importa un PNG como cupón del crédito (kind coupon, 201)", async () => {
     await seedPreviousCoupon();
-    const res = await request(app)
+    const res = await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("png"), { filename: "cuota-3.png", contentType: "image/png" });
     expect(res.status).toBe(201);
@@ -174,7 +181,7 @@ describe("POST /api/import (captura del crédito)", () => {
 
   it("acepta una captura HEIC del iPhone aunque llegue como octet-stream", async () => {
     await seedPreviousCoupon();
-    const res = await request(app)
+    const res = await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("heic"), { filename: "IMG_0001.HEIC", contentType: "application/octet-stream" });
     expect(res.status).toBe(201);
@@ -184,7 +191,7 @@ describe("POST /api/import (captura del crédito)", () => {
   it("lee la imagen con OCR y no con el extractor de PDF", async () => {
     await seedPreviousCoupon();
     mocked.mockClear();
-    await request(app)
+    await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("png"), { filename: "cuota-3.png", contentType: "image/png" });
     expect(mocked).not.toHaveBeenCalled();
@@ -192,7 +199,7 @@ describe("POST /api/import (captura del crédito)", () => {
   });
 
   it("sin cupón previo responde 422 con el mensaje", async () => {
-    const res = await request(app)
+    const res = await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("png"), { filename: "cuota-3.png", contentType: "image/png" });
     expect(res.status).toBe(422);
@@ -202,7 +209,7 @@ describe("POST /api/import (captura del crédito)", () => {
   it("una imagen que no es la captura del crédito responde 422", async () => {
     await seedPreviousCoupon();
     mockedOcr.mockResolvedValue([{ text: "Mercado Pago", x: 0.04, y: 0.1, height: 0.03 }]);
-    const res = await request(app)
+    const res = await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("png"), { filename: "otra.png", contentType: "image/png" });
     expect(res.status).toBe(422);
@@ -210,7 +217,7 @@ describe("POST /api/import (captura del crédito)", () => {
   });
 
   it("rechaza un tipo no soportado nombrando PDF e imágenes", async () => {
-    const res = await request(app)
+    const res = await auth.api
       .post("/api/import")
       .attach("file", Buffer.from("x"), { filename: "notas.txt", contentType: "text/plain" });
     expect(res.status).toBe(400);

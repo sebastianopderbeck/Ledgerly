@@ -1,12 +1,15 @@
+import { Types } from "mongoose";
 import { describe, it, expect, afterEach, vi } from "vitest";
-import request from "supertest";
 import type { CategoryMonthStat } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { BudgetModel, InflationRateModel, StatementModel, TransactionModel } from "../../db/models.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 
 const MISSING_ID = "64b7f9c2a1b2c3d4e5f60718";
 const INVALID_INPUT = "Tope inválido: category no vacía y topeArs mayor a 0";
@@ -15,13 +18,19 @@ const INVALID_PATCH = "Tope inválido: mandá topeArs mayor a 0 o ajustaInflacio
 const seedInflation = (...periodos: string[]) =>
   InflationRateModel.insertMany(periodos.map((periodo) => ({ periodo, variacionMensual: 2 })));
 
-const createBudget = (body: object) => request(app).post("/api/budgets").send(body);
+const createBudget = (body: object) => auth.api.post("/api/budgets").send(body);
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
 describe("CRUD de /api/budgets", () => {
+  it("los topes de otro usuario no cuentan como duplicados", async () => {
+    await BudgetModel.create({ userId: new Types.ObjectId(), category: "Comida", topeArs: 1000, periodoBase: "2026-08" });
+    const created = await createBudget({ category: "Comida", topeArs: 300000 });
+    expect(created.status).toBe(201);
+  });
+
   it("el POST crea el tope con periodoBase en el último IPC publicado", async () => {
     await seedInflation("2026-08", "2026-07");
     const created = await createBudget({ category: "Comida", topeArs: 300000, ajustaInflacion: true });
@@ -42,7 +51,7 @@ describe("CRUD de /api/budgets", () => {
     await seedInflation("2026-08");
     await createBudget({ category: "Transporte", topeArs: 100000 });
     await createBudget({ category: "Comida", topeArs: 300000 });
-    const list = await request(app).get("/api/budgets");
+    const list = await auth.api.get("/api/budgets");
     expect(list.status).toBe(200);
     expect(list.body.map((budget: { category: string }) => budget.category)).toEqual(["Comida", "Transporte"]);
   });
@@ -52,7 +61,7 @@ describe("CRUD de /api/budgets", () => {
     const { body: created } = await createBudget({ category: "Comida", topeArs: 300000, ajustaInflacion: true });
     expect(created.periodoBase).toBe("2026-07");
     await seedInflation("2026-08");
-    const patched = await request(app).patch(`/api/budgets/${created.id}`).send({ topeArs: 320000, category: "Otra" });
+    const patched = await auth.api.patch(`/api/budgets/${created.id}`).send({ topeArs: 320000, category: "Otra" });
     expect(patched.status).toBe(200);
     expect(patched.body).toEqual({
       id: created.id, category: "Comida", topeArs: 320000, ajustaInflacion: true, periodoBase: "2026-08",
@@ -62,7 +71,7 @@ describe("CRUD de /api/budgets", () => {
   it("el PATCH puede cambiar solo el ajuste por inflación", async () => {
     await seedInflation("2026-08");
     const { body: created } = await createBudget({ category: "Comida", topeArs: 300000 });
-    const patched = await request(app).patch(`/api/budgets/${created.id}`).send({ ajustaInflacion: true });
+    const patched = await auth.api.patch(`/api/budgets/${created.id}`).send({ ajustaInflacion: true });
     expect(patched.status).toBe(200);
     expect(patched.body).toMatchObject({ topeArs: 300000, ajustaInflacion: true });
   });
@@ -70,15 +79,15 @@ describe("CRUD de /api/budgets", () => {
   it("el DELETE borra el tope", async () => {
     await seedInflation("2026-08");
     const { body: created } = await createBudget({ category: "Comida", topeArs: 300000 });
-    expect((await request(app).delete(`/api/budgets/${created.id}`)).status).toBe(204);
-    expect((await request(app).get("/api/budgets")).body).toEqual([]);
+    expect((await auth.api.delete(`/api/budgets/${created.id}`)).status).toBe(204);
+    expect((await auth.api.get("/api/budgets")).body).toEqual([]);
   });
 
   it.each([MISSING_ID, "no-es-un-id"])("PATCH y DELETE con el id %s dan 404", async (id) => {
-    const patched = await request(app).patch(`/api/budgets/${id}`).send({ topeArs: 1000 });
+    const patched = await auth.api.patch(`/api/budgets/${id}`).send({ topeArs: 1000 });
     expect(patched.status).toBe(404);
     expect(patched.body.error).toBe("Tope no encontrado");
-    expect((await request(app).delete(`/api/budgets/${id}`)).status).toBe(404);
+    expect((await auth.api.delete(`/api/budgets/${id}`)).status).toBe(404);
   });
 
   it("sin IPC cargado periodoBase es el mes actual", async () => {
@@ -110,7 +119,7 @@ describe("validación de /api/budgets", () => {
   ])("el PATCH da 400 %s", async (_caso, body) => {
     await seedInflation("2026-08");
     const { body: created } = await createBudget({ category: "Comida", topeArs: 300000 });
-    const response = await request(app).patch(`/api/budgets/${created.id}`).send(body);
+    const response = await auth.api.patch(`/api/budgets/${created.id}`).send(body);
     expect(response.status).toBe(400);
     expect(response.body.error).toBe(INVALID_PATCH);
   });
@@ -129,13 +138,13 @@ describe("validación de /api/budgets", () => {
       createBudget({ category: "Comida", topeArs: 2 }),
     ]);
     expect(responses.map((response) => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
-    expect(await BudgetModel.countDocuments()).toBe(1);
+    expect(await BudgetModel.countDocuments({ userId: auth.userId })).toBe(1);
   });
 
   it("el índice único rechaza duplicados", async () => {
     await BudgetModel.init();
-    await BudgetModel.create({ category: "Comida", topeArs: 1, periodoBase: "2026-08" });
-    await expect(BudgetModel.create({ category: "Comida", topeArs: 2, periodoBase: "2026-08" })).rejects.toThrow(/duplicate key/);
+    await BudgetModel.create({ userId: auth.userId, category: "Comida", topeArs: 1, periodoBase: "2026-08" });
+    await expect(BudgetModel.create({ userId: auth.userId, category: "Comida", topeArs: 2, periodoBase: "2026-08" })).rejects.toThrow(/duplicate key/);
   });
 });
 
@@ -159,6 +168,7 @@ let statementCount = 0;
 const seedStatement = (closingDate: string | null) => {
   statementCount += 1;
   return StatementModel.create({
+    userId: auth.userId,
     issuer: "visa_signature", cardLabel: "Visa ****1234", last4: "1234",
     closingDate: closingDate === null ? null : new Date(closingDate), dueDate: null,
     totals: { totalConsumos: money, saldoActual: money, pagoMinimo: money, saldoAnterior: money },
@@ -169,12 +179,12 @@ const seedStatement = (closingDate: string | null) => {
 
 const seedTransactions = async (rows: TxSeed[]) => {
   const statement = await seedStatement(null);
-  await TransactionModel.insertMany(rows.map((row, index) => ({
+  await TransactionModel.insertMany(ownedBy(auth.userId, rows.map((row, index) => ({
     statementId: statement._id, issuer: "visa_signature", cardLabel: row.cardLabel ?? "Visa ****1234",
     date: new Date(row.date), descriptionRaw: `COMERCIO ${index}`, merchant: `COMERCIO ${index}`,
     category: row.category, categorySource: "rule", amount: row.amount, currency: row.currency ?? "ARS",
     direction: "debit", type: row.type ?? "purchase", isInstallment: false, fingerprint: `f${index}`,
-  })));
+  }))));
 };
 
 const byCategory = (a: CategoryTotal, b: CategoryTotal): number => a.category.localeCompare(b.category);
@@ -192,7 +202,7 @@ describe("GET /api/budgets/spending", () => {
       { date: "2026-09-13", category: "Comida", amount: -40, type: "refund" },
       { date: "2026-10-01", category: "Comida", amount: 20 },
     ]);
-    const response = await request(app).get("/api/budgets/spending");
+    const response = await auth.api.get("/api/budgets/spending");
     expect(response.status).toBe(200);
     expect(response.body.gastos).toEqual([
       { month: "2026-09", category: "Comida", total: 150, count: 2 },
@@ -207,9 +217,9 @@ describe("GET /api/budgets/spending", () => {
       { date: "2025-12-31", category: "Comida", amount: 10 },
       { date: "2026-01-01", category: "Comida", amount: 20 },
     ]);
-    const only2026 = await request(app).get("/api/budgets/spending?year=2026");
+    const only2026 = await auth.api.get("/api/budgets/spending?year=2026");
     expect(only2026.body.gastos.map((gasto: CategoryMonthStat) => gasto.month)).toEqual(["2026-01"]);
-    const all = await request(app).get("/api/budgets/spending");
+    const all = await auth.api.get("/api/budgets/spending");
     expect(all.body.gastos.map((gasto: CategoryMonthStat) => gasto.month)).toEqual(["2025-12", "2026-01"]);
   });
 
@@ -217,12 +227,12 @@ describe("GET /api/budgets/spending", () => {
     await seedStatement("2026-09-25");
     await seedStatement("2026-10-02");
     await seedStatement(null);
-    const response = await request(app).get("/api/budgets/spending?year=2025");
+    const response = await auth.api.get("/api/budgets/spending?year=2025");
     expect(response.body.ultimoMesCerrado).toBe("2026-09");
   });
 
   it("sin resúmenes ni consumos devuelve null y una lista vacía", async () => {
-    const response = await request(app).get("/api/budgets/spending");
+    const response = await auth.api.get("/api/budgets/spending");
     expect(response.body).toEqual({ ultimoMesCerrado: null, gastos: [] });
   });
 
@@ -237,8 +247,8 @@ describe("GET /api/budgets/spending", () => {
       { date: "2026-09-18", category: "Ropa", amount: 3, currency: "USD" },
       { date: "2026-10-01", category: "Comida", amount: 13 },
     ]);
-    const spending = await request(app).get("/api/budgets/spending");
-    const dashboard = await request(app)
+    const spending = await auth.api.get("/api/budgets/spending");
+    const dashboard = await auth.api
       .get("/api/stats/by-category")
       .query({ currency: "ARS", from: "2026-09-01", to: "2026-09-30" });
     const fromBudgets = spending.body.gastos

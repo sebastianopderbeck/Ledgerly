@@ -1,25 +1,26 @@
 import { Router } from "express";
-import multer from "multer";
 import { HttpError, asyncHandler } from "../errors.js";
 import { importStatement } from "../../import/importStatement.js";
 import { StatementModel, TransactionModel } from "../../db/models.js";
+import { userIdOf } from "../../auth/requireUser.js";
+import { uploadSingleFile } from "../uploadFile.js";
 import { toStatementDTO, toTransactionDTO } from "../mappers.js";
 import {
   NoTextError, NoTransactionsError, UnsupportedFormatError,
 } from "../../ingestion/errors.js";
 
-const upload = multer({ storage: multer.memoryStorage() });
 export const statementsRouter = Router();
 
 statementsRouter.post(
   "/",
-  upload.single("file"),
+  uploadSingleFile(),
   asyncHandler(async (req, res) => {
     if (!req.file) throw new HttpError(400, "Falta el archivo (campo 'file')");
+    const userId = userIdOf(req);
     const replace = req.query.replace === "true";
     try {
-      const result = await importStatement({ data: req.file.buffer, fileName: req.file.originalname, replace });
-      const doc = await StatementModel.findById(result.statementId);
+      const result = await importStatement({ userId, data: req.file.buffer, fileName: req.file.originalname, replace });
+      const doc = await StatementModel.findOne({ _id: result.statementId, userId });
       const body = {
         status: result.status,
         statement: toStatementDTO(doc!, result.transactionCount),
@@ -37,10 +38,11 @@ statementsRouter.post(
 
 statementsRouter.get(
   "/",
-  asyncHandler(async (_req, res) => {
-    const docs = await StatementModel.find().sort({ closingDate: -1 });
+  asyncHandler(async (req, res) => {
+    const userId = userIdOf(req);
+    const docs = await StatementModel.find({ userId }).sort({ closingDate: -1 });
     const dtos = await Promise.all(
-      docs.map(async (d) => toStatementDTO(d, await TransactionModel.countDocuments({ statementId: d._id }))),
+      docs.map(async (d) => toStatementDTO(d, await TransactionModel.countDocuments({ userId, statementId: d._id }))),
     );
     res.json(dtos);
   }),
@@ -49,9 +51,10 @@ statementsRouter.get(
 statementsRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
-    const doc = await StatementModel.findById(req.params.id);
+    const userId = userIdOf(req);
+    const doc = await StatementModel.findOne({ _id: req.params.id, userId });
     if (!doc) throw new HttpError(404, "Statement no encontrado");
-    const txs = await TransactionModel.find({ statementId: doc._id }).sort({ date: 1 });
+    const txs = await TransactionModel.find({ userId, statementId: doc._id }).sort({ date: 1 });
     res.json({
       statement: toStatementDTO(doc, txs.length),
       transactions: txs.map(toTransactionDTO),
@@ -62,8 +65,9 @@ statementsRouter.get(
 statementsRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    await TransactionModel.deleteMany({ statementId: req.params.id });
-    await StatementModel.deleteOne({ _id: req.params.id });
+    const userId = userIdOf(req);
+    await TransactionModel.deleteMany({ userId, statementId: req.params.id });
+    await StatementModel.deleteOne({ _id: req.params.id, userId });
     res.status(204).end();
   }),
 );

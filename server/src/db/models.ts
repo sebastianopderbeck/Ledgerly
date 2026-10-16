@@ -1,9 +1,23 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { userScoped } from "./userScoped.js";
+
+const userIdPath = { type: Schema.Types.ObjectId, ref: "User", required: true as const, index: true };
 
 const moneyPair = { ars: { type: Number, required: true }, usd: { type: Number, required: true } };
 
+const userSchema = new Schema(
+  {
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    name: { type: String, required: true },
+    lastLoginAt: { type: Date, default: null },
+    mailNoticeSeenAt: { type: Date, default: null },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+
 const statementSchema = new Schema(
   {
+    userId: userIdPath,
     issuer: { type: String, required: true, enum: ["visa_signature", "icbc"] },
     cardLabel: { type: String, required: true },
     last4: { type: String, default: null },
@@ -16,7 +30,7 @@ const statementSchema = new Schema(
       saldoAnterior: moneyPair,
     },
     sourceFileName: { type: String, required: true },
-    sourceHash: { type: String, required: true, unique: true },
+    sourceHash: { type: String, required: true },
     pageCount: { type: Number, required: true },
     parserVersion: { type: String, required: true },
     needsReview: { type: Boolean, default: false },
@@ -27,6 +41,7 @@ const statementSchema = new Schema(
 );
 
 const transactionSchema = new Schema({
+  userId: userIdPath,
   statementId: { type: Schema.Types.ObjectId, ref: "Statement", required: true, index: true },
   issuer: { type: String, required: true },
   cardLabel: { type: String, required: true },
@@ -47,6 +62,7 @@ const transactionSchema = new Schema({
 });
 
 const categoryRuleSchema = new Schema({
+  userId: userIdPath,
   priority: { type: Number, required: true },
   matchType: { type: String, required: true, enum: ["contains", "regex"] },
   pattern: { type: String, required: true },
@@ -57,6 +73,7 @@ const categoryRuleSchema = new Schema({
 
 const mortgageCouponSchema = new Schema(
   {
+    userId: userIdPath,
     prestamoNro: { type: String, required: true, index: true },
     cuotaNro: { type: Number, required: true },
     fechaDebito: { type: Date, required: true },
@@ -76,7 +93,7 @@ const mortgageCouponSchema = new Schema(
   },
   { timestamps: { createdAt: "uploadedAt", updatedAt: false } },
 );
-mortgageCouponSchema.index({ prestamoNro: 1, cuotaNro: 1 }, { unique: true });
+mortgageCouponSchema.index({ userId: 1, prestamoNro: 1, cuotaNro: 1 }, { unique: true });
 
 const autoCouponConceptSchema = new Schema(
   { label: { type: String, required: true }, amount: { type: Number, required: true } },
@@ -85,6 +102,7 @@ const autoCouponConceptSchema = new Schema(
 
 const autoCouponSchema = new Schema(
   {
+    userId: userIdPath,
     grupo: { type: String, required: true, index: true },
     orden: { type: String, required: true },
     cuotaNro: { type: Number, required: true },
@@ -103,7 +121,7 @@ const autoCouponSchema = new Schema(
   },
   { timestamps: { createdAt: "uploadedAt", updatedAt: false } },
 );
-autoCouponSchema.index({ grupo: 1, orden: 1, cuotaNro: 1 }, { unique: true });
+autoCouponSchema.index({ userId: 1, grupo: 1, orden: 1, cuotaNro: 1 }, { unique: true });
 
 const payslipConceptoSchema = new Schema(
   {
@@ -117,6 +135,7 @@ const payslipConceptoSchema = new Schema(
 
 const payslipSchema = new Schema(
   {
+    userId: userIdPath,
     periodo: { type: String, required: true, index: true },
     tipo: { type: String, required: true, enum: ["mensual", "sac"], default: "mensual" },
     fechaPago: { type: Date, required: true },
@@ -135,7 +154,7 @@ const payslipSchema = new Schema(
   },
   { timestamps: { createdAt: "uploadedAt", updatedAt: false } },
 );
-payslipSchema.index({ cuil: 1, periodo: 1, tipo: 1 }, { unique: true });
+payslipSchema.index({ userId: 1, cuil: 1, periodo: 1, tipo: 1 }, { unique: true });
 
 const inflationRateSchema = new Schema({
   periodo: { type: String, required: true, unique: true, index: true },
@@ -150,7 +169,7 @@ const macroSeriesSchema = new Schema({
 macroSeriesSchema.index({ serie: 1, fecha: 1 }, { unique: true });
 
 const hiddenSubscriptionSchema = new Schema(
-  { key: { type: String, required: true, unique: true } },
+  { userId: userIdPath, key: { type: String, required: true } },
   { timestamps: { createdAt: "hiddenAt", updatedAt: false } },
 );
 
@@ -165,7 +184,8 @@ const markedChargeSchema = new Schema(
 
 const manualSubscriptionSchema = new Schema(
   {
-    key: { type: String, required: true, unique: true },
+    userId: userIdPath,
+    key: { type: String, required: true },
     cobros: { type: [markedChargeSchema], default: [] },
   },
   { timestamps: { createdAt: "markedAt", updatedAt: false } },
@@ -173,7 +193,8 @@ const manualSubscriptionSchema = new Schema(
 
 const subscriptionCadenceSchema = new Schema(
   {
-    key: { type: String, required: true, unique: true },
+    userId: userIdPath,
+    key: { type: String, required: true },
     cadencia: { type: String, required: true, enum: ["bimestral", "anual"], default: "anual" },
   },
   { timestamps: { createdAt: "markedAt", updatedAt: false } },
@@ -189,6 +210,7 @@ const assetValuationSchema = new Schema(
 
 const manualAssetSchema = new Schema(
   {
+    userId: userIdPath,
     nombre: { type: String, required: true },
     tipo: { type: String, required: true, enum: ["cuenta", "ahorro", "plazo_fijo", "inversion", "inmueble", "otro"] },
     moneda: { type: String, required: true, enum: ["ARS", "USD"] },
@@ -199,6 +221,7 @@ const manualAssetSchema = new Schema(
 
 const fixedServiceSchema = new Schema(
   {
+    userId: userIdPath,
     nombre: { type: String, required: true },
     monto: { type: Number, required: true, min: 0 },
     cadencia: { type: String, required: true, enum: ["mensual", "bimestral", "anual"], default: "mensual" },
@@ -210,13 +233,15 @@ const fixedServiceSchema = new Schema(
 );
 
 const budgetSchema = new Schema({
-  category: { type: String, required: true, unique: true },
+  userId: userIdPath,
+  category: { type: String, required: true },
   topeArs: { type: Number, required: true },
   ajustaInflacion: { type: Boolean, default: false },
   periodoBase: { type: String, required: true },
 });
 
 const mailSyncRunSchema = new Schema({
+  userId: userIdPath,
   source: { type: String, required: true, enum: ["gmail", "icloud"] },
   trigger: { type: String, required: true, enum: ["manual", "job"] },
   startedAt: { type: Date, required: true },
@@ -226,9 +251,10 @@ const mailSyncRunSchema = new Schema({
   messagesChecked: { type: Number, required: true },
   hasMore: { type: Boolean, required: true },
 });
-mailSyncRunSchema.index({ source: 1, startedAt: -1 });
+mailSyncRunSchema.index({ userId: 1, source: 1, startedAt: -1 });
 
 const mailAttachmentSchema = new Schema({
+  userId: userIdPath,
   source: { type: String, required: true, enum: ["gmail", "icloud"] },
   messageId: { type: String, required: true },
   partId: { type: String, required: true },
@@ -241,8 +267,21 @@ const mailAttachmentSchema = new Schema({
   detail: { type: String, required: true },
   processedAt: { type: Date, required: true },
 });
-mailAttachmentSchema.index({ source: 1, messageId: 1, partId: 1 }, { unique: true });
+mailAttachmentSchema.index({ userId: 1, source: 1, messageId: 1, partId: 1 }, { unique: true });
 
+statementSchema.index({ userId: 1, sourceHash: 1 }, { unique: true });
+hiddenSubscriptionSchema.index({ userId: 1, key: 1 }, { unique: true });
+manualSubscriptionSchema.index({ userId: 1, key: 1 }, { unique: true });
+subscriptionCadenceSchema.index({ userId: 1, key: 1 }, { unique: true });
+budgetSchema.index({ userId: 1, category: 1 }, { unique: true });
+
+[
+  statementSchema, transactionSchema, categoryRuleSchema, mortgageCouponSchema, autoCouponSchema, payslipSchema,
+  hiddenSubscriptionSchema, manualSubscriptionSchema, subscriptionCadenceSchema, manualAssetSchema, fixedServiceSchema,
+  budgetSchema, mailSyncRunSchema, mailAttachmentSchema,
+].forEach((schema) => schema.plugin(userScoped));
+
+export type UserDoc = InferSchemaType<typeof userSchema>;
 export type StatementDoc = InferSchemaType<typeof statementSchema>;
 export type TransactionDoc = InferSchemaType<typeof transactionSchema>;
 export type CategoryRuleDoc = InferSchemaType<typeof categoryRuleSchema>;
@@ -260,6 +299,7 @@ export type BudgetDoc = InferSchemaType<typeof budgetSchema>;
 export type MailSyncRunDoc = InferSchemaType<typeof mailSyncRunSchema>;
 export type MailAttachmentDoc = InferSchemaType<typeof mailAttachmentSchema>;
 
+export const UserModel: Model<UserDoc> = mongoose.models.User ?? mongoose.model("User", userSchema);
 export const StatementModel: Model<StatementDoc> =
   mongoose.models.Statement ?? mongoose.model("Statement", statementSchema);
 export const TransactionModel: Model<TransactionDoc> =
@@ -293,3 +333,8 @@ export const MailSyncRunModel: Model<MailSyncRunDoc> =
   mongoose.models.MailSyncRun ?? mongoose.model("MailSyncRun", mailSyncRunSchema);
 export const MailAttachmentModel: Model<MailAttachmentDoc> =
   mongoose.models.MailAttachment ?? mongoose.model("MailAttachment", mailAttachmentSchema);
+
+export const USER_SCOPED_MODEL_NAMES = [
+  "Statement", "Transaction", "CategoryRule", "MortgageCoupon", "AutoCoupon", "Payslip", "HiddenSubscription",
+  "ManualSubscription", "SubscriptionCadence", "ManualAsset", "FixedService", "Budget", "MailSyncRun", "MailAttachment",
+] as const;

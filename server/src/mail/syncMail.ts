@@ -26,6 +26,7 @@ export interface MailLedgerEntry {
 }
 
 export interface SyncMailDeps {
+  userId: Types.ObjectId;
   source: MailSource;
   openClient: OpenMailClient;
   trigger: MailSyncTrigger;
@@ -53,6 +54,7 @@ interface PartResult {
 }
 
 interface ScanContext {
+  userId: Types.ObjectId;
   source: MailSource;
   runId: Types.ObjectId;
   client: MailClient;
@@ -101,9 +103,9 @@ export function classifyImportError(err: unknown): ImportErrorOutcome {
   return { outcome: "failed", detail: errorMessage(err), kind: null };
 }
 
-const readLedger = async (source: MailSource, ids: string[]): Promise<MailLedgerEntry[]> => {
+const readLedger = async (userId: Types.ObjectId, source: MailSource, ids: string[]): Promise<MailLedgerEntry[]> => {
   const docs = await MailAttachmentModel.find(
-    { source, messageId: { $in: ids } }, { messageId: 1, partId: 1, outcome: 1 },
+    { userId, source, messageId: { $in: ids } }, { messageId: 1, partId: 1, outcome: 1 },
   ).lean();
   return docs.map(({ messageId, partId, outcome }) => ({ messageId, partId, outcome: outcome as MailSyncOutcome }));
 };
@@ -115,7 +117,7 @@ const recordPart = async (
   ctx: RunContext, message: MailMessage, partId: string, fileName: string, result: PartResult,
 ): Promise<void> => {
   await MailAttachmentModel.updateOne(
-    { source: ctx.source, messageId: message.id, partId },
+    { userId: ctx.userId, source: ctx.source, messageId: message.id, partId },
     { $set: { runId: ctx.runId, fileName, receivedAt: new Date(message.receivedAt), ...result, processedAt: ctx.now() } },
     { upsert: true },
   );
@@ -123,7 +125,7 @@ const recordPart = async (
 
 const importPart = async (ctx: RunContext, data: Uint8Array, fileName: string): Promise<PartResult> => {
   try {
-    const { result, file } = await ctx.importPdf({ data, fileName });
+    const { result, file } = await ctx.importPdf({ userId: ctx.userId, data, fileName });
     return { outcome: result.status, kind: result.kind, documentId: file.id, detail: file.description };
   } catch (err) {
     return { ...classifyImportError(err), documentId: null };
@@ -158,7 +160,7 @@ const processMessage = async (ctx: RunContext, message: MailMessage): Promise<vo
 
 const scanMailbox = async (scan: ScanContext, maxMessages: number, progress: RunProgress): Promise<void> => {
   const ids = await scan.client.listMessageIds(MAIL_LIST_LIMIT);
-  const ledger = await readLedger(scan.source, ids);
+  const ledger = await readLedger(scan.userId, scan.source, ids);
   const { batch, hasMore } = selectPendingMessages(ids, ledger, maxMessages);
   const ctx: RunContext = { ...scan, settled: settledKeys(ledger) };
   progress.hasMore = hasMore;
@@ -173,10 +175,11 @@ const closeQuietly = async (client: MailClient | null): Promise<void> => {
   await client?.close().catch(() => undefined);
 };
 
-const itemsOf = (runId: Types.ObjectId) => MailAttachmentModel.find({ runId }).sort({ processedAt: 1, _id: 1 });
+const itemsOf = (userId: Types.ObjectId, runId: Types.ObjectId) =>
+  MailAttachmentModel.find({ userId, runId }).sort({ processedAt: 1, _id: 1 });
 
 export async function syncMail({
-  source, openClient, trigger, importPdf = importPdfFile, maxMessages = MAIL_MAX_MESSAGES_PER_RUN, now = () => new Date(),
+  userId, source, openClient, trigger, importPdf = importPdfFile, maxMessages = MAIL_MAX_MESSAGES_PER_RUN, now = () => new Date(),
 }: SyncMailDeps): Promise<MailSyncRunDTO> {
   const runId = new Types.ObjectId();
   const startedAt = now();
@@ -184,13 +187,14 @@ export async function syncMail({
   let client: MailClient | null = null;
   try {
     client = await openClient();
-    await scanMailbox({ source, runId, client, importPdf, now }, maxMessages, progress);
+    await scanMailbox({ userId, source, runId, client, importPdf, now }, maxMessages, progress);
   } catch (err) {
     progress.error = errorMessage(err);
   }
   await closeQuietly(client);
   const run = await MailSyncRunModel.create({
     _id: runId,
+    userId,
     source,
     trigger,
     startedAt,
@@ -200,22 +204,25 @@ export async function syncMail({
     messagesChecked: progress.messagesChecked,
     hasMore: progress.hasMore,
   });
-  return toMailSyncRunDTO(run, await itemsOf(runId));
+  return toMailSyncRunDTO(run, await itemsOf(userId, runId));
 }
 
-const inFlight = new Map<MailSource, Promise<MailSyncRunDTO>>();
+const inFlight = new Map<string, Promise<MailSyncRunDTO>>();
 
-export function runMailSync(source: MailSource, openClient: OpenMailClient, trigger: MailSyncTrigger): Promise<MailSyncRunDTO> {
-  const current = inFlight.get(source);
+export function runMailSync(
+  userId: Types.ObjectId, source: MailSource, openClient: OpenMailClient, trigger: MailSyncTrigger,
+): Promise<MailSyncRunDTO> {
+  const key = `${userId.toString()}:${source}`;
+  const current = inFlight.get(key);
   if (current) return current;
-  const tracked = syncMail({ source, openClient, trigger }).finally(() => {
-    inFlight.delete(source);
+  const tracked = syncMail({ userId, source, openClient, trigger }).finally(() => {
+    inFlight.delete(key);
   });
-  inFlight.set(source, tracked);
+  inFlight.set(key, tracked);
   return tracked;
 }
 
-export async function findLastMailRun(source: MailSource): Promise<MailSyncRunDTO | null> {
-  const run = await MailSyncRunModel.findOne({ source }).sort({ startedAt: -1 });
-  return run ? toMailSyncRunDTO(run, await itemsOf(run._id)) : null;
+export async function findLastMailRun(userId: Types.ObjectId, source: MailSource): Promise<MailSyncRunDTO | null> {
+  const run = await MailSyncRunModel.findOne({ userId, source }).sort({ startedAt: -1 });
+  return run ? toMailSyncRunDTO(run, await itemsOf(userId, run._id)) : null;
 }

@@ -6,3 +6,5 @@ dist/
 /examples
 *.pdf
 /.claude/worktrees
+/backups
+.vercel

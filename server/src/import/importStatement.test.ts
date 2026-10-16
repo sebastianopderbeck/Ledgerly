@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { withDb } from "../testing/withDb.js";
 import type { ParsedStatement } from "@ledgerly/shared";
@@ -7,6 +8,8 @@ import { parseStatement } from "../ingestion/parseStatement.js";
 import { importStatement } from "./importStatement.js";
 import { seedCategoryRules } from "../rules/seedRules.js";
 import { StatementModel, TransactionModel } from "../db/models.js";
+
+const USER_ID = new Types.ObjectId();
 
 withDb();
 const mocked = vi.mocked(parseStatement);
@@ -34,30 +37,30 @@ beforeEach(() => {
 
 describe("importStatement", () => {
   it("importa statement + transacciones y categoriza", async () => {
-    await seedCategoryRules();
-    const res = await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "r.pdf" });
+    await seedCategoryRules(USER_ID);
+    const res = await importStatement({ userId: USER_ID, data: new Uint8Array([1, 2, 3]), fileName: "r.pdf" });
     expect(res.status).toBe("imported");
     expect(res.transactionCount).toBe(2);
-    expect(await StatementModel.countDocuments()).toBe(1);
-    const ml = await TransactionModel.findOne({ comprobante: "001001" });
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(1);
+    const ml = await TransactionModel.findOne({ userId: USER_ID, comprobante: "001001" });
     expect(ml?.category).toBe("Compras");
     expect(ml?.categorySource).toBe("rule");
   });
 
   it("es idempotente: reimportar el mismo PDF no duplica", async () => {
-    await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "r.pdf" });
-    const res = await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "r.pdf" });
+    await importStatement({ userId: USER_ID, data: new Uint8Array([1, 2, 3]), fileName: "r.pdf" });
+    const res = await importStatement({ userId: USER_ID, data: new Uint8Array([1, 2, 3]), fileName: "r.pdf" });
     expect(res.status).toBe("duplicate");
-    expect(await StatementModel.countDocuments()).toBe(1);
-    expect(await TransactionModel.countDocuments()).toBe(2);
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(1);
+    expect(await TransactionModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 
   it("replace=true reemplaza el statement anterior", async () => {
-    await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "r.pdf" });
-    const res = await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "r.pdf", replace: true });
+    await importStatement({ userId: USER_ID, data: new Uint8Array([1, 2, 3]), fileName: "r.pdf" });
+    const res = await importStatement({ userId: USER_ID, data: new Uint8Array([1, 2, 3]), fileName: "r.pdf", replace: true });
     expect(res.status).toBe("imported");
-    expect(await StatementModel.countDocuments()).toBe(1);
-    expect(await TransactionModel.countDocuments()).toBe(2);
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(1);
+    expect(await TransactionModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 });
 
@@ -80,61 +83,61 @@ const okMeta = { reconciliation: { ok: true, entries: [] },
 describe("importStatement dedup entre resúmenes", () => {
   it("no duplica una línea idéntica (misma cuota) presente en dos resúmenes distintos", async () => {
     mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5)]), ...okMeta });
-    await importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    await importStatement({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" });
     mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5), cuotaRow(6)], "2026-08-02"), ...okMeta });
-    const res = await importStatement({ data: new Uint8Array([2]), fileName: "b.pdf" });
+    const res = await importStatement({ userId: USER_ID, data: new Uint8Array([2]), fileName: "b.pdf" });
     expect(res.transactionCount).toBe(1);
-    expect(await TransactionModel.countDocuments()).toBe(2);
+    expect(await TransactionModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 
   it("conserva cuotas distintas de la misma compra (no son duplicados)", async () => {
     mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(5)]), ...okMeta });
-    await importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    await importStatement({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" });
     mocked.mockResolvedValueOnce({ statement: stmtWith([cuotaRow(6)], "2026-08-02"), ...okMeta });
-    await importStatement({ data: new Uint8Array([2]), fileName: "b.pdf" });
-    expect(await TransactionModel.countDocuments()).toBe(2);
+    await importStatement({ userId: USER_ID, data: new Uint8Array([2]), fileName: "b.pdf" });
+    expect(await TransactionModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 });
 
 describe("importStatement dedup por clave natural", () => {
   it("la misma tarjeta y el mismo cierre con otros bytes es duplicate, sin segundo resumen", async () => {
-    await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "home-banking.pdf" });
-    const res = await importStatement({ data: new Uint8Array([4, 5, 6]), fileName: "mail.pdf" });
-    const only = await StatementModel.findOne();
+    await importStatement({ userId: USER_ID, data: new Uint8Array([1, 2, 3]), fileName: "home-banking.pdf" });
+    const res = await importStatement({ userId: USER_ID, data: new Uint8Array([4, 5, 6]), fileName: "mail.pdf" });
+    const only = await StatementModel.findOne({ userId: USER_ID });
     expect(res.status).toBe("duplicate");
     expect(res.statementId).toBe(only?._id.toString());
     expect(res.transactionCount).toBe(2);
     expect(only?.sourceFileName).toBe("home-banking.pdf");
-    expect(await StatementModel.countDocuments()).toBe(1);
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(1);
   });
 
   it("con replace reemplaza el resumen de la misma tarjeta y cierre", async () => {
-    await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "home-banking.pdf" });
-    const res = await importStatement({ data: new Uint8Array([4, 5, 6]), fileName: "mail.pdf", replace: true });
+    await importStatement({ userId: USER_ID, data: new Uint8Array([1, 2, 3]), fileName: "home-banking.pdf" });
+    const res = await importStatement({ userId: USER_ID, data: new Uint8Array([4, 5, 6]), fileName: "mail.pdf", replace: true });
     expect(res.status).toBe("imported");
     expect(res.transactionCount).toBe(2);
-    expect(await StatementModel.countDocuments()).toBe(1);
-    expect((await StatementModel.findOne())?.sourceFileName).toBe("mail.pdf");
-    expect(await TransactionModel.countDocuments()).toBe(2);
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(1);
+    expect((await StatementModel.findOne({ userId: USER_ID }))?.sourceFileName).toBe("mail.pdf");
+    expect(await TransactionModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 
   it("otra tarjeta con el mismo cierre no es duplicado", async () => {
-    await importStatement({ data: new Uint8Array([1]), fileName: "icbc.pdf" });
+    await importStatement({ userId: USER_ID, data: new Uint8Array([1]), fileName: "icbc.pdf" });
     mocked.mockResolvedValueOnce({
       statement: { ...parsed, header: { ...parsed.header, issuer: "visa_signature", cardLabel: "Visa Signature ****1234" } },
       ...okMeta,
     });
-    const res = await importStatement({ data: new Uint8Array([2]), fileName: "visa.pdf" });
+    const res = await importStatement({ userId: USER_ID, data: new Uint8Array([2]), fileName: "visa.pdf" });
     expect(res.status).toBe("imported");
-    expect(await StatementModel.countDocuments()).toBe(2);
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 
   it("sin fecha de cierre no deduplica por clave natural", async () => {
     mocked.mockResolvedValue({ statement: { ...parsed, header: { ...parsed.header, closingDate: null } }, ...okMeta });
-    await importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" });
-    const res = await importStatement({ data: new Uint8Array([2]), fileName: "b.pdf" });
+    await importStatement({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" });
+    const res = await importStatement({ userId: USER_ID, data: new Uint8Array([2]), fileName: "b.pdf" });
     expect(res.status).toBe("imported");
-    expect(await StatementModel.countDocuments()).toBe(2);
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 });
 
@@ -145,9 +148,9 @@ describe("importStatement atómico", () => {
 
   it("si insertMany falla no queda ni el resumen ni sus movimientos", async () => {
     vi.spyOn(TransactionModel, "insertMany").mockRejectedValueOnce(new Error("insertMany roto"));
-    await expect(importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" })).rejects.toThrow("insertMany roto");
-    expect(await StatementModel.countDocuments()).toBe(0);
-    expect(await TransactionModel.countDocuments()).toBe(0);
+    await expect(importStatement({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" })).rejects.toThrow("insertMany roto");
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(0);
+    expect(await TransactionModel.countDocuments({ userId: USER_ID })).toBe(0);
   });
 
   it("un movimiento que no valida aborta antes de escribir nada", async () => {
@@ -156,23 +159,23 @@ describe("importStatement atómico", () => {
       statement: { ...parsed, rows: [first, { ...second, date: "2026-01-64" }] },
       ...okMeta,
     });
-    await expect(importStatement({ data: new Uint8Array([1]), fileName: "a.pdf" })).rejects.toThrow();
-    expect(await StatementModel.countDocuments()).toBe(0);
-    expect(await TransactionModel.countDocuments()).toBe(0);
+    await expect(importStatement({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" })).rejects.toThrow();
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(0);
+    expect(await TransactionModel.countDocuments({ userId: USER_ID })).toBe(0);
   });
 
   it("con replace, un movimiento que no valida deja intacto el resumen anterior", async () => {
-    await importStatement({ data: new Uint8Array([1, 2, 3]), fileName: "viejo.pdf" });
+    await importStatement({ userId: USER_ID, data: new Uint8Array([1, 2, 3]), fileName: "viejo.pdf" });
     const [first, second] = parsed.rows;
     mocked.mockResolvedValueOnce({
       statement: { ...parsed, rows: [first, { ...second, date: "2026-01-64" }] },
       ...okMeta,
     });
     await expect(
-      importStatement({ data: new Uint8Array([4, 5, 6]), fileName: "nuevo.pdf", replace: true }),
+      importStatement({ userId: USER_ID, data: new Uint8Array([4, 5, 6]), fileName: "nuevo.pdf", replace: true }),
     ).rejects.toThrow();
-    expect(await StatementModel.countDocuments()).toBe(1);
-    expect((await StatementModel.findOne())?.sourceFileName).toBe("viejo.pdf");
-    expect(await TransactionModel.countDocuments()).toBe(2);
+    expect(await StatementModel.countDocuments({ userId: USER_ID })).toBe(1);
+    expect((await StatementModel.findOne({ userId: USER_ID }))?.sourceFileName).toBe("viejo.pdf");
+    expect(await TransactionModel.countDocuments({ userId: USER_ID })).toBe(2);
   });
 });

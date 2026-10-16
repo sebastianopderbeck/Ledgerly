@@ -1,10 +1,11 @@
 import type { MacroRefreshDTO } from "@ledgerly/shared";
+import type { Types } from "mongoose";
 import { backfillMacro } from "./backfillMacro.js";
 import { refreshAllRates } from "./refreshRates.js";
 
-export async function refreshMacroData(): Promise<MacroRefreshDTO> {
+export async function refreshMacroData(userId: Types.ObjectId): Promise<MacroRefreshDTO> {
   const series = await backfillMacro();
-  const tipoCambio = await refreshAllRates();
+  const tipoCambio = await refreshAllRates(userId);
   return {
     series: {
       usdOficial: series.usd_oficial,

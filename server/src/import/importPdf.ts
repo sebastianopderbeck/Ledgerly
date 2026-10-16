@@ -1,4 +1,5 @@
 import type { ExtractedPdf, ImportedFileDTO, ImportedFileKind, ImportResultUnionDTO } from "@ledgerly/shared";
+import type { Types } from "mongoose";
 import { extractPdfText } from "../pdf/extract.js";
 import { detectDocumentKind } from "../ingestion/detectDocumentKind.js";
 import { EncryptedPdfError, NoTextError, UnsupportedFormatError } from "../ingestion/errors.js";
@@ -17,6 +18,7 @@ export const MAX_PDF_BYTES = 15 * 1024 * 1024;
 const MIN_TEXT_LENGTH = 20;
 
 export interface ImportPdfInput {
+  userId: Types.ObjectId;
   data: Uint8Array;
   fileName: string;
   replace?: boolean;
@@ -28,6 +30,7 @@ export interface ImportPdfOutcome {
 }
 
 interface KindImportInput {
+  userId: Types.ObjectId;
   data: Uint8Array;
   fileName: string;
   replace: boolean;
@@ -55,26 +58,28 @@ const found = <T>(doc: T): NonNullable<T> => {
 
 const importStatementPdf: KindImporter = async (input) => {
   const { status, statementId, transactionCount } = await importStatement(input);
-  const doc = found(await StatementModel.findById(statementId));
+  const doc = found(await StatementModel.findOne({ _id: statementId, userId: input.userId }));
   return {
     result: { kind: "statement", status, statement: toStatementDTO(doc, transactionCount), transactionCount },
     file: statementToImportedFileDTO(doc, transactionCount),
   };
 };
 
-export const mortgageCouponOutcome = async ({ status, couponId }: SaveCouponResult): Promise<ImportPdfOutcome> => {
-  const doc = found(await MortgageCouponModel.findById(couponId));
+export const mortgageCouponOutcome = async (
+  { status, couponId }: SaveCouponResult, userId: Types.ObjectId,
+): Promise<ImportPdfOutcome> => {
+  const doc = found(await MortgageCouponModel.findOne({ _id: couponId, userId }));
   return {
     result: { kind: "coupon", status, coupon: toMortgageCouponDTO(doc) },
     file: mortgageCouponToImportedFileDTO(doc),
   };
 };
 
-const importMortgageCouponPdf: KindImporter = async (input) => mortgageCouponOutcome(await importCoupon(input));
+const importMortgageCouponPdf: KindImporter = async (input) => mortgageCouponOutcome(await importCoupon(input), input.userId);
 
 const importAutoCouponPdf: KindImporter = async (input) => {
   const { status, couponId } = await importAutoCoupon(input);
-  const doc = found(await AutoCouponModel.findById(couponId));
+  const doc = found(await AutoCouponModel.findOne({ _id: couponId, userId: input.userId }));
   return {
     result: { kind: "auto", status, coupon: toAutoCouponDTO(doc) },
     file: autoCouponToImportedFileDTO(doc),
@@ -83,7 +88,7 @@ const importAutoCouponPdf: KindImporter = async (input) => {
 
 const importPayslipPdf: KindImporter = async (input) => {
   const { status, payslipId } = await importPayslip(input);
-  const doc = found(await PayslipModel.findById(payslipId));
+  const doc = found(await PayslipModel.findOne({ _id: payslipId, userId: input.userId }));
   return {
     result: { kind: "payslip", status, payslip: toPayslipDTO(doc) },
     file: payslipToImportedFileDTO(doc),
@@ -97,10 +102,10 @@ const importers: Record<ImportedFileKind, KindImporter> = {
   payslip: importPayslipPdf,
 };
 
-export async function importPdf({ data, fileName, replace = false }: ImportPdfInput): Promise<ImportPdfOutcome> {
+export async function importPdf({ userId, data, fileName, replace = false }: ImportPdfInput): Promise<ImportPdfOutcome> {
   const extracted = await extract(data);
   if (extracted.text.trim().length < MIN_TEXT_LENGTH) throw new NoTextError();
   const kind = detectDocumentKind(extracted.text, extracted.meta);
   if (kind === "unknown") throw new UnsupportedFormatError();
-  return importers[kind]({ data, fileName, replace, extracted });
+  return importers[kind]({ userId, data, fileName, replace, extracted });
 }

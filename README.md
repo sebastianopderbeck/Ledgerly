@@ -11,6 +11,7 @@ Vite + React 18 + MUI · Express + MongoDB.
 bun install
 cp .env.example .env
 docker compose up -d       # MongoDB en localhost:27018
+bun run migrate:owner      # crea tu usuario (OWNER_EMAIL)
 bun run seed               # reglas de categoría base
 bun run dev                # API :4000 + SPA :5173
 ```
@@ -19,57 +20,163 @@ bun run dev                # API :4000 + SPA :5173
 - `bun run dev` — backend + frontend
 - `bun run test` — toda la suite (Vitest)
 - `bun run typecheck` — TypeScript de todo el monorepo
+- `bun run migrate:owner` — crea el usuario owner y le asigna los datos que no tienen dueño (se puede correr varias veces)
 - `bun run seed` — siembra reglas de categoría
 - `bun run build` — build del cliente (`client/dist`)
 - `bun run start` — server sin watch, sirviendo `client/dist`
-- `bun run service:install` — instala la versión publicada y su deploy automático (ver abajo)
-- `bun run deploy [ref]` — publica `origin/main` (o `ref`) en la versión publicada
-- `bun run test:scripts` — prueba `install-service.sh` / `deploy.sh` con `launchctl` y `lsof` simulados
+- `bun run backup` — copia la base de Atlas a `backups/` (ver «Producción en Vercel»)
+- `bun run backup:restore-local` — restaura el último backup en el Mongo de Docker local
 - `bun run gmail:auth` — autoriza a Ledgerly a leer tu Gmail (solo lectura) y guarda el refresh token en `.env`
 
-## Versión publicada (privada)
+## Login
 
-Ledgerly corre de fondo en la Mac y se abre desde mis dispositivos vía Tailscale, sin exponerse a
-internet. Diseño: `docs/superpowers/specs/2026-10-02-publicacion-privada-design.md`.
+Ledgerly pide entrar con Google. Solo entran el owner (`OWNER_EMAIL`) y los mails de `ALLOWED_EMAILS`; cada uno ve
+únicamente sus datos. La sesión dura 30 días en una cookie; «Salir», en el menú del avatar, la cierra. La sección
+«Mails» de Importar es solo del owner: la búsqueda automática de mails importa siempre a su nombre.
+Diseño: `docs/superpowers/specs/2026-10-16-login-multiusuario-design.md`.
 
-### Instalación (una vez)
-1. Docker Desktop → Settings → General → **Start Docker Desktop when you sign in**; `docker compose up -d`.
-2. `bun run service:install` — clona `origin/main` en `~/Services/ledgerly`, crea su `.env`
-   (puerto 4100, solo `127.0.0.1`), registra el servicio `com.ledgerly.server`, hace el primer deploy
-   y registra el deploy automático `com.ledgerly.auto-deploy`.
-3. Tailscale en la Mac: `brew install --cask tailscale-app`, iniciar sesión, activar **Launch at login**.
-4. Tailscale en el celular: misma cuenta.
-5. [Admin de Tailscale](https://login.tailscale.com/admin): DNS → **MagicDNS** y **HTTPS Certificates**;
-   Machines → renombrar la Mac a algo neutro (p. ej. `ledger`) y **Disable key expiry**.
-6. `tailscale serve --bg http://127.0.0.1:4100` → `https://ledger.<tailnet>.ts.net`.
-   **Nunca `tailscale funnel`**: eso publica en internet.
+### Cliente de Google (una vez)
+1. [Google Cloud Console](https://console.cloud.google.com) → Google Auth Platform → **Desarrollo de la marca**:
+   nombre «Ledgerly» y tu mail.
+2. **Público**: tipo **Externo**. Mientras la app esté en estado «Prueba», solo entran los mails cargados en
+   **Usuarios de prueba** (la cuenta dueña del proyecto entra igual): sumá ahí a cada persona de `ALLOWED_EMAILS`,
+   o publicá la app.
+3. **Acceso a los datos**: solo `openid`, `email` y `profile`.
+4. **Clientes** → Crear cliente → **Aplicación web**, con las redirect URIs:
+   - `http://localhost:5173/api/auth/google/callback` (desarrollo)
+   - `https://<app>.vercel.app/api/auth/google/callback` (producción)
+5. Copiar el ID y el secreto a `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` del `.env`.
 
-### Actualizar
-Automático: cada minuto `com.ledgerly.auto-deploy` revisa `origin/main` y, si cambió (push directo o
-merge de un PR), lo publica y avisa con una notificación. Si el deploy falla, vuelve solo al commit
-anterior, avisa, y no reintenta ese commit hasta el próximo cambio en `main`.
+### Variables
+`SESSION_SECRET` (al menos 32 caracteres: `openssl rand -base64 48`), `OWNER_EMAIL`, `ALLOWED_EMAILS` (separados por
+coma) y `PUBLIC_URL` (`http://localhost:5173` en desarrollo, `https://<app>.vercel.app` en producción). Si falta
+alguna, el server local no arranca y dice cuál; en Vercel la API responde «Error interno» y el log de la función dice
+cuál (`Arranque: …`).
 
-Manual: `bun run deploy` publica `origin/main` ya. Para volver a un commit: `bun run deploy <sha>`;
-ese rollback se mantiene hasta el próximo cambio en `main`. Si hay otro deploy corriendo, espera a
-que termine. Si cambia la versión de Node (nvm) o de Bun: `bun run service:install`.
+### Sumar o sacar a alguien
+Sumar: agregar su mail a `ALLOWED_EMAILS` (y como usuario de prueba en Google) y reiniciar (en Vercel: cambiar la
+variable y redeployar). Arranca vacío, con las reglas de categoría del sistema. Sacar: borrar su mail de
+`ALLOWED_EMAILS` y reiniciar o redeployar; pierde el acceso aunque tenga una sesión abierta. Sus datos quedan en la
+base.
 
-### Disponibilidad
-Solo con la Mac **enchufada y con la tapa abierta**. Tapa cerrada o batería = Mac dormida.
+### Puesta en marcha en producción
+Ver «Producción en Vercel» → «El corte».
+
+## Producción en Vercel
+
+Ledgerly corre en Vercel: el cliente como sitio estático y la API de Express en una función
+(`api/index.ts`; `vercel.json` manda ahí todo `/api/*`). La base es un cluster Free de MongoDB Atlas. Cada merge a `main` deploya
+producción. Los preview deployments de las ramas no tienen variables: no tocan ninguna base (la API
+responde «Error interno») y quedan detrás del login de Vercel.
+Diseño: `docs/superpowers/specs/2026-10-16-deploy-vercel-design.md`.
+
+### Variables de producción
+Se cargan en el proyecto de Vercel → Settings → Environment Variables, **solo en Production** y
+marcadas como **Sensitive**, salvo `PUBLIC_URL`: Vercel no deja marcar como secreta una variable que
+empieza con `PUBLIC_`, y su valor es la URL pública de la app. Después de cambiar una, redeployar.
+
+| Variable | Valor |
+|---|---|
+| `MONGO_URL` | `mongodb+srv://…` de Atlas |
+| `PUBLIC_URL` | `https://<app>.vercel.app` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | cliente OAuth del login (con la redirect URI de Vercel) |
+| `SESSION_SECRET`, `OWNER_EMAIL`, `ALLOWED_EMAILS` | como en «Login» |
+| `CRON_SECRET` | aleatorio, 32+ caracteres (`openssl rand -base64 48`) |
+| `MAIL_SYNC_DAYS` | `25-5` |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_QUERY` | como en el `.env` (opcionales) |
+| `ICLOUD_USER`, `ICLOUD_APP_PASSWORD`, `ICLOUD_SINCE`, `ICLOUD_MAILBOXES` | como en el `.env`, con la contraseña de app en variable (opcionales) |
+| `GOOGLE_VISION_API_KEY` | API key restringida a Cloud Vision |
+
+### El corte
+Se hace una sola vez. Entre los pasos 1 y 6 nadie escribe en ninguna base.
+
+1. Apagar el servicio de la Mac y su auto-deploy:
+   ```bash
+   launchctl bootout gui/$(id -u)/com.ledgerly.auto-deploy
+   launchctl bootout gui/$(id -u)/com.ledgerly.server
+   ```
+2. Backup del Mongo local, fuera del volumen de Docker:
+   ```bash
+   docker exec ledgerly-mongo mongodump --db=ledgerly --archive=/tmp/pre-vercel.archive
+   docker cp ledgerly-mongo:/tmp/pre-vercel.archive ~/backup-pre-vercel.archive
+   ```
+3. En el Mongo local, con el `.env` apuntando a él y el `OWNER_EMAIL` de producción:
+   `bun run migrate:owner`.
+4. [MongoDB Atlas](https://cloud.mongodb.com): cluster **Free** en São Paulo (si Free no lo ofrece,
+   `us-east-1`, y en `vercel.json` la región pasa a `iad1`). Database Access: un usuario solo para la
+   app, contraseña aleatoria larga, rol `readWrite` sobre la base `ledgerly`. Network Access:
+   `0.0.0.0/0` (Vercel no tiene IPs fijas; protegen las credenciales y TLS). Backup: snapshot
+   diario, se guardan los últimos cuatro. Copiar el string `mongodb+srv://…/ledgerly` a `ATLAS_URL`
+   en el `.env` local y restaurar:
+   ```bash
+   mkdir -p backups
+   docker exec ledgerly-mongo mongodump --db=ledgerly --archive=/tmp/para-atlas.archive
+   docker cp ledgerly-mongo:/tmp/para-atlas.archive backups/para-atlas.archive
+   ATLAS_URL="$(grep -E '^ATLAS_URL=' .env | cut -d= -f2- | tr -d '"')"
+   docker run --rm -v "$PWD/backups:/backups" mongo:7 \
+     mongorestore --uri="$ATLAS_URL" --archive=/backups/para-atlas.archive --nsInclude='ledgerly.*'
+   bun run backup
+   ```
+   El `bun run backup` del final prueba que el backup de Atlas anda.
+5. [Vercel](https://vercel.com/new): importar el repo de GitHub (preset **Other**: el build, la salida
+   y la región salen de `vercel.json`; Node 22 sale de `engines`). Cargar las variables de arriba en
+   Production. En el cliente OAuth del login, sumar la redirect URI
+   `https://<app>.vercel.app/api/auth/google/callback`. En Google Cloud: habilitar **Cloud Vision
+   API** (pide una cuenta de facturación), crear una API key restringida a Cloud Vision API y una
+   alerta de presupuesto de USD 1; la key va en `GOOGLE_VISION_API_KEY`.
+6. Merge a `main` → deploy de producción.
+7. Verificar:
+   1. Login del owner en la web y en la PWA del iPhone, reinstalada desde la URL nueva (Compartir →
+      Agregar a inicio); ver los datos migrados.
+   2. Importar un PDF de resumen y un cupón en imagen.
+   3. «Buscar» en iCloud y en Gmail a mano.
+   4. Disparar cada cron a mano (abajo) y ver el resumen; ver el punto en Importar y que se apaga
+      al entrar.
+   5. Login de la otra persona: arranca vacía y no ve «Mails».
+
+   Si algo falla y no se arregla en el momento, volver a la Mac mientras tanto (los `.plist` siguen
+   ahí hasta el paso 9):
+   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ledgerly.server.plist`. Levanta la
+   versión que estaba publicada antes del corte, con la base local; lo cargado en Vercel entre medio
+   no vuelve a la Mac. El auto-deploy queda apagado hasta terminar el corte.
+8. Sumar a la otra persona: su mail en `ALLOWED_EMAILS` (redeploy) y como usuario de prueba en Google.
+9. Limpiar la Mac:
+   ```bash
+   rm ~/Library/LaunchAgents/com.ledgerly.auto-deploy.plist ~/Library/LaunchAgents/com.ledgerly.server.plist
+   tailscale serve reset
+   ```
+   El volumen de Docker queda como copia vieja.
+
+### Búsqueda automática de mails
+Dos cron de Vercel (`vercel.json`) llaman a `/api/cron/mail/icloud` a las 21 h de Argentina y a
+`/api/cron/mail/gmail` a las 22 h, con una tolerancia de hasta una hora (plan Hobby). Corren todos los
+días, pero solo buscan entre los días de `MAIL_SYNC_DAYS`, contados en hora de Argentina; fuera de
+esos días responden `{"skipped":"fuera de agenda"}`. Vercel manda `CRON_SECRET` en cada llamada; sin
+él, la ruta responde 401. Importan siempre a nombre del owner. Cuando una corrida automática importa
+algo o algo falla, aparece un punto en el ícono de Importar; se apaga al entrar a Importar.
+
+Disparar un cron a mano:
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://<app>.vercel.app/api/cron/mail/icloud
+```
+
+### Cupones en imagen
+En producción el OCR es Google Cloud Vision (`GOOGLE_VISION_API_KEY`). No lee HEIC: la app pide la
+imagen como JPG o PNG. En la Mac, sin esa variable, usa el OCR de macOS.
+
+### Límite de subida
+La subida web acepta archivos de hasta 4 MB (Vercel corta los requests de más de 4,5 MB). Los
+adjuntos de mail no pasan por ese límite.
+
+### Backups
+- Atlas guarda un snapshot diario (los últimos cuatro).
+- `bun run backup`: copia la base de Atlas a `backups/ledgerly-<AAAA-MM-DD>.archive`. Necesita
+  `ATLAS_URL` en el `.env` y Docker (usa la imagen `mongo:7`).
+- `bun run backup:restore-local`: restaura el último archivo de `backups/` en el Mongo de Docker local
+  (reemplaza lo que haya), para desarrollar con datos reales.
 
 ### Logs
-```bash
-tail -f ~/Library/Logs/Ledgerly/server.log ~/Library/Logs/Ledgerly/server.err.log
-tail -f ~/Library/Logs/Ledgerly/auto-deploy.log
-```
-
-### Desinstalar
-```bash
-launchctl bootout gui/$(id -u)/com.ledgerly.auto-deploy
-rm ~/Library/LaunchAgents/com.ledgerly.auto-deploy.plist
-launchctl bootout gui/$(id -u)/com.ledgerly.server
-rm ~/Library/LaunchAgents/com.ledgerly.server.plist
-tailscale serve reset
-```
+`bunx vercel logs <url-del-deploy>` o la pestaña **Logs** del proyecto en Vercel.
 
 ## Importar desde iCloud (opcional)
 
@@ -81,7 +188,8 @@ Diseño: `docs/superpowers/specs/2026-10-05-importacion-icloud-design.md`.
 
 1. [account.apple.com](https://account.apple.com) → Inicio de sesión y seguridad → **Contraseñas de
    apps** → generar una con el nombre «Ledgerly».
-2. Guardarla en el Llavero. El comando la pide, así no queda en el historial:
+2. En desarrollo, guardarla en el Llavero (en producción va en `ICLOUD_APP_PASSWORD`, ver abajo). El
+   comando la pide, así no queda en el historial:
    `security add-generic-password -s ledgerly-icloud-imap -a <tu-cuenta>@icloud.com -w`
 3. En el `.env`: `ICLOUD_USER=<tu-cuenta>@icloud.com` y, si hace falta, `ICLOUD_SINCE=AAAA-MM-DD`
    (desde cuándo buscar; sin ella, los últimos 90 días) e `ICLOUD_MAILBOXES=INBOX,Otra carpeta`.
@@ -91,22 +199,15 @@ Diseño: `docs/superpowers/specs/2026-10-05-importacion-icloud-design.md`.
    en `html2pdf.certisend.com`; los links de seguimiento nunca se abren). La carpeta donde caen
    esos mails tiene que estar en `ICLOUD_MAILBOXES`, por ejemplo `ICLOUD_MAILBOXES=INBOX,Auto`.
 4. Reiniciar `bun run dev` → Importar → **Buscar en iCloud**.
-5. Versión publicada: copiar las líneas `ICLOUD_*` a `~/Services/ledgerly/.env`, sumar
-   `MAIL_SYNC_DAYS=25-5` (y, si querés otra hora, `MAIL_SYNC_HOUR=21`; va de 0 a 23) y correr
-   `launchctl kickstart -k gui/$(id -u)/com.ledgerly.server`. En `server.log` aparece
-   `Mails: búsqueda automática todos los días a las 21 h, del 25 al 5`. La búsqueda corre una vez
-   por día a esa hora, solo entre el 25 y el 5 (los resúmenes llegan dos veces por mes); el rango
-   puede cruzar el fin de mes. Si la Mac estaba dormida o apagada a esa hora, o el servicio se
-   reinició, la búsqueda que quedó pendiente corre a los 60 segundos de arrancar. Es una sola
-   agenda para iCloud y Gmail. Dejar la búsqueda automática **solo** en la
-   publicada. Las corridas automáticas avisan con una notificación de macOS cuando importan algo o
-   algo falla; la primera vez puede hacer falta habilitar las notificaciones de «Script Editor» en
-   Ajustes → Notificaciones. Si al arrancar el servicio falta la contraseña en el Llavero, la
-   búsqueda automática corre igual: la tarjeta y la notificación te dicen qué falta, y empieza a
-   funcionar apenas la cargues.
+5. Producción: cargar en Vercel `ICLOUD_USER`, `ICLOUD_APP_PASSWORD` (la contraseña de app) y, si
+   hacen falta, `ICLOUD_SINCE` e `ICLOUD_MAILBOXES`, más `MAIL_SYNC_DAYS=25-5`, y redeployar. La
+   búsqueda automática corre a las 21 h de Argentina (con hasta una hora de tolerancia), solo entre el
+   25 y el 5 (los resúmenes llegan dos veces por mes); el rango puede cruzar el fin de mes. No hay
+   notificaciones de macOS: el punto en Importar avisa cuando una corrida importa algo o algo falla.
+   Ver «Producción en Vercel» → «Búsqueda automática de mails».
 6. Revocar: borrar la contraseña de app en account.apple.com, el ítem del Llavero
-   (`security delete-generic-password -s ledgerly-icloud-imap -a <tu-cuenta>@icloud.com`) y las
-   líneas `ICLOUD_*`.
+   (`security delete-generic-password -s ledgerly-icloud-imap -a <tu-cuenta>@icloud.com`), las
+   líneas `ICLOUD_*` y las variables `ICLOUD_*` de Vercel.
 
 ### Recibos de sueldo por reenvío
 
@@ -117,7 +218,8 @@ una sola vez). Los recibos llegan entonces a iCloud y entran por el mismo camino
 
 Si Apple invalida la contraseña (cambio de contraseña de Apple o revocación), la tarjeta muestra el
 error: generar una nueva y actualizarla con `security add-generic-password -U -s ledgerly-icloud-imap
--a <tu-cuenta>@icloud.com -w`. No hace falta reiniciar: cada corrida lee la contraseña del Llavero.
+-a <tu-cuenta>@icloud.com -w`. No hace falta reiniciar: cada corrida lee la contraseña del Llavero. En
+producción: actualizar `ICLOUD_APP_PASSWORD` en Vercel y redeployar.
 
 ## Importar desde Gmail (opcional)
 
@@ -142,25 +244,24 @@ Diseño: `docs/superpowers/specs/2026-10-03-importacion-gmail-design.md`.
 8. Reiniciar `bun run dev` → Importar → **Buscar en Gmail**.
 9. (Opcional) Acotar la búsqueda: probarla antes en el buscador de Gmail y cargarla entre comillas,
    p. ej. `GMAIL_QUERY="from:(resumenes@mibanco.com.ar OR recibos@miempresa.com) has:attachment filename:pdf newer_than:90d"`.
-10. Versión publicada: copiar las líneas `GMAIL_*` a `~/Services/ledgerly/.env`, sumar
-    `MAIL_SYNC_DAYS=25-5` (y, opcional, `MAIL_SYNC_HOUR=21`) y correr
-    `launchctl kickstart -k gui/$(id -u)/com.ledgerly.server`. La agenda es la misma que la de
-    iCloud (una vez por día a esa hora, solo del 25 al 5); si la Mac dormía a esa hora, la búsqueda
-    pendiente corre al volver. En `server.log` aparece
-    `Mails: búsqueda automática todos los días a las 21 h, del 25 al 5`. Dejar la búsqueda
-    automática **solo** en la publicada.
+10. Producción: cargar las variables `GMAIL_*` en Vercel, más `MAIL_SYNC_DAYS=25-5`, y redeployar.
+    La búsqueda automática corre a las 22 h de Argentina (con hasta una hora de tolerancia), solo del
+    25 al 5, y avisa con el punto en Importar, como la de iCloud.
 11. Revocar: [myaccount.google.com/connections](https://myaccount.google.com/connections) →
-    Ledgerly → Borrar todas las conexiones, y borrar las líneas `GMAIL_*`. Si el secreto se filtró,
-    borrar el cliente en «Clientes» y crear otro.
+    Ledgerly → Borrar todas las conexiones, y borrar las líneas `GMAIL_*` y sus variables en Vercel.
+    Si el secreto se filtró, borrar el cliente en «Clientes» y crear otro.
 
 Si Google revoca el token (cambio de contraseña, revocación manual o 6 meses sin uso), la sección
-muestra el error: volver a correr `bun run gmail:auth`, copiar la línea nueva al `.env` que
-corresponda y reiniciar.
+muestra el error: volver a correr `bun run gmail:auth` y reiniciar; en producción, copiar el
+`GMAIL_REFRESH_TOKEN` nuevo a la variable de Vercel y redeployar.
 
 ## Privacidad
 Los PDFs reales (`examples/`) están gitignoreados; los fixtures de test son sintéticos.
 No se commitea data financiera real.
-El refresh token de Gmail da lectura de todo el mail: vive solo en `.env` (gitignoreado), nunca se
-loguea ni se manda al cliente. Los PDFs de Gmail se procesan en memoria; no se guarda asunto,
+El refresh token de Gmail da lectura de todo el mail: vive solo en `.env` (gitignoreado) y en las variables Sensitive de
+Vercel, nunca se loguea ni se manda al cliente. Los PDFs de Gmail se procesan en memoria; no se guarda asunto,
 remitente ni cuerpo de ningún mail.
-La contraseña de app de iCloud vive solo en el Llavero de macOS: el server la lee en cada corrida, nunca la loguea ni la manda al cliente.
+La contraseña de app de iCloud vive en el Llavero de macOS (desarrollo) o en la variable Sensitive `ICLOUD_APP_PASSWORD`
+de Vercel (producción): el server la lee en cada corrida, nunca la loguea ni la manda al cliente.
+En producción, los cupones en imagen se mandan a Google Cloud Vision para leerlos; el server no loguea la imagen.
+Los backups de `backups/` tienen datos reales y están gitignoreados.

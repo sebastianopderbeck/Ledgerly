@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ParsedCoupon, ParsedCouponImage } from "@ledgerly/shared";
-import type { HydratedDocument } from "mongoose";
+import type { HydratedDocument, Types } from "mongoose";
 import { MortgageCouponModel, type MortgageCouponDoc } from "../db/models.js";
 import {
   CouponImageMismatchError, CouponImageTotalsError, MissingPreviousCouponError, UnrecognizedCouponImageError,
@@ -25,8 +25,8 @@ const readCoupon = (text: string): ParsedCouponImage => {
   }
 };
 
-const latestCoupon = async (): Promise<HydratedDocument<MortgageCouponDoc>> => {
-  const latest = await MortgageCouponModel.findOne().sort({ fechaDebito: -1 });
+const latestCoupon = async (userId: Types.ObjectId): Promise<HydratedDocument<MortgageCouponDoc>> => {
+  const latest = await MortgageCouponModel.findOne({ userId }).sort({ fechaDebito: -1 });
   if (!latest) throw new MissingPreviousCouponError();
   return latest;
 };
@@ -49,13 +49,13 @@ const toParsedCoupon = (image: ParsedCouponImage, terms: LoanTerms): ParsedCoupo
   cotizacionUva: round2((image.capital + image.intereses) / image.totalUva),
 });
 
-export async function importCouponImage({ data, fileName, replace = false }: ImportPdfInput): Promise<ImportPdfOutcome> {
+export async function importCouponImage({ userId, data, fileName, replace = false }: ImportPdfInput): Promise<ImportPdfOutcome> {
   const image = readCoupon(toLines(await recognizeImage(data, fileName)));
   if (!totalsMatch(image)) throw new CouponImageTotalsError();
-  const latest = await latestCoupon();
+  const latest = await latestCoupon(userId);
   if (!matchesLatest(image, latest)) throw new CouponImageMismatchError();
   const { prestamoNro, tea, tna, cft } = latest;
   const coupon = toParsedCoupon(image, { prestamoNro, tea, tna, cft });
   const sourceHash = createHash("sha256").update(data).digest("hex");
-  return mortgageCouponOutcome(await saveCoupon({ coupon, fileName, sourceHash, replace }));
+  return mortgageCouponOutcome(await saveCoupon({ userId, coupon, fileName, sourceHash, replace }), userId);
 }

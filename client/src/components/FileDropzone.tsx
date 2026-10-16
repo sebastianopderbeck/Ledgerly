@@ -1,12 +1,15 @@
 import { useRef, useState, type DragEvent } from "react";
 import { Box, Button, Typography } from "@mui/material";
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE } from "@ledgerly/shared";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { useIsMobile } from "../useIsMobile.js";
 
 interface FileDropzoneProps { onFile: (file: File) => void; disabled?: boolean; }
 
-const ACCEPTED_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/heic"];
+const PICKER_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+const ACCEPTED_TYPES = [...PICKER_TYPES, "image/heic"];
 const ACCEPTED_EXTENSIONS = /\.(pdf|png|jpe?g|heic)$/i;
+const UNSUPPORTED_FILE = "Sólo se aceptan PDF o imágenes (PNG, JPG, HEIC)";
 
 const isAccepted = (file: File): boolean =>
   ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.test(file.name);
@@ -15,14 +18,18 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
   const isMobile = useIsMobile();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [rejected, setRejected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFile = (file: File) => {
     if (!isAccepted(file)) {
-      setRejected(true);
+      setError(UNSUPPORTED_FILE);
       return;
     }
-    setRejected(false);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError(UPLOAD_TOO_LARGE);
+      return;
+    }
+    setError(null);
     onFile(file);
   };
 
@@ -32,6 +39,8 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
   };
+
+  const errorText = error ? <Typography color="error" variant="body2" sx={{ mt: 2 }}>{error}</Typography> : null;
 
   return (
     <Box
@@ -55,15 +64,11 @@ export const FileDropzone = ({ onFile, disabled = false }: FileDropzoneProps) =>
       >
         Elegir archivo
       </Button>
-      {rejected && (
-        <Typography color="error" variant="body2" sx={{ mt: 2 }}>
-          Sólo se aceptan PDF o imágenes (PNG, JPG, HEIC)
-        </Typography>
-      )}
+      {errorText}
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPTED_TYPES.join(",")}
+        accept={PICKER_TYPES.join(",")}
         hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
       />

@@ -3,7 +3,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { OcrFailedError, OcrUnavailableError } from "../ingestion/errors.js";
+import { OcrFailedError, OcrUnavailableError, UnsupportedImageFormatError } from "../ingestion/errors.js";
+import { GOOGLE_VISION_TIMEOUT_MS, recognizeWithGoogleVision } from "./googleVision.js";
 
 export interface OcrObservation {
   text: string;
@@ -15,11 +16,14 @@ export interface OcrObservation {
 export interface RecognizeImageDeps {
   platform: NodeJS.Platform;
   runScript: (scriptPath: string, imagePath: string) => Promise<string>;
+  googleApiKey: string | null;
+  fetch: typeof fetch;
 }
 
 const SCRIPT_PATH = fileURLToPath(new URL("./visionOcr.jxa", import.meta.url));
 const TIMEOUT_MS = 60_000;
 const IMAGE_EXTENSION = /^\.(png|jpe?g|heic)$/;
+const HEIC_EXTENSION = /\.(heic|heif)$/i;
 
 const runOsascript = (scriptPath: string, imagePath: string): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -29,7 +33,12 @@ const runOsascript = (scriptPath: string, imagePath: string): Promise<string> =>
     });
   });
 
-const defaultDeps: RecognizeImageDeps = { platform: process.platform, runScript: runOsascript };
+const defaultDeps = (): RecognizeImageDeps => ({
+  platform: process.platform,
+  runScript: runOsascript,
+  googleApiKey: process.env.GOOGLE_VISION_API_KEY?.trim() || null,
+  fetch: globalThis.fetch,
+});
 
 const isObservation = (value: unknown): value is OcrObservation => {
   if (typeof value !== "object" || value === null) return false;
@@ -51,8 +60,12 @@ const tempName = (fileName: string): string => {
 export async function recognizeImage(
   data: Uint8Array,
   fileName: string,
-  deps: RecognizeImageDeps = defaultDeps,
+  deps: RecognizeImageDeps = defaultDeps(),
 ): Promise<OcrObservation[]> {
+  if (deps.googleApiKey) {
+    if (HEIC_EXTENSION.test(fileName)) throw new UnsupportedImageFormatError();
+    return recognizeWithGoogleVision(data, { apiKey: deps.googleApiKey, fetch: deps.fetch, timeoutMs: GOOGLE_VISION_TIMEOUT_MS });
+  }
   if (deps.platform !== "darwin") throw new OcrUnavailableError();
   const dir = await mkdtemp(join(tmpdir(), "ledgerly-ocr-"));
   const imagePath = join(dir, tempName(fileName));

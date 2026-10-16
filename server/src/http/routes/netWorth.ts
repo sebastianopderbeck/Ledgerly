@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { isValidObjectId } from "mongoose";
+import { isValidObjectId, type Types } from "mongoose";
+import { userIdOf } from "../../auth/requireUser.js";
 import {
   manualAssetCreateSchema, manualAssetUpdateSchema, type AssetValuationDTO, type Currency,
 } from "@ledgerly/shared";
@@ -26,13 +27,13 @@ const todayIso = (): string => new Date().toISOString().slice(0, 10);
 
 const isoOf = (date: Date): string => date.toISOString().slice(0, 10);
 
-const loadInputs = async (hoy: string): Promise<NetWorthInputs> => {
+const loadInputs = async (hoy: string, userId: Types.ObjectId): Promise<NetWorthInputs> => {
   const [autoCoupons, mortgageCoupons, statements, installments, assets, macro] = await Promise.all([
-    AutoCouponModel.find().sort({ cuotaNro: 1 }).lean(),
-    MortgageCouponModel.find().sort({ cuotaNro: 1 }).lean(),
-    StatementModel.find({ closingDate: { $ne: null } }).lean(),
-    TransactionModel.find({ type: "purchase", isInstallment: true }).lean(),
-    ManualAssetModel.find().sort({ nombre: 1 }),
+    AutoCouponModel.find({ userId }).sort({ cuotaNro: 1 }).lean(),
+    MortgageCouponModel.find({ userId }).sort({ cuotaNro: 1 }).lean(),
+    StatementModel.find({ userId, closingDate: { $ne: null } }).lean(),
+    TransactionModel.find({ userId, type: "purchase", isInstallment: true }).lean(),
+    ManualAssetModel.find({ userId }).sort({ nombre: 1 }),
     MacroSeriesModel.find({ serie: { $in: ["usd_oficial", "uva"] } }).sort({ fecha: 1 }).lean(),
   ]);
   const serie = (name: string): SeriePoint[] =>
@@ -83,8 +84,8 @@ const assertNotFuture = (valuacion: AssetValuationDTO | undefined): void => {
   if (valuacion && valuacion.fecha > todayIso()) throw new HttpError(400, FUTURE_VALUATION);
 };
 
-const findAsset = async (id: string) => {
-  const doc = isValidObjectId(id) ? await ManualAssetModel.findById(id) : null;
+const findAsset = async (id: string, userId: Types.ObjectId) => {
+  const doc = isValidObjectId(id) ? await ManualAssetModel.findOne({ _id: id, userId }) : null;
   if (!doc) throw new HttpError(404, ASSET_NOT_FOUND);
   return doc;
 };
@@ -93,9 +94,9 @@ const upsertValuation = (valuaciones: AssetValuationDTO[], valuacion: AssetValua
   [...valuaciones.filter((current) => current.fecha !== valuacion.fecha), valuacion]
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
-netWorthRouter.get("/", asyncHandler(async (_req, res) => {
+netWorthRouter.get("/", asyncHandler(async (req, res) => {
   const hoy = todayIso();
-  const inputs = await loadInputs(hoy);
+  const inputs = await loadInputs(hoy, userIdOf(req));
   if (firstDataMonth(inputs) === null) {
     res.status(204).end();
     return;
@@ -108,7 +109,7 @@ netWorthRouter.post("/assets", asyncHandler(async (req, res) => {
   if (!parsed.success) throw new HttpError(400, INVALID_ASSET);
   const { nombre, tipo, moneda, valuacion } = parsed.data;
   assertNotFuture(valuacion);
-  const doc = await ManualAssetModel.create({ nombre, tipo, moneda, valuaciones: [valuacion] });
+  const doc = await ManualAssetModel.create({ userId: userIdOf(req), nombre, tipo, moneda, valuaciones: [valuacion] });
   res.status(201).json(toManualAssetDTO(doc));
 }));
 
@@ -117,7 +118,7 @@ netWorthRouter.patch("/assets/:id", asyncHandler(async (req, res) => {
   if (!parsed.success) throw new HttpError(400, INVALID_ASSET);
   const { nombre, tipo, valuacion } = parsed.data;
   assertNotFuture(valuacion);
-  const doc = await findAsset(req.params.id);
+  const doc = await findAsset(req.params.id, userIdOf(req));
   if (nombre !== undefined) doc.nombre = nombre;
   if (tipo !== undefined) doc.tipo = tipo;
   if (valuacion) doc.set("valuaciones", upsertValuation(toManualAssetDTO(doc).valuaciones, valuacion));
@@ -126,12 +127,12 @@ netWorthRouter.patch("/assets/:id", asyncHandler(async (req, res) => {
 }));
 
 netWorthRouter.delete("/assets/:id", asyncHandler(async (req, res) => {
-  if (isValidObjectId(req.params.id)) await ManualAssetModel.deleteOne({ _id: req.params.id });
+  if (isValidObjectId(req.params.id)) await ManualAssetModel.deleteOne({ _id: req.params.id, userId: userIdOf(req) });
   res.status(204).end();
 }));
 
 netWorthRouter.delete("/assets/:id/valuations/:fecha", asyncHandler(async (req, res) => {
-  const doc = await findAsset(req.params.id);
+  const doc = await findAsset(req.params.id, userIdOf(req));
   const { fecha } = req.params;
   const { valuaciones } = toManualAssetDTO(doc);
   if (!valuaciones.some((valuacion) => valuacion.fecha === fecha)) throw new HttpError(404, VALUATION_NOT_FOUND);

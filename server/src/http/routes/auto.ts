@@ -1,18 +1,19 @@
 import { Router } from "express";
 import { HttpError, asyncHandler } from "../errors.js";
+import { userIdOf } from "../../auth/requireUser.js";
 import { AutoCouponModel } from "../../db/models.js";
 import { toAutoCouponDTO } from "../mappers.js";
 import { computeAutoProgress } from "../../stats/autoProgress.js";
 
 export const autoRouter = Router();
 
-autoRouter.get("/coupons", asyncHandler(async (_req, res) => {
-  const docs = await AutoCouponModel.find().sort({ cuotaNro: 1 });
+autoRouter.get("/coupons", asyncHandler(async (req, res) => {
+  const docs = await AutoCouponModel.find({ userId: userIdOf(req) }).sort({ cuotaNro: 1 });
   res.json(docs.map(toAutoCouponDTO));
 }));
 
-autoRouter.get("/summary", asyncHandler(async (_req, res) => {
-  const docs = await AutoCouponModel.find().sort({ cuotaNro: 1 }).lean();
+autoRouter.get("/summary", asyncHandler(async (req, res) => {
+  const docs = await AutoCouponModel.find({ userId: userIdOf(req) }).sort({ cuotaNro: 1 }).lean();
   const progress = computeAutoProgress(
     docs.map((c) => ({
       grupo: c.grupo,
@@ -38,8 +39,8 @@ autoRouter.patch("/coupons/:id", asyncHandler(async (req, res) => {
   if (typeof tipoCambioUsd !== "number" || !(tipoCambioUsd > 0)) {
     throw new HttpError(400, "tipoCambioUsd debe ser un número positivo");
   }
-  const doc = await AutoCouponModel.findByIdAndUpdate(
-    req.params.id,
+  const doc = await AutoCouponModel.findOneAndUpdate(
+    { _id: req.params.id, userId: userIdOf(req) },
     { tipoCambioUsd, tipoCambioSource: "manual" },
     { new: true },
   );

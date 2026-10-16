@@ -5,8 +5,10 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serveClient } from "./serveClient.js";
+import { withLocalServers } from "../testing/localServer.js";
 
 let dist: string;
+const serve = withLocalServers();
 
 beforeAll(() => {
   dist = mkdtempSync(join(tmpdir(), "ledgerly-dist-"));
@@ -23,21 +25,21 @@ function appWith(distDir: string) {
 
 describe("serveClient", () => {
   it("sirve index.html en la raíz", async () => {
-    const res = await request(appWith(dist)).get("/");
+    const res = await request(await serve(appWith(dist))).get("/");
     expect(res.status).toBe(200);
     expect(res.text).toContain("SPA");
   });
   it("hace fallback de rutas del SPA a index.html", async () => {
-    const res = await request(appWith(dist)).get("/dashboard");
+    const res = await request(await serve(appWith(dist))).get("/dashboard");
     expect(res.status).toBe(200);
     expect(res.text).toContain("SPA");
   });
   it("no intercepta /api", async () => {
-    const res = await request(appWith(dist)).get("/api/health");
+    const res = await request(await serve(appWith(dist))).get("/api/health");
     expect(res.body).toEqual({ ok: true });
   });
   it("es no-op si el dist no existe", async () => {
-    const res = await request(appWith(join(dist, "nope"))).get("/");
+    const res = await request(await serve(appWith(join(dist, "nope")))).get("/");
     expect(res.status).toBe(404);
   });
 });

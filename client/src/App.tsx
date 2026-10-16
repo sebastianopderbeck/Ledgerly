@@ -1,10 +1,12 @@
 import { CssBaseline, ThemeProvider } from "@mui/material";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import { ColorModeProvider, useColorModeState } from "./theme.js";
 import { useThemeColorMeta } from "./useThemeColorMeta.js";
 import { Layout } from "./components/layout/Layout.js";
+import { AuthGate } from "./components/auth/AuthGate.js";
+import { createAppQueryClient } from "./auth/queryClient.js";
 import { PageTransition } from "./components/motion/PageTransition.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { ImportPage } from "./pages/ImportPage.js";
@@ -22,7 +24,7 @@ import { FixedServicesPage } from "./pages/FixedServicesPage.js";
 import { NetWorthPage } from "./pages/NetWorthPage.js";
 import { VencimientosPage } from "./pages/VencimientosPage.js";
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const queryClient = createAppQueryClient();
 
 const AnimatedRoutes = () => {
   const location = useLocation();
@@ -59,9 +61,11 @@ export const App = () => {
         <MotionConfig reducedMotion="user">
           <QueryClientProvider client={queryClient}>
             <BrowserRouter>
-              <Layout>
-                <AnimatedRoutes />
-              </Layout>
+              <AuthGate>
+                <Layout>
+                  <AnimatedRoutes />
+                </Layout>
+              </AuthGate>
             </BrowserRouter>
           </QueryClientProvider>
         </MotionConfig>

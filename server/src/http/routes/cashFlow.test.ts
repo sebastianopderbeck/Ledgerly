@@ -1,17 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import request from "supertest";
 import { Types } from "mongoose";
 import { cashFlowDtoSchema, type CashFlowDTO } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import {
   AutoCouponModel, FixedServiceModel, HiddenSubscriptionModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel,
   PayslipModel, StatementModel, TransactionModel,
 } from "../../db/models.js";
 import { merchantKey } from "../../stats/merchantKey.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 
 const money = (ars: number, usd = 0) => ({ ars, usd });
 
@@ -51,13 +53,14 @@ const cuponAuto = (cuotaNro: number, vencimiento: string, valorMovil: number, to
 });
 
 const seed = async () => {
-  await PayslipModel.create([recibo("2026-08", "2026-08-31", 1_000_000), recibo("2026-09", "2026-09-30", 1_100_000)]);
-  const statements = await StatementModel.create([
+  await PayslipModel.create(ownedBy(auth.userId, [recibo("2026-08", "2026-08-31", 1_000_000), recibo("2026-09", "2026-09-30", 1_100_000)]));
+  const statements = await StatementModel.create(ownedBy(auth.userId, [
     visa("2026-07-31", "2026-08-11", 400_000),
     visa("2026-08-28", "2026-09-09", 450_000, 20),
     visa("2026-10-02", "2026-10-13", 500_000),
-  ]);
+  ]));
   await TransactionModel.create({
+    userId: auth.userId,
     statementId: statements[2]._id, issuer: "visa_signature", cardLabel: "Visa Signature", date: new Date("2026-08-20"),
     descriptionRaw: "COMERCIO EN CUOTAS", merchant: "COMERCIO", category: "Hogar", categorySource: "rule",
     amount: 30_000, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
@@ -65,11 +68,12 @@ const seed = async () => {
   });
   await MacroSeriesModel.create({ serie: "usd_oficial", fecha: "2026-09-08", valor: 1_400 });
   await MortgageCouponModel.create({
+    userId: auth.userId,
     prestamoNro: "0000000001", cuotaNro: 12, fechaDebito: new Date("2026-09-17"), capital: 100_000, intereses: 200_000,
     seguroIncendio: 0, totalDebitado: 300_000, cuotaPuraUva: 300, cotizacionUva: 1_000, tea: 12.68, tna: 12, cft: 0,
     sourceFileName: "cupon-12.pdf", sourceHash: "cupon-12",
   });
-  await AutoCouponModel.create(cuponAuto(20, "2026-09-10", 20_000_000, 150_000));
+  await AutoCouponModel.create({ ...cuponAuto(20, "2026-09-10", 20_000_000, 150_000), userId: auth.userId });
   return statements;
 };
 
@@ -86,24 +90,26 @@ describe("GET /api/cash-flow", () => {
   });
 
   const suscripcionVisa = async (cobros: [string, unknown][]) => {
-    await TransactionModel.insertMany(cobros.map(([fecha, statementId], index) => ({
+    await TransactionModel.insertMany(ownedBy(auth.userId, cobros.map(([fecha, statementId], index) => ({
       statementId, issuer: "visa_signature", cardLabel: "Visa Signature", date: new Date(fecha),
       descriptionRaw: "STREAMBOX", merchant: "STREAMBOX", category: "Suscripciones", categorySource: "rule",
       amount: 5_000, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
       installmentCurrent: null, installmentTotal: null, comprobante: null, fingerprint: `streambox-${index}`,
-    })));
+    }))));
   };
 
   it("resta los servicios cargados, con defaults para los documentos viejos", async () => {
     await seed();
     await FixedServiceModel.create({
+      userId: auth.userId,
       nombre: "Luz", monto: 30_000, cadencia: "mensual", desde: "2026-09", hasta: null, montoDesde: "2026-09",
     });
-    await FixedServiceModel.collection.insertOne({ nombre: "Gas", monto: 10_000, desde: "2026-10" });
+    await FixedServiceModel.collection.insertOne({ userId: auth.userId, nombre: "Gas", monto: 10_000, desde: "2026-10" });
     await FixedServiceModel.create({
+      userId: auth.userId,
       nombre: "ABL", monto: 120_000, cadencia: "anual", desde: "2026-12", hasta: null, montoDesde: "2026-10",
     });
-    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-08")?.servicios).toBe(0);
     expect(mesDe(flow, "2026-09")).toMatchObject({ servicios: 30_000, egresos: 958_000, margen: 142_000 });
     expect(mesDe(flow, "2026-10")?.servicios).toBe(40_000);
@@ -120,7 +126,7 @@ describe("GET /api/cash-flow", () => {
   it("separa las suscripciones de cada resumen y las proyecta en su columna", async () => {
     const statements = await seed();
     await suscripcionVisa(cobrosEnSusResumenes(statements));
-    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-08")).toMatchObject({ tarjetas: 395_000, suscripciones: 5_000, egresos: 400_000 });
     expect(mesDe(flow, "2026-09")).toMatchObject({ tarjetas: 473_000, suscripciones: 5_000 });
     expect(mesDe(flow, "2026-10")).toMatchObject({ tarjetas: 495_000, suscripciones: 5_000 });
@@ -135,8 +141,8 @@ describe("GET /api/cash-flow", () => {
   it("deja una suscripción oculta en Tarjetas", async () => {
     const statements = await seed();
     await suscripcionVisa(cobrosEnSusResumenes(statements));
-    await HiddenSubscriptionModel.create({ key: merchantKey("STREAMBOX") });
-    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    await HiddenSubscriptionModel.create({ userId: auth.userId, key: merchantKey("STREAMBOX") });
+    const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-10")).toMatchObject({ tarjetas: 500_000, suscripciones: 0 });
     expect(mesDe(flow, "2026-11")).toMatchObject({ tarjetas: 30_000, suscripciones: 0 });
     expect(mesDe(flow, "2026-11")?.estimados).not.toContain("Suscripciones (último cobro)");
@@ -147,20 +153,20 @@ describe("GET /api/cash-flow", () => {
     await suscripcionVisa([
       ["2026-05-20", new Types.ObjectId()], ["2026-06-20", new Types.ObjectId()], ["2026-07-20", statements[0]._id],
     ]);
-    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-08")).toMatchObject({ tarjetas: 395_000, suscripciones: 5_000 });
     expect(mesDe(flow, "2026-11")).toMatchObject({ tarjetas: 30_000, suscripciones: 0 });
   });
 
   it("con la base vacía no hay flujo", async () => {
-    const res = await request(app).get("/api/cash-flow");
+    const res = await auth.api.get("/api/cash-flow");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ mesActual: "2026-10", meses: [] });
   });
 
   it("arma la historia y la proyección desde los documentos importados", async () => {
     await seed();
-    const res = await request(app).get("/api/cash-flow");
+    const res = await auth.api.get("/api/cash-flow");
     expect(res.status).toBe(200);
     const flow = cashFlowDtoSchema.parse(res.body);
     expect(flow.mesActual).toBe("2026-10");
@@ -183,8 +189,8 @@ describe("GET /api/cash-flow", () => {
       { serie: "uva", fecha: "2026-07-03", valor: 1_000 },
       { serie: "uva", fecha: "2026-10-03", valor: 1_061.208 },
     ]);
-    await AutoCouponModel.create(cuponAuto(19, "2026-08-10", 16_000_000, 140_000));
-    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    await AutoCouponModel.create({ ...cuponAuto(19, "2026-08-10", 16_000_000, 140_000), userId: auth.userId });
+    const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-10")?.hipoteca).toBeCloseTo(306_000, 6);
     expect(mesDe(flow, "2026-10")?.auto).toBeCloseTo(187_500, 6);
     expect(mesDe(flow, "2026-10")?.estimados).toEqual(
@@ -199,7 +205,7 @@ describe("GET /api/cash-flow", () => {
       { serie: "rem_12m", fecha: "2026-08-31", valor: 40 },
       { serie: "rem_12m", fecha: "2026-09-30", valor: 26.8242 },
     ]);
-    const flow = cashFlowDtoSchema.parse((await request(app).get("/api/cash-flow")).body);
+    const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-12")?.ingreso).toBe(1_650_000);
     expect(mesDe(flow, "2027-01")?.ingreso).toBeCloseTo(1_100_000 * 1.02 ** 4, 0);
     expect(mesDe(flow, "2027-01")?.estimados[0]).toBe("Sueldo (último neto +8,2% por aumento de enero · IPC esperado del REM)");

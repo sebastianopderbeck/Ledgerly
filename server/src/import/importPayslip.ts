@@ -1,10 +1,12 @@
 import type { ExtractedPdf } from "@ledgerly/shared";
 import { createHash } from "node:crypto";
+import type { Types } from "mongoose";
 import { parsePayslip } from "../ingestion/parsePayslip.js";
 import { PayslipModel } from "../db/models.js";
 import { fetchOficialRate } from "../fx/dollarRate.js";
 
 export async function importPayslip(input: {
+  userId: Types.ObjectId;
   data: Uint8Array;
   fileName: string;
   replace?: boolean;
@@ -13,13 +15,14 @@ export async function importPayslip(input: {
   const sourceHash = createHash("sha256").update(input.data).digest("hex");
   const { payslip } = await parsePayslip(input.data, input.extracted, input.fileName);
 
-  const existing = await PayslipModel.findOne({ cuil: payslip.cuil, periodo: payslip.periodo, tipo: payslip.tipo });
+  const existing = await PayslipModel.findOne({ userId: input.userId, cuil: payslip.cuil, periodo: payslip.periodo, tipo: payslip.tipo });
   if (existing && !input.replace) return { status: "duplicate", payslipId: existing._id.toString() };
-  if (existing && input.replace) await PayslipModel.deleteOne({ _id: existing._id });
+  if (existing && input.replace) await PayslipModel.deleteOne({ _id: existing._id, userId: input.userId });
 
   const tipoCambioUsd = await fetchOficialRate(payslip.fechaPago).catch(() => null);
 
   const created = await PayslipModel.create({
+    userId: input.userId,
     periodo: payslip.periodo,
     tipo: payslip.tipo,
     fechaPago: new Date(payslip.fechaPago),

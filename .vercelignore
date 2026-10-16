@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+examples
+backups
+*.pdf
+.superpowers
+.claude
+.idea
+dist

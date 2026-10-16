@@ -1,4 +1,5 @@
 import type { Currency, Direction, Issuer, TxType } from "@ledgerly/shared";
+import type { Types } from "mongoose";
 import {
   HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, SubscriptionCadenceModel, TransactionModel,
 } from "../db/models.js";
@@ -11,13 +12,13 @@ export interface SubscriptionInputs {
 
 const isoDay = (date: Date): string => date.toISOString().slice(0, 10);
 
-export async function loadSubscriptionInputs(hoy: string): Promise<SubscriptionInputs> {
+export async function loadSubscriptionInputs(hoy: string, userId: Types.ObjectId): Promise<SubscriptionInputs> {
   const [transactions, statements, hidden, manual, cadences] = await Promise.all([
-    TransactionModel.find({ isInstallment: false, type: { $in: ["purchase", "refund"] } }).lean(),
-    StatementModel.find({}, { issuer: 1, closingDate: 1 }).lean(),
-    HiddenSubscriptionModel.find().lean(),
-    ManualSubscriptionModel.find().lean(),
-    SubscriptionCadenceModel.find(),
+    TransactionModel.find({ userId, isInstallment: false, type: { $in: ["purchase", "refund"] } }).lean(),
+    StatementModel.find({ userId }, { issuer: 1, closingDate: 1 }).lean(),
+    HiddenSubscriptionModel.find({ userId }).lean(),
+    ManualSubscriptionModel.find({ userId }).lean(),
+    SubscriptionCadenceModel.find({ userId }),
   ]);
   const txs: SubscriptionTx[] = transactions.map((t) => ({
     date: isoDay(t.date),

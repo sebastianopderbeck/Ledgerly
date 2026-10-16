@@ -8,6 +8,7 @@ import {
 import { toBudgetDTO } from "../mappers.js";
 import { parseYears, yearDateRanges } from "../yearFilter.js";
 import { lastClosedMonth } from "../../stats/closedMonth.js";
+import { userIdOf } from "../../auth/requireUser.js";
 
 export const budgetsRouter = Router();
 
@@ -31,8 +32,8 @@ const validId = (id: string): string => {
   return id;
 };
 
-budgetsRouter.get("/", asyncHandler(async (_req, res) => {
-  const budgets = await BudgetModel.find().sort({ category: 1 });
+budgetsRouter.get("/", asyncHandler(async (req, res) => {
+  const budgets = await BudgetModel.find({ userId: userIdOf(req) }).sort({ category: 1 });
   res.json(budgets.map(toBudgetDTO));
 }));
 
@@ -51,12 +52,13 @@ const spendingByMonthAndCategory = (match: FilterQuery<TransactionDoc>) =>
   ]);
 
 budgetsRouter.get("/spending", asyncHandler(async (req, res) => {
-  const match: FilterQuery<TransactionDoc> = { type: "purchase", currency: "ARS" };
+  const userId = userIdOf(req);
+  const match: FilterQuery<TransactionDoc> = { userId, type: "purchase", currency: "ARS" };
   const years = parseYears(req.query.year);
   if (years) match.$or = yearDateRanges(years);
   const [gastos, statements] = await Promise.all([
     spendingByMonthAndCategory(match),
-    StatementModel.find({}, { closingDate: 1 }).lean(),
+    StatementModel.find({ userId }, { closingDate: 1 }).lean(),
   ]);
   const body: BudgetSpendingDTO = {
     ultimoMesCerrado: lastClosedMonth(statements.map((statement) => statement.closingDate ?? null)),
@@ -69,10 +71,11 @@ budgetsRouter.post("/", asyncHandler(async (req, res) => {
   const parsed = budgetInputSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, INVALID_INPUT);
   const { category } = parsed.data;
-  if (await BudgetModel.exists({ category })) throw duplicated(category);
+  const userId = userIdOf(req);
+  if (await BudgetModel.exists({ userId, category })) throw duplicated(category);
   const periodoBase = await basePeriod();
   try {
-    const doc = await BudgetModel.create({ ...parsed.data, periodoBase });
+    const doc = await BudgetModel.create({ ...parsed.data, userId, periodoBase });
     res.status(201).json(toBudgetDTO(doc));
   } catch (error) {
     throw isDuplicateKey(error) ? duplicated(category) : error;
@@ -84,14 +87,14 @@ budgetsRouter.patch("/:id", asyncHandler(async (req, res) => {
   const parsed = budgetPatchSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, INVALID_PATCH);
   const periodoBase = await basePeriod();
-  const doc = await BudgetModel.findByIdAndUpdate(id, { ...parsed.data, periodoBase }, { new: true });
+  const doc = await BudgetModel.findOneAndUpdate({ _id: id, userId: userIdOf(req) }, { ...parsed.data, periodoBase }, { new: true });
   if (!doc) throw new HttpError(404, NOT_FOUND);
   res.json(toBudgetDTO(doc));
 }));
 
 budgetsRouter.delete("/:id", asyncHandler(async (req, res) => {
   const id = validId(req.params.id);
-  const { deletedCount } = await BudgetModel.deleteOne({ _id: id });
+  const { deletedCount } = await BudgetModel.deleteOne({ _id: id, userId: userIdOf(req) });
   if (deletedCount === 0) throw new HttpError(404, NOT_FOUND);
   res.status(204).end();
 }));

@@ -1,18 +1,19 @@
 import { Router } from "express";
 import { HttpError, asyncHandler } from "../errors.js";
+import { userIdOf } from "../../auth/requireUser.js";
 import { PayslipModel } from "../../db/models.js";
 import { toPayslipDTO } from "../mappers.js";
 import { computePayslipSummary } from "../../stats/payslipSummary.js";
 
 export const payslipsRouter = Router();
 
-payslipsRouter.get("/", asyncHandler(async (_req, res) => {
-  const docs = await PayslipModel.find().sort({ periodo: 1 });
+payslipsRouter.get("/", asyncHandler(async (req, res) => {
+  const docs = await PayslipModel.find({ userId: userIdOf(req) }).sort({ periodo: 1 });
   res.json(docs.map(toPayslipDTO));
 }));
 
-payslipsRouter.get("/summary", asyncHandler(async (_req, res) => {
-  const docs = await PayslipModel.find().sort({ periodo: 1 }).lean();
+payslipsRouter.get("/summary", asyncHandler(async (req, res) => {
+  const docs = await PayslipModel.find({ userId: userIdOf(req) }).sort({ periodo: 1 }).lean();
   const summary = computePayslipSummary(
     docs.map((p) => ({
       periodo: p.periodo,
@@ -35,8 +36,8 @@ payslipsRouter.patch("/:id", asyncHandler(async (req, res) => {
   if (typeof tipoCambioUsd !== "number" || !(tipoCambioUsd > 0)) {
     throw new HttpError(400, "tipoCambioUsd debe ser un número positivo");
   }
-  const doc = await PayslipModel.findByIdAndUpdate(
-    req.params.id,
+  const doc = await PayslipModel.findOneAndUpdate(
+    { _id: req.params.id, userId: userIdOf(req) },
     { tipoCambioUsd, tipoCambioSource: "manual" },
     { new: true },
   );

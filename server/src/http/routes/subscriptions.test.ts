@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../fx/dollarRate.js", () => ({ fetchOficialRate: vi.fn() }));
-import request from "supertest";
 import { subscriptionsReportDtoSchema } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import {
   HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, SubscriptionCadenceModel, TransactionModel,
 } from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 const COTIZACION = 1465;
 
 interface TxSeed {
@@ -27,19 +29,20 @@ const zero = { ars: 0, usd: 0 };
 
 async function seedVisa(rows: TxSeed[]): Promise<void> {
   const statement = await StatementModel.create({
+    userId: auth.userId,
     issuer: "visa_signature", cardLabel: "Visa Signature", last4: "1234", closingDate: new Date("2026-08-26"),
     dueDate: null, totals: { totalConsumos: zero, saldoActual: zero, pagoMinimo: zero, saldoAnterior: zero },
     sourceFileName: "visa.pdf", sourceHash: "visa-2026-08", pageCount: 1, parserVersion: "1.0.0",
     needsReview: false, reconciliation: { ok: true, entries: [] },
   });
-  await TransactionModel.insertMany(rows.map(
+  await TransactionModel.insertMany(ownedBy(auth.userId, rows.map(
     ({ date, merchant, amount, currency = "ARS", type = "purchase", isInstallment = false, category = "Suscripciones" }, index) => ({
       statementId: statement._id, issuer: "visa_signature", cardLabel: "Visa Signature", date: new Date(date),
       descriptionRaw: merchant, merchant, category, categorySource: "rule", amount, currency, direction: "debit",
       type, isInstallment, installmentCurrent: isInstallment ? 1 : null, installmentTotal: isInstallment ? 12 : null,
       comprobante: null, fingerprint: `fp-${index}`,
     }),
-  ));
+  )));
 }
 
 const STREAMFLIX_IDS = ["58141049416586488", "ydnBWjd7S", "LYXdQ0WEI5", "77Hq2Kp1"];
@@ -63,13 +66,13 @@ beforeEach(() => {
 describe("GET /api/subscriptions", () => {
   it("cada suscripción trae el emisor de su tarjeta", async () => {
     await seedVisa(streamflixAndNoise());
-    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    const report = subscriptionsReportDtoSchema.parse((await auth.api.get("/api/subscriptions")).body);
     expect(report.items.length).toBeGreaterThan(0);
     expect(new Set(report.items.map((item) => item.issuer))).toEqual(new Set(["visa_signature"]));
   });
 
   it("sin datos responde 200 con la lista vacía y totales en cero", async () => {
-    const res = await request(app).get("/api/subscriptions");
+    const res = await auth.api.get("/api/subscriptions");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       cotizacionOficial: COTIZACION, totalMensualArs: 0, totalMensualUsd: 0, totalAnualArs: 0, items: [],
@@ -78,7 +81,7 @@ describe("GET /api/subscriptions", () => {
 
   it("detecta el cobro mensual entre cuotas, impuestos y compras sueltas", async () => {
     await seedVisa(streamflixAndNoise());
-    const res = await request(app).get("/api/subscriptions");
+    const res = await auth.api.get("/api/subscriptions");
     expect(res.status).toBe(200);
     const report = subscriptionsReportDtoSchema.parse(res.body);
     expect(report.items).toHaveLength(1);
@@ -93,7 +96,7 @@ describe("GET /api/subscriptions", () => {
   it("sin cotización deja los pesos de los dólares en null", async () => {
     vi.mocked(fetchOficialRate).mockResolvedValue(null);
     await seedVisa(streamflixAndNoise());
-    const res = await request(app).get("/api/subscriptions");
+    const res = await auth.api.get("/api/subscriptions");
     expect(res.body).toMatchObject({ cotizacionOficial: null, totalMensualArs: 0, totalMensualUsd: 12.99 });
     expect(res.body.items[0].montoMensualArs).toBeNull();
   });
@@ -102,20 +105,20 @@ describe("GET /api/subscriptions", () => {
 describe("ocultar suscripciones", () => {
   it("PUT la oculta, es idempotente y saca sus montos de los totales", async () => {
     await seedVisa(streamflixAndNoise());
-    expect((await request(app).put("/api/subscriptions/hidden/STREAMFLIX%20COM")).status).toBe(204);
-    expect((await request(app).put("/api/subscriptions/hidden/STREAMFLIX%20COM")).status).toBe(204);
-    expect(await HiddenSubscriptionModel.countDocuments()).toBe(1);
-    const res = await request(app).get("/api/subscriptions");
+    expect((await auth.api.put("/api/subscriptions/hidden/STREAMFLIX%20COM")).status).toBe(204);
+    expect((await auth.api.put("/api/subscriptions/hidden/STREAMFLIX%20COM")).status).toBe(204);
+    expect(await HiddenSubscriptionModel.countDocuments({ userId: auth.userId })).toBe(1);
+    const res = await auth.api.get("/api/subscriptions");
     expect(res.body.items[0].oculta).toBe(true);
     expect(res.body).toMatchObject({ totalMensualArs: 0, totalMensualUsd: 0, totalAnualArs: 0 });
   });
 
   it("DELETE la vuelve a mostrar y también es idempotente", async () => {
     await seedVisa(streamflixAndNoise());
-    await request(app).put("/api/subscriptions/hidden/STREAMFLIX%20COM");
-    expect((await request(app).delete("/api/subscriptions/hidden/STREAMFLIX%20COM")).status).toBe(204);
-    expect((await request(app).delete("/api/subscriptions/hidden/STREAMFLIX%20COM")).status).toBe(204);
-    const res = await request(app).get("/api/subscriptions");
+    await auth.api.put("/api/subscriptions/hidden/STREAMFLIX%20COM");
+    expect((await auth.api.delete("/api/subscriptions/hidden/STREAMFLIX%20COM")).status).toBe(204);
+    expect((await auth.api.delete("/api/subscriptions/hidden/STREAMFLIX%20COM")).status).toBe(204);
+    const res = await auth.api.get("/api/subscriptions");
     expect(res.body.items[0].oculta).toBe(false);
     expect(res.body.totalMensualUsd).toBe(12.99);
   });
@@ -124,41 +127,41 @@ describe("ocultar suscripciones", () => {
     ["en blanco", "%20%20"],
     ["de más de 60 caracteres", "A".repeat(61)],
   ])("PUT con una clave %s responde 400", async (_label, key) => {
-    const res = await request(app).put(`/api/subscriptions/hidden/${key}`);
+    const res = await auth.api.put(`/api/subscriptions/hidden/${key}`);
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: "Clave inválida" });
   });
 
   it("guarda la clave recortada", async () => {
-    await request(app).put("/api/subscriptions/hidden/%20STREAMFLIX%20COM%20");
-    expect((await HiddenSubscriptionModel.findOne().lean())?.key).toBe("STREAMFLIX COM");
+    await auth.api.put("/api/subscriptions/hidden/%20STREAMFLIX%20COM%20");
+    expect((await HiddenSubscriptionModel.findOne({ userId: auth.userId }).lean())?.key).toBe("STREAMFLIX COM");
   });
 });
 
 describe("GET /api/subscriptions con marcas guardadas", () => {
   it("un comercio marcado a mano aparece desde su primer cobro", async () => {
     await seedVisa(cafeRosita());
-    expect((await request(app).get("/api/subscriptions")).body.items).toEqual([]);
-    await ManualSubscriptionModel.create({ key: "CAFE ROSITA" });
-    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    expect((await auth.api.get("/api/subscriptions")).body.items).toEqual([]);
+    await ManualSubscriptionModel.create({ userId: auth.userId, key: "CAFE ROSITA" });
+    const report = subscriptionsReportDtoSchema.parse((await auth.api.get("/api/subscriptions")).body);
     expect(report.items).toMatchObject([{ key: "CAFE ROSITA", cobros: 1, cadencia: "mensual", estado: "activa" }]);
   });
 
   it("una marca manual guardada antes de que existieran los cobros marcados sigue forzando el comercio", async () => {
     await seedVisa(cafeRosita());
-    await ManualSubscriptionModel.collection.insertOne({ key: "CAFE ROSITA", markedAt: new Date() });
-    const res = await request(app).get("/api/subscriptions");
+    await ManualSubscriptionModel.collection.insertOne({ userId: auth.userId, key: "CAFE ROSITA", markedAt: new Date() });
+    const res = await auth.api.get("/api/subscriptions");
     expect(res.status).toBe(200);
     expect(res.body.items).toMatchObject([{ key: "CAFE ROSITA", cobros: 1 }]);
   });
 });
 
 const idOf = async (merchant: string, date: string): Promise<string> => {
-  const doc = await TransactionModel.findOne({ merchant, date: new Date(date) }).lean();
+  const doc = await TransactionModel.findOne({ userId: auth.userId, merchant, date: new Date(date) }).lean();
   return String(doc?._id);
 };
 
-const markTransaction = (body: object) => request(app).post("/api/subscriptions/manual").send(body);
+const markTransaction = (body: object) => auth.api.post("/api/subscriptions/manual").send(body);
 
 const ridesAndMembership = (): TxSeed[] => [
   { date: "2026-07-04", merchant: "RIDEGO 7001", amount: 3100, category: "Transporte" },
@@ -173,7 +176,7 @@ describe("marcar suscripciones a mano", () => {
     await seedVisa(cafeRosita());
     const res = await markTransaction({ transactionId: await idOf("CAFE ROSITA 4471", "2026-08-15") });
     expect(res.status).toBe(204);
-    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    const report = subscriptionsReportDtoSchema.parse((await auth.api.get("/api/subscriptions")).body);
     expect(report.items).toMatchObject([
       { key: "CAFE ROSITA", cobros: 1, ultimoCobro: "2026-08-15", cadencia: "mensual", estado: "activa", oculta: false },
     ]);
@@ -182,7 +185,7 @@ describe("marcar suscripciones a mano", () => {
   it("en un comercio con otros gastos, la suscripción sale del movimiento marcado", async () => {
     await seedVisa(ridesAndMembership());
     await markTransaction({ transactionId: await idOf("RIDEGO 7001", "2026-08-02") });
-    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    const report = subscriptionsReportDtoSchema.parse((await auth.api.get("/api/subscriptions")).body);
     expect(report.items).toMatchObject([
       { key: "RIDEGO", montoActual: 9900, primerCobro: "2026-08-02", ultimoCobro: "2026-08-02", cobros: 1 },
     ]);
@@ -193,7 +196,7 @@ describe("marcar suscripciones a mano", () => {
     const transactionId = await idOf("GOOGLE *VideoPremium", "2026-08-09");
     expect((await markTransaction({ transactionId: `  ${transactionId}  ` })).status).toBe(204);
     expect((await markTransaction({ transactionId })).status).toBe(204);
-    const docs = await ManualSubscriptionModel.find().lean();
+    const docs = await ManualSubscriptionModel.find({ userId: auth.userId }).lean();
     expect(docs.map(({ key, cobros }) => ({ key, cobros }))).toEqual([
       { key: "GOOGLE VIDEOPREMIUM", cobros: [{ date: "2026-08-09", amount: 3500, currency: "ARS" }] },
     ]);
@@ -203,7 +206,7 @@ describe("marcar suscripciones a mano", () => {
     await seedVisa(ridesAndMembership());
     await markTransaction({ transactionId: await idOf("RIDEGO 7001", "2026-07-17") });
     await markTransaction({ transactionId: await idOf("RIDEGO 7001", "2026-08-02") });
-    const docs = await ManualSubscriptionModel.find().lean();
+    const docs = await ManualSubscriptionModel.find({ userId: auth.userId }).lean();
     expect(docs.map(({ key, cobros }) => ({ key, fechas: cobros.map(({ date }) => date) }))).toEqual([
       { key: "RIDEGO", fechas: ["2026-07-17", "2026-08-02"] },
     ]);
@@ -226,7 +229,7 @@ describe("marcar suscripciones a mano", () => {
     const res = await markTransaction({ transactionId });
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: "Movimiento no encontrado" });
-    expect(await ManualSubscriptionModel.countDocuments()).toBe(0);
+    expect(await ManualSubscriptionModel.countDocuments({ userId: auth.userId })).toBe(0);
   });
 
   it("POST /manual con un comercio sin palabras responde 400 y no guarda nada", async () => {
@@ -234,28 +237,28 @@ describe("marcar suscripciones a mano", () => {
     const res = await markTransaction({ transactionId: await idOf("123456 7890", "2026-08-09") });
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: "Este comercio no tiene un nombre reconocible" });
-    expect(await ManualSubscriptionModel.countDocuments()).toBe(0);
+    expect(await ManualSubscriptionModel.countDocuments({ userId: auth.userId })).toBe(0);
   });
 
   it("marcar un comercio oculto lo vuelve a mostrar", async () => {
     await seedVisa(cafeRosita());
-    await request(app).put("/api/subscriptions/hidden/CAFE%20ROSITA");
+    await auth.api.put("/api/subscriptions/hidden/CAFE%20ROSITA");
     await markTransaction({ transactionId: await idOf("CAFE ROSITA 4471", "2026-08-15") });
-    expect(await HiddenSubscriptionModel.countDocuments()).toBe(0);
-    const res = await request(app).get("/api/subscriptions");
+    expect(await HiddenSubscriptionModel.countDocuments({ userId: auth.userId })).toBe(0);
+    const res = await auth.api.get("/api/subscriptions");
     expect(res.body.items).toMatchObject([{ key: "CAFE ROSITA", oculta: false }]);
   });
 });
 
-const setCadence = (key: string, body: object) => request(app).put(`/api/subscriptions/cadence/${key}`).send(body);
+const setCadence = (key: string, body: object) => auth.api.put(`/api/subscriptions/cadence/${key}`).send(body);
 
 describe("cambiar la cadencia de una suscripción", () => {
   it("PUT anual la pasa a anual, es idempotente y divide por 12", async () => {
     await seedVisa(streamflixAndNoise());
     expect((await setCadence("STREAMFLIX%20COM", { cadencia: "anual" })).status).toBe(204);
     expect((await setCadence("STREAMFLIX%20COM", { cadencia: "anual" })).status).toBe(204);
-    expect(await SubscriptionCadenceModel.countDocuments()).toBe(1);
-    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    expect(await SubscriptionCadenceModel.countDocuments({ userId: auth.userId })).toBe(1);
+    const report = subscriptionsReportDtoSchema.parse((await auth.api.get("/api/subscriptions")).body);
     expect(report.items).toMatchObject([{
       key: "STREAMFLIX COM", cadencia: "anual", cobros: 1, proximoCobro: "2027-08-09", montoMensualArs: 1585.86,
     }]);
@@ -264,9 +267,9 @@ describe("cambiar la cadencia de una suscripción", () => {
 
   it("PUT bimestral la pasa a bimestral y divide por 2", async () => {
     await seedVisa(cafeRosita());
-    await ManualSubscriptionModel.create({ key: "CAFE ROSITA" });
+    await ManualSubscriptionModel.create({ userId: auth.userId, key: "CAFE ROSITA" });
     expect((await setCadence("CAFE%20ROSITA", { cadencia: "bimestral" })).status).toBe(204);
-    const report = subscriptionsReportDtoSchema.parse((await request(app).get("/api/subscriptions")).body);
+    const report = subscriptionsReportDtoSchema.parse((await auth.api.get("/api/subscriptions")).body);
     expect(report.items).toMatchObject([{
       key: "CAFE ROSITA", cadencia: "bimestral", cobros: 1, proximoCobro: "2026-10-15", montoMensualArs: 1900,
     }]);
@@ -276,7 +279,7 @@ describe("cambiar la cadencia de una suscripción", () => {
     await seedVisa(cafeRosita());
     await setCadence("CAFE%20ROSITA", { cadencia: "anual" });
     await setCadence("CAFE%20ROSITA", { cadencia: "bimestral" });
-    expect(await SubscriptionCadenceModel.find().lean()).toMatchObject([{ key: "CAFE ROSITA", cadencia: "bimestral" }]);
+    expect(await SubscriptionCadenceModel.find({ userId: auth.userId }).lean()).toMatchObject([{ key: "CAFE ROSITA", cadencia: "bimestral" }]);
   });
 
   it("PUT mensual borra la marca y también es idempotente", async () => {
@@ -284,16 +287,16 @@ describe("cambiar la cadencia de una suscripción", () => {
     await setCadence("STREAMFLIX%20COM", { cadencia: "anual" });
     expect((await setCadence("STREAMFLIX%20COM", { cadencia: "mensual" })).status).toBe(204);
     expect((await setCadence("STREAMFLIX%20COM", { cadencia: "mensual" })).status).toBe(204);
-    expect(await SubscriptionCadenceModel.countDocuments()).toBe(0);
-    const res = await request(app).get("/api/subscriptions");
+    expect(await SubscriptionCadenceModel.countDocuments({ userId: auth.userId })).toBe(0);
+    const res = await auth.api.get("/api/subscriptions");
     expect(res.body.items).toMatchObject([{ cadencia: "mensual", cobros: 4 }]);
     expect(res.body.totalMensualUsd).toBe(12.99);
   });
 
   it("una marca anual guardada antes de que existiera la cadencia sigue siendo anual", async () => {
     await seedVisa(streamflixAndNoise());
-    await SubscriptionCadenceModel.collection.insertOne({ key: "STREAMFLIX COM", annualAt: new Date() });
-    const res = await request(app).get("/api/subscriptions");
+    await SubscriptionCadenceModel.collection.insertOne({ userId: auth.userId, key: "STREAMFLIX COM", annualAt: new Date() });
+    const res = await auth.api.get("/api/subscriptions");
     expect(res.body.items).toMatchObject([{ key: "STREAMFLIX COM", cadencia: "anual" }]);
   });
 
@@ -313,6 +316,6 @@ describe("cambiar la cadencia de una suscripción", () => {
     const res = await setCadence("STREAMFLIX%20COM", body);
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: "Cadencia inválida" });
-    expect(await SubscriptionCadenceModel.countDocuments()).toBe(0);
+    expect(await SubscriptionCadenceModel.countDocuments({ userId: auth.userId })).toBe(0);
   });
 });

@@ -68,6 +68,13 @@ export class OcrUnavailableError extends IngestionError {
   }
 }
 
+export class UnsupportedImageFormatError extends IngestionError {
+  constructor() {
+    super("Mandá la imagen como JPG o PNG");
+    this.name = "UnsupportedImageFormatError";
+  }
+}
+
 export class OcrFailedError extends IngestionError {
   constructor() {
     super("No se pudo leer el texto de la imagen");

@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Types } from "mongoose";
 import { fixedServiceCadenciaSchema, type SubscriptionDTO } from "@ledgerly/shared";
 import { asyncHandler } from "../errors.js";
+import { userIdOf } from "../../auth/requireUser.js";
 import { loadSubscriptionInputs } from "../loadSubscriptions.js";
 import {
   AutoCouponModel, FixedServiceModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel, PayslipModel, StatementModel,
@@ -145,25 +146,26 @@ const salaryInflation = (rows: InflationRow[], rem12m: number | null): SalaryInf
 
 export const cashFlowRouter = Router();
 
-cashFlowRouter.get("/", asyncHandler(async (_req, res) => {
+cashFlowRouter.get("/", asyncHandler(async (req, res) => {
+  const userId = userIdOf(req);
   const today = new Date().toISOString().slice(0, 10);
   const [
     payslips, statements, mortgageCoupons, autoCoupons, usdPoints, uvaPoints, inflationRows, lastRem, fixedServices, subscriptionInputs,
   ] = await Promise.all([
-    PayslipModel.find().lean(),
-    StatementModel.find().lean(),
-    MortgageCouponModel.find().sort({ cuotaNro: 1 }).lean(),
-    AutoCouponModel.find().sort({ cuotaNro: 1 }).lean(),
+    PayslipModel.find({ userId }).lean(),
+    StatementModel.find({ userId }).lean(),
+    MortgageCouponModel.find({ userId }).sort({ cuotaNro: 1 }).lean(),
+    AutoCouponModel.find({ userId }).sort({ cuotaNro: 1 }).lean(),
     MacroSeriesModel.find({ serie: "usd_oficial" }).sort({ fecha: 1 }).lean(),
     MacroSeriesModel.find({ serie: "uva" }).sort({ fecha: 1 }).lean(),
     InflationRateModel.find().lean(),
     MacroSeriesModel.findOne({ serie: "rem_12m" }).sort({ fecha: -1 }).lean(),
-    FixedServiceModel.find().lean(),
-    loadSubscriptionInputs(today),
+    FixedServiceModel.find({ userId }).lean(),
+    loadSubscriptionInputs(today, userId),
   ]);
   const latestIds = latestStatementIdsPerIssuer(statements.map(toRecency));
   const installmentTxs = await TransactionModel.find({
-    statementId: { $in: latestIds }, type: "purchase", isInstallment: true, currency: "ARS",
+    userId, statementId: { $in: latestIds }, type: "purchase", isInstallment: true, currency: "ARS",
   }).lean();
   const credit = computeCreditProgress(mortgageCoupons.map(toCouponInput));
   const detected = detectSubscriptionRuns(subscriptionInputs.txs, { ...subscriptionInputs.ctx, cotizacion: null });

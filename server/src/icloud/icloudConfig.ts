@@ -1,7 +1,8 @@
 export const ICLOUD_HOST = "imap.mail.me.com";
 export const ICLOUD_PORT = 993;
 export const ICLOUD_USER_VAR = "ICLOUD_USER";
-export const ICLOUD_PASSWORD_MISSING = "la contraseña de app en el Llavero";
+export const ICLOUD_PASSWORD_VAR = "ICLOUD_APP_PASSWORD";
+export const ICLOUD_PASSWORD_MISSING = "ICLOUD_APP_PASSWORD (o la contraseña de app en el Llavero)";
 export const DEFAULT_ICLOUD_MAILBOXES = ["INBOX"];
 export const DEFAULT_ICLOUD_WINDOW_DAYS = 90;
 

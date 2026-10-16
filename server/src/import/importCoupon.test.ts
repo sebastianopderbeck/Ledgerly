@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { withDb } from "../testing/withDb.js";
 import type { ParsedCoupon } from "@ledgerly/shared";
@@ -8,6 +9,8 @@ vi.mock("../fx/dollarRate.js", () => ({ fetchOficialRate: vi.fn() }));
 import { fetchOficialRate } from "../fx/dollarRate.js";
 import { importCoupon } from "./importCoupon.js";
 import { MortgageCouponModel } from "../db/models.js";
+
+const USER_ID = new Types.ObjectId();
 
 withDb();
 const mocked = vi.mocked(parseCoupon);
@@ -26,49 +29,49 @@ beforeEach(() => {
 
 describe("importCoupon", () => {
   it("importa un cupón nuevo", async () => {
-    const r = await importCoupon({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    const r = await importCoupon({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" });
     expect(r.status).toBe("imported");
-    expect(await MortgageCouponModel.countDocuments()).toBe(1);
+    expect(await MortgageCouponModel.countDocuments({ userId: USER_ID })).toBe(1);
   });
 
   it("deduplica por (prestamoNro, cuotaNro) aunque cambien los bytes", async () => {
-    await importCoupon({ data: new Uint8Array([1]), fileName: "a.pdf" });
-    const r = await importCoupon({ data: new Uint8Array([2, 3]), fileName: "b.pdf" });
+    await importCoupon({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" });
+    const r = await importCoupon({ userId: USER_ID, data: new Uint8Array([2, 3]), fileName: "b.pdf" });
     expect(r.status).toBe("duplicate");
-    expect(await MortgageCouponModel.countDocuments()).toBe(1);
+    expect(await MortgageCouponModel.countDocuments({ userId: USER_ID })).toBe(1);
   });
 
   it("replace reemplaza el cupón existente", async () => {
-    await importCoupon({ data: new Uint8Array([1]), fileName: "a.pdf" });
-    const r = await importCoupon({ data: new Uint8Array([2]), fileName: "b.pdf", replace: true });
+    await importCoupon({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" });
+    const r = await importCoupon({ userId: USER_ID, data: new Uint8Array([2]), fileName: "b.pdf", replace: true });
     expect(r.status).toBe("imported");
-    expect(await MortgageCouponModel.countDocuments()).toBe(1);
+    expect(await MortgageCouponModel.countDocuments({ userId: USER_ID })).toBe(1);
   });
 
   it("guarda el tipo de cambio oficial al importar", async () => {
-    await importCoupon({ data: new Uint8Array([1]), fileName: "a.pdf" });
-    const doc = await MortgageCouponModel.findOne({ cuotaNro: 1 });
+    await importCoupon({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" });
+    const doc = await MortgageCouponModel.findOne({ userId: USER_ID, cuotaNro: 1 });
     expect(doc?.tipoCambioUsd).toBe(1350.5);
     expect(doc?.tipoCambioSource).toBe("api");
   });
 
   it("importa igual si la API de dólar falla (tipoCambioUsd null)", async () => {
     mockedFx.mockResolvedValueOnce(null);
-    const r = await importCoupon({ data: new Uint8Array([9]), fileName: "b.pdf" });
+    const r = await importCoupon({ userId: USER_ID, data: new Uint8Array([9]), fileName: "b.pdf" });
     expect(r.status).toBe("imported");
-    const doc = await MortgageCouponModel.findOne({ cuotaNro: 1 });
+    const doc = await MortgageCouponModel.findOne({ userId: USER_ID, cuotaNro: 1 });
     expect(doc?.tipoCambioUsd ?? null).toBeNull();
     expect(doc?.tipoCambioSource ?? null).toBeNull();
   });
 
   it("replace no borra el cupón existente si el nuevo es inválido", async () => {
-    await importCoupon({ data: new Uint8Array([1]), fileName: "a.pdf" });
+    await importCoupon({ userId: USER_ID, data: new Uint8Array([1]), fileName: "a.pdf" });
     mocked.mockResolvedValueOnce({
       coupon: { ...coupon, fechaDebito: "2025-17-17" },
       meta: { producer: null, creator: null, pageCount: 1, encrypted: false },
     });
-    await expect(importCoupon({ data: new Uint8Array([2]), fileName: "b.pdf", replace: true })).rejects.toThrow();
-    const docs = await MortgageCouponModel.find({ cuotaNro: 1 }).lean();
+    await expect(importCoupon({ userId: USER_ID, data: new Uint8Array([2]), fileName: "b.pdf", replace: true })).rejects.toThrow();
+    const docs = await MortgageCouponModel.find({ userId: USER_ID, cuotaNro: 1 }).lean();
     expect(docs).toHaveLength(1);
     expect(docs[0].sourceFileName).toBe("a.pdf");
   });

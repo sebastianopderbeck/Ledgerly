@@ -53,6 +53,10 @@ export const categoryRuleDtoSchema = z.object({
   enabled: z.boolean(),
 });
 
+export const categoryRulePatchSchema = categoryRuleDtoSchema
+  .pick({ priority: true, matchType: true, pattern: true, category: true, enabled: true })
+  .partial();
+
 export const importResultDtoSchema = z.object({
   status: z.enum(["imported", "duplicate"]),
   statement: statementDtoSchema,
@@ -632,6 +636,14 @@ export const mailSourceStatusDtoSchema = z.object({
   lastRun: mailSyncRunDtoSchema.nullable(),
 });
 
+export const mailNoticeDtoSchema = z.object({ pending: z.boolean() });
+
+export const meDtoSchema = z.object({
+  email: z.string(),
+  name: z.string(),
+  isOwner: z.boolean(),
+});
+
 export type TransactionDTO = z.infer<typeof transactionDtoSchema>;
 export type StatementDTO = z.infer<typeof statementDtoSchema>;
 export type CategoryRuleDTO = z.infer<typeof categoryRuleDtoSchema>;
@@ -709,3 +721,6 @@ export type MailSyncTrigger = z.infer<typeof mailSyncTriggerSchema>;
 export type MailSyncItemDTO = z.infer<typeof mailSyncItemDtoSchema>;
 export type MailSyncRunDTO = z.infer<typeof mailSyncRunDtoSchema>;
 export type MailSourceStatusDTO = z.infer<typeof mailSourceStatusDtoSchema>;
+export type MeDTO = z.infer<typeof meDtoSchema>;
+export type CategoryRulePatch = z.infer<typeof categoryRulePatchSchema>;
+export type MailNoticeDTO = z.infer<typeof mailNoticeDtoSchema>;

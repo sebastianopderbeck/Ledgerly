@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import request from "supertest";
 import type { ReviewFinding, StatementReviewDTO } from "@ledgerly/shared";
 import { withDb } from "../../testing/withDb.js";
+import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { StatementModel, TransactionModel } from "../../db/models.js";
 
 withDb();
-const app = createApp();
+const app = createApp(TEST_AUTH_CONFIG);
+const auth = withAuthedApi(app);
 
 const money = { ars: 0, usd: 0 };
 const MISSING_ID = "64b7f9c2a1b2c3d4e5f60718";
@@ -27,6 +28,7 @@ interface TransactionSeed {
 
 const createStatement = ({ issuer, cardLabel, closingDate, hash }: StatementSeed) =>
   StatementModel.create({
+    userId: auth.userId,
     issuer, cardLabel, last4: null, closingDate: new Date(closingDate), dueDate: null,
     totals: { totalConsumos: money, saldoActual: money, pagoMinimo: money, saldoAnterior: money },
     sourceFileName: `${hash}.pdf`, sourceHash: hash, pageCount: 1, parserVersion: "1",
@@ -37,6 +39,7 @@ type SeededStatement = Awaited<ReturnType<typeof createStatement>>;
 
 const createTransaction = (statement: SeededStatement, { merchant, date, amount = 1000 }: TransactionSeed) =>
   TransactionModel.create({
+    userId: auth.userId,
     statementId: statement._id, issuer: statement.issuer, cardLabel: statement.cardLabel, date: new Date(date),
     descriptionRaw: merchant, merchant, category: "Comida", categorySource: "rule", amount, currency: "ARS",
     direction: "debit", type: "purchase", isInstallment: false, fingerprint: `${statement.issuer}|${merchant}|${date}|${amount}`,
@@ -64,7 +67,7 @@ beforeEach(async () => {
 });
 
 const getReview = async (id: string): Promise<StatementReviewDTO> => {
-  const res = await request(app).get(`/api/statements/${id}/review`);
+  const res = await auth.api.get(`/api/statements/${id}/review`);
   expect(res.status).toBe(200);
   return res.body as StatementReviewDTO;
 };
@@ -72,7 +75,7 @@ const getReview = async (id: string): Promise<StatementReviewDTO> => {
 const findingFor = (review: StatementReviewDTO, merchant: string): ReviewFinding | undefined =>
   review.findings.find((finding) => finding.kind === "transaction" && finding.transaction.merchant === merchant);
 
-const patchReview = (id: string, body: object) => request(app).patch(`/api/statements/${id}/review`).send(body);
+const patchReview = (id: string, body: object) => auth.api.patch(`/api/statements/${id}/review`).send(body);
 
 describe("GET /api/statements/:id/review", () => {
   it("compara contra los resúmenes anteriores de la misma tarjeta", async () => {
@@ -110,10 +113,10 @@ describe("GET /api/statements/:id/review", () => {
   });
 
   it("404 si el resumen no existe o el id no es válido", async () => {
-    const missing = await request(app).get(`/api/statements/${MISSING_ID}/review`);
+    const missing = await auth.api.get(`/api/statements/${MISSING_ID}/review`);
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual(NOT_FOUND);
-    const invalid = await request(app).get("/api/statements/no-es-un-id/review");
+    const invalid = await auth.api.get("/api/statements/no-es-un-id/review");
     expect(invalid.status).toBe(404);
     expect(invalid.body).toEqual(NOT_FOUND);
   });
@@ -157,7 +160,7 @@ describe("borrar el resumen", () => {
   it("se lleva su revisión", async () => {
     const id = ids.visaSep._id.toString();
     await patchReview(id, { keys: ["tx:a"], reviewed: true });
-    expect((await request(app).delete(`/api/imports/statement/${id}`)).status).toBe(204);
-    expect((await request(app).get(`/api/statements/${id}/review`)).status).toBe(404);
+    expect((await auth.api.delete(`/api/imports/statement/${id}`)).status).toBe(204);
+    expect((await auth.api.get(`/api/statements/${id}/review`)).status).toBe(404);
   });
 });

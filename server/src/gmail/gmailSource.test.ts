@@ -41,10 +41,10 @@ describe("gmailSourceSetup", () => {
     const raw = fakeGmailClient([]);
     vi.mocked(createGmailClient).mockReturnValue(raw);
     const setup = gmailSourceSetup({
-      ...CREDENTIALS, GMAIL_QUERY: "from:banco has:attachment", MAIL_SYNC_DAYS: "25-5", MAIL_SYNC_HOUR: "9",
+      ...CREDENTIALS, GMAIL_QUERY: "from:banco has:attachment", MAIL_SYNC_DAYS: "25-5",
     });
     expect(setup).toMatchObject({ source: "gmail", missing: [], scope: "from:banco has:attachment",
-      schedule: { fromDay: 25, toDay: 5, hour: 9 },
+      schedule: { fromDay: 25, toDay: 5, hour: 22 },
     });
     expect(createGmailClient).not.toHaveBeenCalled();
     const client = await setup.openClient?.();

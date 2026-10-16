@@ -8,5 +8,5 @@
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["shared/src", "server/src", "client/src", "vitest.config.ts"]
+  "include": ["shared/src", "server/src", "client/src", "vitest.config.ts", "api"]
 }

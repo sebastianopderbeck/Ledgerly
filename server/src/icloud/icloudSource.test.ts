@@ -26,12 +26,22 @@ describe("icloudSourceSetup", () => {
     const d = deps(false);
     const setup = await icloudSourceSetup({ ICLOUD_USER: USER, MAIL_SYNC_DAYS: "25-5" }, d);
     expect(setup).toMatchObject({
-      source: "icloud", missing: ["la contraseña de app en el Llavero"], scope: "INBOX · últimos 90 días", schedule: SCHEDULE,
+      source: "icloud", missing: ["ICLOUD_APP_PASSWORD (o la contraseña de app en el Llavero)"], scope: "INBOX · últimos 90 días", schedule: SCHEDULE,
     });
     expect(setup.openClient).not.toBeNull();
     expect(d.hasPassword).toHaveBeenCalledWith(USER);
     await setup.openClient?.();
     expect(d.readPassword).toHaveBeenCalledWith(USER);
+  });
+
+  it("con ICLOUD_APP_PASSWORD no mira el Llavero y abre con esa contraseña", async () => {
+    const d = deps(false);
+    const setup = await icloudSourceSetup({ ICLOUD_USER: USER, ICLOUD_APP_PASSWORD: " clave-de-variable " }, d);
+    expect(setup.missing).toEqual([]);
+    await setup.openClient?.();
+    expect(d.hasPassword).not.toHaveBeenCalled();
+    expect(d.readPassword).not.toHaveBeenCalled();
+    expect(d.open).toHaveBeenCalledWith(expect.objectContaining({ password: "clave-de-variable" }));
   });
 
   it("habilitada informa alcance y agenda, y lee la contraseña recién al abrir", async () => {
@@ -48,6 +58,13 @@ describe("icloudSourceSetup", () => {
 });
 
 describe("describeIcloudSource", () => {
+  it("con ICLOUD_APP_PASSWORD no avisa que falta la contraseña", async () => {
+    const hasPassword = vi.fn(async () => false);
+    expect(await describeIcloudSource({ ICLOUD_USER: USER, ICLOUD_APP_PASSWORD: "x" }, hasPassword))
+      .toBe("iCloud: habilitado (INBOX · últimos 90 días)");
+    expect(hasPassword).not.toHaveBeenCalled();
+  });
+
   it("mira el Llavero solo si hay cuenta", async () => {
     const hasPassword = vi.fn(async () => true);
     expect(await describeIcloudSource({}, hasPassword)).toBe("iCloud: deshabilitado (falta ICLOUD_USER)");
@@ -59,9 +76,9 @@ describe("describeIcloudSource", () => {
   it("si la búsqueda automática está encendida y falta la contraseña, lo avisa en lugar de deshabilitar", async () => {
     const hasPassword = vi.fn(async () => false);
     expect(await describeIcloudSource({ ICLOUD_USER: USER }, hasPassword))
-      .toBe("iCloud: deshabilitado (falta la contraseña de app en el Llavero)");
+      .toBe("iCloud: deshabilitado (falta ICLOUD_APP_PASSWORD (o la contraseña de app en el Llavero))");
     expect(await describeIcloudSource({ ICLOUD_USER: USER, MAIL_SYNC_DAYS: "25-5" }, hasPassword)).toBe(
-      "iCloud: habilitado (INBOX · últimos 90 días); falta la contraseña de app en el Llavero, las corridas van a fallar hasta que la cargues",
+      "iCloud: habilitado (INBOX · últimos 90 días); falta ICLOUD_APP_PASSWORD (o la contraseña de app en el Llavero), las corridas van a fallar hasta que la cargues",
     );
   });
 });

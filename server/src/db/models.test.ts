@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { withDb } from "../testing/withDb.js";
 import {
   AutoCouponModel,
@@ -12,13 +12,17 @@ import {
   StatementModel,
   SubscriptionCadenceModel,
   TransactionModel,
+  USER_SCOPED_MODEL_NAMES,
 } from "./models.js";
+
+const USER_ID = new Types.ObjectId();
 
 withDb();
 
 describe("modelos", () => {
   it("persiste y recupera un statement", async () => {
     const s = await StatementModel.create({
+      userId: USER_ID,
       issuer: "icbc", cardLabel: "ICBC", last4: null,
       closingDate: new Date("2026-07-02"), dueDate: new Date("2026-07-14"),
       totals: { totalConsumos: { ars: 2400, usd: 0 }, saldoActual: { ars: 2400, usd: 0 },
@@ -39,12 +43,13 @@ describe("modelos", () => {
       needsReview: false, reconciliation: { ok: true, entries: [] },
     };
     await StatementModel.init();
-    await StatementModel.create(base);
-    await expect(StatementModel.create(base)).rejects.toThrow();
+    await StatementModel.create({ ...base, userId: USER_ID });
+    await expect(StatementModel.create({ ...base, userId: USER_ID })).rejects.toThrow();
   });
 
   it("persiste una transacción con categoría", async () => {
     const parent = await StatementModel.create({
+      userId: USER_ID,
       issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: null, dueDate: null,
       totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
         pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
@@ -52,6 +57,7 @@ describe("modelos", () => {
       needsReview: false, reconciliation: { ok: true, entries: [] },
     });
     const tx = await TransactionModel.create({
+      userId: USER_ID,
       statementId: parent._id,
       issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-05-04"),
       descriptionRaw: "COMERCIO TRES", merchant: "COMERCIO TRES",
@@ -73,21 +79,21 @@ describe("MortgageCoupon", () => {
   };
 
   it("persiste un cupón", async () => {
-    const c = await MortgageCouponModel.create(base);
+    const c = await MortgageCouponModel.create({ ...base, userId: USER_ID });
     expect(c._id).toBeDefined();
   });
 
   it("rechaza (prestamoNro, cuotaNro) duplicado", async () => {
     await MortgageCouponModel.init();
-    await MortgageCouponModel.create(base);
-    await expect(MortgageCouponModel.create({ ...base, sourceHash: "h2" })).rejects.toThrow();
+    await MortgageCouponModel.create({ ...base, userId: USER_ID });
+    await expect(MortgageCouponModel.create({ userId: USER_ID, ...base, sourceHash: "h2" })).rejects.toThrow();
   });
 
   it("tipoCambioUsd/Source default null y aceptan valores", async () => {
-    const withoutFx = await MortgageCouponModel.create(base);
+    const withoutFx = await MortgageCouponModel.create({ ...base, userId: USER_ID });
     expect(withoutFx.tipoCambioUsd ?? null).toBeNull();
     expect(withoutFx.tipoCambioSource ?? null).toBeNull();
-    const withFx = await MortgageCouponModel.create({ ...base, cuotaNro: 2, tipoCambioUsd: 1350.5, tipoCambioSource: "api" });
+    const withFx = await MortgageCouponModel.create({ userId: USER_ID, ...base, cuotaNro: 2, tipoCambioUsd: 1350.5, tipoCambioSource: "api" });
     expect(withFx.tipoCambioUsd).toBe(1350.5);
     expect(withFx.tipoCambioSource).toBe("api");
   });
@@ -103,7 +109,7 @@ describe("AutoCoupon", () => {
   };
 
   it("persiste un cupón de auto con conceptos", async () => {
-    const c = await AutoCouponModel.create(base);
+    const c = await AutoCouponModel.create({ ...base, userId: USER_ID });
     expect(c._id).toBeDefined();
     expect(c.conceptos).toHaveLength(2);
     expect(c.conceptos[1].amount).toBe(-70607.06);
@@ -111,8 +117,8 @@ describe("AutoCoupon", () => {
 
   it("rechaza (grupo, orden, cuotaNro) duplicado", async () => {
     await AutoCouponModel.init();
-    await AutoCouponModel.create(base);
-    await expect(AutoCouponModel.create({ ...base, sourceHash: "h2" })).rejects.toThrow();
+    await AutoCouponModel.create({ ...base, userId: USER_ID });
+    await expect(AutoCouponModel.create({ userId: USER_ID, ...base, sourceHash: "h2" })).rejects.toThrow();
   });
 });
 
@@ -131,6 +137,7 @@ const mailAttachment = (runId: Types.ObjectId, partId: string, source: string) =
 describe("modelos nuevos", () => {
   it("un resumen nace sin claves revisadas", async () => {
     const statement = await StatementModel.create({
+      userId: USER_ID,
       issuer: "icbc", cardLabel: "ICBC", totals: emptyTotals, sourceFileName: "r.pdf", sourceHash: "h1",
       pageCount: 1, parserVersion: "1.0.0", reconciliation: { ok: true, entries: [] },
     });
@@ -139,54 +146,56 @@ describe("modelos nuevos", () => {
 
   it("una suscripción oculta guarda la clave una sola vez y registra cuándo se ocultó", async () => {
     await HiddenSubscriptionModel.init();
-    const hidden = await HiddenSubscriptionModel.create({ key: "STREAMFLIX COM" });
+    const hidden = await HiddenSubscriptionModel.create({ userId: USER_ID, key: "STREAMFLIX COM" });
     expect((hidden as unknown as { hiddenAt: Date }).hiddenAt).toBeInstanceOf(Date);
-    await expect(HiddenSubscriptionModel.create({ key: "STREAMFLIX COM" })).rejects.toThrow();
+    await expect(HiddenSubscriptionModel.create({ userId: USER_ID, key: "STREAMFLIX COM" })).rejects.toThrow();
   });
 
   it("la cadencia de una suscripción acepta bimestral o anual, una por clave", async () => {
     await SubscriptionCadenceModel.init();
-    await SubscriptionCadenceModel.create({ key: "CAFE ROSITA", cadencia: "bimestral" });
-    await expect(SubscriptionCadenceModel.create({ key: "CAFE ROSITA", cadencia: "anual" })).rejects.toThrow();
-    await expect(SubscriptionCadenceModel.create({ key: "STREAMBOX", cadencia: "mensual" })).rejects.toThrow();
+    await SubscriptionCadenceModel.create({ userId: USER_ID, key: "CAFE ROSITA", cadencia: "bimestral" });
+    await expect(SubscriptionCadenceModel.create({ userId: USER_ID, key: "CAFE ROSITA", cadencia: "anual" })).rejects.toThrow();
+    await expect(SubscriptionCadenceModel.create({ userId: USER_ID, key: "STREAMBOX", cadencia: "mensual" })).rejects.toThrow();
   });
 
   it("una marca guardada antes de que existiera la cadencia se lee como anual", async () => {
-    await SubscriptionCadenceModel.collection.insertOne({ key: "STREAMBOX", annualAt: new Date() });
-    expect((await SubscriptionCadenceModel.find()).map(({ key, cadencia }) => ({ key, cadencia }))).toEqual([
+    await SubscriptionCadenceModel.collection.insertOne({ userId: USER_ID, key: "STREAMBOX", annualAt: new Date() });
+    expect((await SubscriptionCadenceModel.find({ userId: USER_ID })).map(({ key, cadencia }) => ({ key, cadencia }))).toEqual([
       { key: "STREAMBOX", cadencia: "anual" },
     ]);
   });
 
   it("un activo manual rechaza tipos desconocidos y montos negativos", async () => {
-    await expect(ManualAssetModel.create({ nombre: "X", tipo: "cripto", moneda: "ARS" })).rejects.toThrow();
+    await expect(ManualAssetModel.create({ userId: USER_ID, nombre: "X", tipo: "cripto", moneda: "ARS" })).rejects.toThrow();
     await expect(ManualAssetModel.create({
+      userId: USER_ID,
       nombre: "X", tipo: "cuenta", moneda: "ARS", valuaciones: [{ fecha: "2026-10-01", monto: -1 }],
     })).rejects.toThrow();
-    const asset = await ManualAssetModel.create({ nombre: "Cuenta", tipo: "cuenta", moneda: "ARS" });
+    const asset = await ManualAssetModel.create({ userId: USER_ID, nombre: "Cuenta", tipo: "cuenta", moneda: "ARS" });
     expect([...asset.valuaciones]).toEqual([]);
   });
 
   it("hay un solo tope por categoría", async () => {
     await BudgetModel.init();
-    const budget = await BudgetModel.create({ category: "Comida", topeArs: 1000, periodoBase: "2026-08" });
+    const budget = await BudgetModel.create({ userId: USER_ID, category: "Comida", topeArs: 1000, periodoBase: "2026-08" });
     expect(budget.ajustaInflacion).toBe(false);
-    await expect(BudgetModel.create({ category: "Comida", topeArs: 2000, periodoBase: "2026-08" })).rejects.toThrow();
+    await expect(BudgetModel.create({ userId: USER_ID, category: "Comida", topeArs: 2000, periodoBase: "2026-08" })).rejects.toThrow();
   });
 
   it("cada adjunto se registra una sola vez por fuente, mensaje y parte", async () => {
     await MailAttachmentModel.init();
     const run = await MailSyncRunModel.create({
+      userId: USER_ID,
       source: "gmail", trigger: "manual", startedAt: new Date("2026-10-03T12:00:00Z"),
       finishedAt: new Date("2026-10-03T12:00:05Z"), status: "ok", messagesChecked: 1, hasMore: false,
     });
     expect(run.error).toBeNull();
-    const attachment = await MailAttachmentModel.create(mailAttachment(run._id, "1", "gmail"));
+    const attachment = await MailAttachmentModel.create({ ...mailAttachment(run._id, "1", "gmail"), userId: USER_ID });
     expect(attachment.kind).toBeNull();
     expect(attachment.documentId).toBeNull();
-    await expect(MailAttachmentModel.create(mailAttachment(run._id, "1", "gmail"))).rejects.toThrow();
-    await expect(MailAttachmentModel.create(mailAttachment(run._id, "2", "gmail"))).resolves.toBeDefined();
-    await expect(MailAttachmentModel.create(mailAttachment(run._id, "1", "icloud"))).resolves.toBeDefined();
+    await expect(MailAttachmentModel.create({ ...mailAttachment(run._id, "1", "gmail"), userId: USER_ID })).rejects.toThrow();
+    await expect(MailAttachmentModel.create({ ...mailAttachment(run._id, "2", "gmail"), userId: USER_ID })).resolves.toBeDefined();
+    await expect(MailAttachmentModel.create({ ...mailAttachment(run._id, "1", "icloud"), userId: USER_ID })).resolves.toBeDefined();
   });
 
   it("una corrida sin fuente o con una fuente desconocida se rechaza", async () => {
@@ -194,7 +203,60 @@ describe("modelos nuevos", () => {
       trigger: "manual", startedAt: new Date("2026-10-03T12:00:00Z"), finishedAt: new Date("2026-10-03T12:00:05Z"),
       status: "ok", messagesChecked: 0, hasMore: false,
     };
-    await expect(MailSyncRunModel.create(base)).rejects.toThrow();
-    await expect(MailSyncRunModel.create({ ...base, source: "yahoo" })).rejects.toThrow();
+    await expect(MailSyncRunModel.create({ ...base, userId: USER_ID })).rejects.toThrow();
+    await expect(MailSyncRunModel.create({ userId: USER_ID, ...base, source: "yahoo" })).rejects.toThrow();
+  });
+});
+
+describe("colecciones por usuario", () => {
+  it("son exactamente las 14 del diseño", () => {
+    expect([...USER_SCOPED_MODEL_NAMES].sort()).toEqual([
+      "AutoCoupon", "Budget", "CategoryRule", "FixedService", "HiddenSubscription", "MailAttachment", "MailSyncRun",
+      "ManualAsset", "ManualSubscription", "MortgageCoupon", "Payslip", "Statement", "SubscriptionCadence", "Transaction",
+    ]);
+  });
+
+  it.each([...USER_SCOPED_MODEL_NAMES])("%s tiene userId indexado", (name) => {
+    const path = mongoose.model(name).schema.path("userId");
+    expect(path?.instance).toBe("ObjectId");
+    expect(path?.options.index).toBe(true);
+  });
+});
+
+describe("unicidad por usuario", () => {
+  it.each([...USER_SCOPED_MODEL_NAMES])("%s exige userId", (name) => {
+    const Model = mongoose.model(name);
+    expect(new Model({}).validateSync()?.errors.userId).toBeDefined();
+  });
+
+  it("el mismo sourceHash en dos usuarios se acepta", async () => {
+    const statement = (userId: Types.ObjectId) => ({
+      userId, issuer: "icbc" as const, cardLabel: "ICBC", last4: null, closingDate: new Date(), dueDate: new Date(),
+      totals: { totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
+        pagoMinimo: { ars: 0, usd: 0 }, saldoAnterior: { ars: 0, usd: 0 } },
+      sourceFileName: "r.pdf", sourceHash: "mismo", pageCount: 1, parserVersion: "1.0.0",
+      needsReview: false, reconciliation: { ok: true, entries: [] },
+    });
+    await StatementModel.init();
+    await StatementModel.create(statement(new Types.ObjectId()));
+    await expect(StatementModel.create(statement(new Types.ObjectId()))).resolves.toBeDefined();
+  });
+
+  it("los índices únicos empiezan por userId", () => {
+    const expected: Record<string, string[]> = {
+      Statement: ["userId", "sourceHash"],
+      MortgageCoupon: ["userId", "prestamoNro", "cuotaNro"],
+      AutoCoupon: ["userId", "grupo", "orden", "cuotaNro"],
+      Payslip: ["userId", "cuil", "periodo", "tipo"],
+      HiddenSubscription: ["userId", "key"],
+      ManualSubscription: ["userId", "key"],
+      SubscriptionCadence: ["userId", "key"],
+      Budget: ["userId", "category"],
+      MailAttachment: ["userId", "source", "messageId", "partId"],
+    };
+    for (const [name, keys] of Object.entries(expected)) {
+      const unique = mongoose.model(name).schema.indexes().filter(([, options]) => options?.unique === true);
+      expect(unique.map(([fields]) => Object.keys(fields))).toEqual([keys]);
+    }
   });
 });
