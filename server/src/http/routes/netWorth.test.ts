@@ -32,6 +32,7 @@ const createdAhorros = async (): Promise<ManualAssetDTO> => (await createAsset(A
 
 const createAutoCoupon = (cuotaNro: number, fechaEmision: string, valorMovil: number) =>
   AutoCouponModel.create({
+    userId: auth.userId,
     grupo: "1000", orden: "1", cuotaNro, plan: "A", fechaEmision: new Date(fechaEmision),
     fechaVencimiento: new Date(fechaEmision), comprobante: `C-${cuotaNro}`, modelo: "MODELO X", valorMovil,
     conceptos: [], totalAPagar: 100_000, sourceFileName: `auto-${cuotaNro}.pdf`, sourceHash: `auto-${cuotaNro}`,
@@ -39,6 +40,7 @@ const createAutoCoupon = (cuotaNro: number, fechaEmision: string, valorMovil: nu
 
 const createStatementWithInstallment = async () => {
   const statement = await StatementModel.create({
+    userId: auth.userId,
     issuer: "icbc", cardLabel: "ICBC", last4: null, closingDate: new Date("2026-09-25"), dueDate: null,
     totals: {
       totalConsumos: { ars: 0, usd: 0 }, saldoActual: { ars: 0, usd: 0 },
@@ -48,6 +50,7 @@ const createStatementWithInstallment = async () => {
     needsReview: false, reconciliation: { ok: true, entries: [] },
   });
   await TransactionModel.create({
+    userId: auth.userId,
     statementId: statement._id, issuer: "icbc", cardLabel: "ICBC", date: new Date("2026-08-10"),
     descriptionRaw: "TIENDA", merchant: "TIENDA", category: "Hogar", categorySource: "rule", amount: 10_000,
     currency: "ARS", direction: "debit", type: "purchase", isInstallment: true, installmentCurrent: 3,
@@ -110,7 +113,7 @@ describe("POST /api/net-worth/assets", () => {
       id: expect.any(String), nombre: "Ahorros", tipo: "ahorro", moneda: "USD",
       valuaciones: [{ fecha: "2026-10-01", monto: 5000 }],
     });
-    expect(await ManualAssetModel.countDocuments()).toBe(1);
+    expect(await ManualAssetModel.countDocuments({ userId: auth.userId })).toBe(1);
   });
 
   it.each([
@@ -123,7 +126,7 @@ describe("POST /api/net-worth/assets", () => {
     const res = await createAsset(body);
     expect(res.status).toBe(400);
     expect(res.body.error).toBe(mensaje);
-    expect(await ManualAssetModel.countDocuments()).toBe(0);
+    expect(await ManualAssetModel.countDocuments({ userId: auth.userId })).toBe(0);
   });
 });
 
@@ -180,7 +183,7 @@ describe("DELETE /api/net-worth/assets/:id", () => {
   it("borra el activo y deja de aparecer", async () => {
     const { id } = await createdAhorros();
     expect((await auth.api.delete(`/api/net-worth/assets/${id}`)).status).toBe(204);
-    expect(await ManualAssetModel.countDocuments()).toBe(0);
+    expect(await ManualAssetModel.countDocuments({ userId: auth.userId })).toBe(0);
     expect((await auth.api.get("/api/net-worth")).status).toBe(204);
   });
 

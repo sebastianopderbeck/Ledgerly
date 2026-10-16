@@ -72,7 +72,7 @@ describe("GET /api/fixed-services", () => {
   });
 
   it("un documento viejo sin cadencia ni hasta se lee con los defaults", async () => {
-    await FixedServiceModel.collection.insertOne({ nombre: "Luz", monto: 30_000, desde: "2026-10", montoDesde: "2026-10" });
+    await FixedServiceModel.collection.insertOne({ userId: auth.userId, nombre: "Luz", monto: 30_000, desde: "2026-10", montoDesde: "2026-10" });
     const [servicio] = (await auth.api.get("/api/fixed-services")).body as FixedServiceDTO[];
     expect(servicio).toMatchObject({ nombre: "Luz", cadencia: "mensual", hasta: null });
   });
@@ -126,7 +126,7 @@ describe("DELETE /api/fixed-services/:id", () => {
   it("borra el servicio", async () => {
     const luz = await created();
     expect((await auth.api.delete(`/api/fixed-services/${luz.id}`)).status).toBe(204);
-    expect(await FixedServiceModel.countDocuments()).toBe(0);
+    expect(await FixedServiceModel.countDocuments({ userId: auth.userId })).toBe(0);
   });
 
   it("responde 404 con un id inexistente", async () => {
