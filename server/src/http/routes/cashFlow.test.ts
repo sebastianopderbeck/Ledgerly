@@ -9,6 +9,7 @@ import {
   PayslipModel, StatementModel, TransactionModel,
 } from "../../db/models.js";
 import { merchantKey } from "../../stats/merchantKey.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
@@ -52,13 +53,14 @@ const cuponAuto = (cuotaNro: number, vencimiento: string, valorMovil: number, to
 });
 
 const seed = async () => {
-  await PayslipModel.create([recibo("2026-08", "2026-08-31", 1_000_000), recibo("2026-09", "2026-09-30", 1_100_000)]);
-  const statements = await StatementModel.create([
+  await PayslipModel.create(ownedBy(auth.userId, [recibo("2026-08", "2026-08-31", 1_000_000), recibo("2026-09", "2026-09-30", 1_100_000)]));
+  const statements = await StatementModel.create(ownedBy(auth.userId, [
     visa("2026-07-31", "2026-08-11", 400_000),
     visa("2026-08-28", "2026-09-09", 450_000, 20),
     visa("2026-10-02", "2026-10-13", 500_000),
-  ]);
+  ]));
   await TransactionModel.create({
+    userId: auth.userId,
     statementId: statements[2]._id, issuer: "visa_signature", cardLabel: "Visa Signature", date: new Date("2026-08-20"),
     descriptionRaw: "COMERCIO EN CUOTAS", merchant: "COMERCIO", category: "Hogar", categorySource: "rule",
     amount: 30_000, currency: "ARS", direction: "debit", type: "purchase", isInstallment: true,
@@ -66,11 +68,12 @@ const seed = async () => {
   });
   await MacroSeriesModel.create({ serie: "usd_oficial", fecha: "2026-09-08", valor: 1_400 });
   await MortgageCouponModel.create({
+    userId: auth.userId,
     prestamoNro: "0000000001", cuotaNro: 12, fechaDebito: new Date("2026-09-17"), capital: 100_000, intereses: 200_000,
     seguroIncendio: 0, totalDebitado: 300_000, cuotaPuraUva: 300, cotizacionUva: 1_000, tea: 12.68, tna: 12, cft: 0,
     sourceFileName: "cupon-12.pdf", sourceHash: "cupon-12",
   });
-  await AutoCouponModel.create(cuponAuto(20, "2026-09-10", 20_000_000, 150_000));
+  await AutoCouponModel.create({ ...cuponAuto(20, "2026-09-10", 20_000_000, 150_000), userId: auth.userId });
   return statements;
 };
 
@@ -87,21 +90,23 @@ describe("GET /api/cash-flow", () => {
   });
 
   const suscripcionVisa = async (cobros: [string, unknown][]) => {
-    await TransactionModel.insertMany(cobros.map(([fecha, statementId], index) => ({
+    await TransactionModel.insertMany(ownedBy(auth.userId, cobros.map(([fecha, statementId], index) => ({
       statementId, issuer: "visa_signature", cardLabel: "Visa Signature", date: new Date(fecha),
       descriptionRaw: "STREAMBOX", merchant: "STREAMBOX", category: "Suscripciones", categorySource: "rule",
       amount: 5_000, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
       installmentCurrent: null, installmentTotal: null, comprobante: null, fingerprint: `streambox-${index}`,
-    })));
+    }))));
   };
 
   it("resta los servicios cargados, con defaults para los documentos viejos", async () => {
     await seed();
     await FixedServiceModel.create({
+      userId: auth.userId,
       nombre: "Luz", monto: 30_000, cadencia: "mensual", desde: "2026-09", hasta: null, montoDesde: "2026-09",
     });
-    await FixedServiceModel.collection.insertOne({ nombre: "Gas", monto: 10_000, desde: "2026-10" });
+    await FixedServiceModel.collection.insertOne({ userId: auth.userId, nombre: "Gas", monto: 10_000, desde: "2026-10" });
     await FixedServiceModel.create({
+      userId: auth.userId,
       nombre: "ABL", monto: 120_000, cadencia: "anual", desde: "2026-12", hasta: null, montoDesde: "2026-10",
     });
     const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
@@ -136,7 +141,7 @@ describe("GET /api/cash-flow", () => {
   it("deja una suscripción oculta en Tarjetas", async () => {
     const statements = await seed();
     await suscripcionVisa(cobrosEnSusResumenes(statements));
-    await HiddenSubscriptionModel.create({ key: merchantKey("STREAMBOX") });
+    await HiddenSubscriptionModel.create({ userId: auth.userId, key: merchantKey("STREAMBOX") });
     const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-10")).toMatchObject({ tarjetas: 500_000, suscripciones: 0 });
     expect(mesDe(flow, "2026-11")).toMatchObject({ tarjetas: 30_000, suscripciones: 0 });
@@ -184,7 +189,7 @@ describe("GET /api/cash-flow", () => {
       { serie: "uva", fecha: "2026-07-03", valor: 1_000 },
       { serie: "uva", fecha: "2026-10-03", valor: 1_061.208 },
     ]);
-    await AutoCouponModel.create(cuponAuto(19, "2026-08-10", 16_000_000, 140_000));
+    await AutoCouponModel.create({ ...cuponAuto(19, "2026-08-10", 16_000_000, 140_000), userId: auth.userId });
     const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-10")?.hipoteca).toBeCloseTo(306_000, 6);
     expect(mesDe(flow, "2026-10")?.auto).toBeCloseTo(187_500, 6);
