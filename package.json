@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "workspaces": ["shared", "server", "client"],
+  "engines": { "node": "22.x" },
   "trustedDependencies": ["esbuild", "mongodb-memory-server"],
   "scripts": {
     "test": "vitest run",

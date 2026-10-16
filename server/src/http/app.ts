@@ -27,9 +27,13 @@ import { checkOrigin, requireOwner, requireUser } from "../auth/requireUser.js";
 
 export interface AppDeps {
   google?: GoogleAuthClient;
+  env?: NodeJS.ProcessEnv;
+  now?: () => Date;
 }
 
-export function createApp(config: AuthConfig, { google = createGoogleAuthClient(config) }: AppDeps = {}): express.Express {
+export function createApp(
+  config: AuthConfig, { google = createGoogleAuthClient(config), env = process.env, now = () => new Date() }: AppDeps = {},
+): express.Express {
   const app = express();
   app.use(express.json());
   app.use(cookieParser());
