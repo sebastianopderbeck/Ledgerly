@@ -28,6 +28,7 @@ interface TransactionSeed {
 
 const createStatement = ({ issuer, cardLabel, closingDate, hash }: StatementSeed) =>
   StatementModel.create({
+    userId: auth.userId,
     issuer, cardLabel, last4: null, closingDate: new Date(closingDate), dueDate: null,
     totals: { totalConsumos: money, saldoActual: money, pagoMinimo: money, saldoAnterior: money },
     sourceFileName: `${hash}.pdf`, sourceHash: hash, pageCount: 1, parserVersion: "1",
@@ -38,6 +39,7 @@ type SeededStatement = Awaited<ReturnType<typeof createStatement>>;
 
 const createTransaction = (statement: SeededStatement, { merchant, date, amount = 1000 }: TransactionSeed) =>
   TransactionModel.create({
+    userId: auth.userId,
     statementId: statement._id, issuer: statement.issuer, cardLabel: statement.cardLabel, date: new Date(date),
     descriptionRaw: merchant, merchant, category: "Comida", categorySource: "rule", amount, currency: "ARS",
     direction: "debit", type: "purchase", isInstallment: false, fingerprint: `${statement.issuer}|${merchant}|${date}|${amount}`,

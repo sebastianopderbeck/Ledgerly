@@ -1,18 +1,19 @@
 import { Router } from "express";
 import { HttpError, asyncHandler } from "../errors.js";
+import { userIdOf } from "../../auth/requireUser.js";
 import { MortgageCouponModel } from "../../db/models.js";
 import { toMortgageCouponDTO } from "../mappers.js";
 import { computeCreditProgress } from "../../stats/amortization.js";
 
 export const creditsRouter = Router();
 
-creditsRouter.get("/coupons", asyncHandler(async (_req, res) => {
-  const docs = await MortgageCouponModel.find().sort({ cuotaNro: 1 });
+creditsRouter.get("/coupons", asyncHandler(async (req, res) => {
+  const docs = await MortgageCouponModel.find({ userId: userIdOf(req) }).sort({ cuotaNro: 1 });
   res.json(docs.map(toMortgageCouponDTO));
 }));
 
-creditsRouter.get("/summary", asyncHandler(async (_req, res) => {
-  const docs = await MortgageCouponModel.find().sort({ cuotaNro: 1 }).lean();
+creditsRouter.get("/summary", asyncHandler(async (req, res) => {
+  const docs = await MortgageCouponModel.find({ userId: userIdOf(req) }).sort({ cuotaNro: 1 }).lean();
   const progress = computeCreditProgress(
     docs.map((c) => ({
       prestamoNro: c.prestamoNro, cuotaNro: c.cuotaNro, capital: c.capital, intereses: c.intereses,
@@ -32,8 +33,8 @@ creditsRouter.patch("/coupons/:id", asyncHandler(async (req, res) => {
   if (typeof tipoCambioUsd !== "number" || !(tipoCambioUsd > 0)) {
     throw new HttpError(400, "tipoCambioUsd debe ser un número positivo");
   }
-  const doc = await MortgageCouponModel.findByIdAndUpdate(
-    req.params.id,
+  const doc = await MortgageCouponModel.findOneAndUpdate(
+    { _id: req.params.id, userId: userIdOf(req) },
     { tipoCambioUsd, tipoCambioSource: "manual" },
     { new: true },
   );

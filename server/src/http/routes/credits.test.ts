@@ -4,15 +4,14 @@ import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { MortgageCouponModel } from "../../db/models.js";
 import { RAW_COUPONS } from "../../testing/couponFixtures.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
 const auth = withAuthedApi(app);
 
 beforeEach(async () => {
-  await MortgageCouponModel.insertMany(
-    RAW_COUPONS.map((c) => ({ ...c, fechaDebito: new Date(c.fechaDebito), sourceFileName: `${c.cuotaNro}.pdf`, sourceHash: `h${c.cuotaNro}` })),
-  );
+  await MortgageCouponModel.insertMany(ownedBy(auth.userId, RAW_COUPONS.map((c) => ({ ...c, fechaDebito: new Date(c.fechaDebito), sourceFileName: `${c.cuotaNro}.pdf`, sourceHash: `h${c.cuotaNro}` }))));
 });
 
 describe("GET /api/credits/coupons", () => {

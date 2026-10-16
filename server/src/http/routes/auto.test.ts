@@ -4,21 +4,20 @@ import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import { AutoCouponModel } from "../../db/models.js";
 import { RAW_AUTO_COUPONS } from "../../testing/autoCouponFixtures.js";
+import { ownedBy } from "../../testing/ownedBy.js";
 
 withDb();
 const app = createApp(TEST_AUTH_CONFIG);
 const auth = withAuthedApi(app);
 
 beforeEach(async () => {
-  await AutoCouponModel.insertMany(
-    RAW_AUTO_COUPONS.map((c) => ({
+  await AutoCouponModel.insertMany(ownedBy(auth.userId, RAW_AUTO_COUPONS.map((c) => ({
       ...c,
       fechaEmision: new Date(c.fechaEmision),
       fechaVencimiento: new Date(c.fechaVencimiento),
       sourceFileName: `${c.cuotaNro}.pdf`,
       sourceHash: `h${c.cuotaNro}`,
-    })),
-  );
+    }))));
 });
 
 describe("GET /api/auto/coupons", () => {
