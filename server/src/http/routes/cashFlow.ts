@@ -72,6 +72,7 @@ const toRecency = (statement: StatementRow): StatementRecency<Types.ObjectId> =>
 const toFlowStatement = (
   statement: StatementRow,
   suscripciones: StatementSubscriptions = SIN_SUSCRIPCIONES,
+  serviciosArs = 0,
 ): CashFlowStatement => ({
   issuer: statement.issuer,
   cardLabel: statement.cardLabel,
@@ -80,6 +81,7 @@ const toFlowStatement = (
   saldoArs: statement.totals?.saldoActual?.ars ?? 0,
   saldoUsd: statement.totals?.saldoActual?.usd ?? 0,
   ...suscripciones,
+  serviciosArs,
   uploadedAt: uploadedAtOf(statement).toISOString(),
 });
 
