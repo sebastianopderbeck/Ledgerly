@@ -1,6 +1,6 @@
 import {
   MESES_SERVICIO, isActiveFixedService, isoMonthSchema,
-  type FixedServiceCadencia, type FixedServiceCreateDTO, type FixedServiceDTO, type FixedServiceUpdateDTO,
+  type CardServiceDTO, type FixedServiceCadencia, type FixedServiceCreateDTO, type FixedServiceDTO, type FixedServiceUpdateDTO,
 } from "@ledgerly/shared";
 import { formatMoneyInput, parseMoneyInput } from "./moneyInput.js";
 
@@ -66,9 +66,18 @@ export const fixedServiceSections = (services: FixedServiceDTO[], mesActual: str
   deBaja: services.filter((service) => !isActiveFixedService(service, mesActual)),
 });
 
-export const fixedServiceKpis = (activos: FixedServiceDTO[], mesActual: string): FixedServiceKpis => {
+export const fixedServiceKpis = (
+  activos: FixedServiceDTO[],
+  mesActual: string,
+  enTarjeta: CardServiceDTO[] = [],
+): FixedServiceKpis => {
   const vigentes = activos.filter((service) => service.desde <= mesActual);
-  return { porMes: monthlyTotal(vigentes), vigentes: vigentes.length, proximos: activos.length - vigentes.length };
+  const tarjeta = enTarjeta.reduce((total, { ultimoMonto }) => total + ultimoMonto, 0);
+  return {
+    porMes: monthlyTotal(vigentes) + tarjeta,
+    vigentes: vigentes.length + enTarjeta.length,
+    proximos: activos.length - vigentes.length,
+  };
 };
 
 export const activeKpiSub = (proximos: number): string => {

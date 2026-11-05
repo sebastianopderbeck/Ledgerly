@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { FixedServiceDTO } from "@ledgerly/shared";
+import type { CardServiceDTO, FixedServiceDTO } from "@ledgerly/shared";
 import { formatMoney } from "../format.js";
 import { renderWithProviders } from "../testing/renderWithProviders.js";
 import { emulateMobile } from "../testing/viewport.js";
@@ -25,10 +25,16 @@ const cable: FixedServiceDTO = {
   id: "f-cable", nombre: "Cable", monto: 15_000, cadencia: "mensual", desde: "2026-01", hasta: "2026-08", montoDesde: "2026-01",
 };
 
+const gasco: CardServiceDTO = {
+  key: "GASCO", nombre: "GASCO", issuer: "visa_signature", cardLabel: "Visa Signature", ultimoMonto: 20_000,
+  ultimoCargo: "2026-09-20",
+};
+
 const money = (value: number): string => formatMoney(value, "ARS").replace(/\s/g, " ");
 
 let listReply: StubReply;
 let mutationReply: StubReply;
+let cardReply: StubReply;
 
 const respond = ({ status, body }: StubReply): Response =>
   new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -38,8 +44,10 @@ beforeEach(() => {
   vi.setSystemTime(new Date(`${TODAY}T12:00:00`));
   listReply = { status: 200, body: [luz, gas, cable] };
   mutationReply = { status: 200, body: luz };
-  vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+  cardReply = { status: 200, body: [] };
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
+    if (url.includes("/card-services") && method === "GET") return respond(cardReply);
     if (method === "GET") return respond(listReply);
     if (method === "DELETE") return respond({ status: 204 });
     return respond(mutationReply);
@@ -186,6 +194,59 @@ describe("FixedServicesPage", () => {
   });
 });
 
+describe("FixedServicesPage: servicios de la tarjeta", () => {
+  it("explica que lo de la tarjeta se marca desde Movimientos", async () => {
+    renderPage();
+    expect(await screen.findByText(/lo que llega en el resumen marcalo desde Movimientos con «Es un servicio»/)).toBeInTheDocument();
+  });
+
+  it("lista los servicios de la tarjeta en su sección, entre los activos y los dados de baja", async () => {
+    cardReply = { status: 200, body: [gasco] };
+    renderPage();
+    const enTarjeta = await screen.findByRole("table", { name: "Servicios en la tarjeta" });
+    const row = within(enTarjeta).getByRole("row", { name: /GASCO/ });
+    expect(within(row).getByText("Visa Signature")).toBeInTheDocument();
+    expect(within(row).getByText("2026-09-20")).toBeInTheDocument();
+    expect(within(row).getByText(money(20_000))).toBeInTheDocument();
+    const headings = screen.getAllByRole("heading", { level: 6 }).map((heading) => heading.textContent);
+    expect(headings).toEqual(["Activos", "En la tarjeta", "Dados de baja"]);
+  });
+
+  it("Quitar pide confirmación y manda el DELETE con la clave", async () => {
+    cardReply = { status: 200, body: [gasco] };
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "quitar GASCO de Servicios" }));
+    const confirm = await screen.findByRole("dialog", { name: "Quitar de Servicios" });
+    expect(confirm).toHaveTextContent("¿Sacar «GASCO» de Servicios? Sus cargos vuelven a contar en Tarjetas.");
+    await userEvent.click(within(confirm).getByRole("button", { name: "Quitar" }));
+    await waitFor(() => expect(requests("DELETE")).toEqual([{ url: "/api/card-services/GASCO", body: undefined }]));
+  });
+
+  it("con solo servicios de tarjeta no muestra el vacío ni la sección de activos", async () => {
+    listReply = { status: 200, body: [] };
+    cardReply = { status: 200, body: [gasco] };
+    renderPage();
+    expect(await screen.findByRole("table", { name: "Servicios en la tarjeta" })).toBeInTheDocument();
+    expect(screen.queryByText(/Todavía no cargaste servicios/)).not.toBeInTheDocument();
+    expect(screen.queryByText("No hay servicios activos.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 6, name: "Activos" })).not.toBeInTheDocument();
+    expect(screen.getByText("Por mes")).toBeInTheDocument();
+  });
+
+  it("sin servicios cargados ni de tarjeta muestra el vacío", async () => {
+    listReply = { status: 200, body: [] };
+    renderPage();
+    expect(await screen.findByText(/Todavía no cargaste servicios/)).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Servicios en la tarjeta" })).not.toBeInTheDocument();
+  });
+
+  it("si falla la carga de los de la tarjeta lo dice", async () => {
+    cardReply = { status: 500, body: { error: "Error interno" } };
+    renderPage();
+    expect(await screen.findByText("No pudimos cargar los servicios.")).toBeInTheDocument();
+  });
+});
+
 describe("FixedServicesPage en mobile", () => {
   beforeEach(() => emulateMobile());
 
@@ -195,5 +256,15 @@ describe("FixedServicesPage en mobile", () => {
     expect(within(gasCard).getByText(money(9_000))).toBeInTheDocument();
     await userEvent.click(within(gasCard).getByRole("button", { name: "editar Gas" }));
     expect(screen.getByRole("dialog", { name: "Editar servicio" })).toBeInTheDocument();
+  });
+
+  it("muestra los servicios de la tarjeta como tarjetas y deja quitarlos", async () => {
+    cardReply = { status: 200, body: [gasco] };
+    renderPage();
+    const section = await screen.findByRole("region", { name: "Servicios en la tarjeta" });
+    const card = within(section).getByRole("article", { name: "GASCO" });
+    expect(within(card).getByText("Visa Signature")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "quitar GASCO de Servicios" }));
+    expect(await screen.findByRole("dialog", { name: "Quitar de Servicios" })).toBeInTheDocument();
   });
 });

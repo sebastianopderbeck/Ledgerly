@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { FixedServiceDTO } from "@ledgerly/shared";
+import type { CardServiceDTO, FixedServiceDTO } from "@ledgerly/shared";
 import {
   activeKpiSub, fixedServiceDraftFrom, fixedServiceKpis, fixedServiceRequest, fixedServiceSections, monthlyEquivalent,
   monthlyTotal, serviceMonth, type FixedServiceDraft,
@@ -36,6 +36,13 @@ describe("fixedServiceKpis y activeKpiSub", () => {
     const gas = servicio({ id: "f-gas", monto: 18_000, cadencia: "bimestral", desde: MES });
     const internet = servicio({ id: "f-internet", monto: 25_000, desde: "2026-12" });
     expect(fixedServiceKpis([servicio(), gas, internet], MES)).toEqual({ porMes: 39_000, vigentes: 2, proximos: 1 });
+  });
+
+  it("los servicios de la tarjeta suman su último monto y cuentan como vigentes", () => {
+    const gasco: CardServiceDTO = {
+      key: "GASCO", nombre: "GASCO", issuer: "visa_signature", cardLabel: "Visa", ultimoMonto: 20_000, ultimoCargo: "2026-09-20",
+    };
+    expect(fixedServiceKpis([servicio()], MES, [gasco])).toEqual({ porMes: 50_000, vigentes: 2, proximos: 0 });
   });
 
   it("el subtítulo de Activos avisa cuántos empiezan más adelante", () => {
