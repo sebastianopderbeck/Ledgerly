@@ -4,6 +4,7 @@ import { withDb } from "../testing/withDb.js";
 import {
   AutoCouponModel,
   BudgetModel,
+  CardServiceModel,
   MailAttachmentModel,
   MailSyncRunModel,
   HiddenSubscriptionModel,
@@ -151,6 +152,13 @@ describe("modelos nuevos", () => {
     await expect(HiddenSubscriptionModel.create({ userId: USER_ID, key: "STREAMFLIX COM" })).rejects.toThrow();
   });
 
+  it("una marca de servicio guarda la clave una sola vez y registra cuándo se marcó", async () => {
+    await CardServiceModel.init();
+    const marca = await CardServiceModel.create({ userId: USER_ID, key: "GASCO" });
+    expect((marca as unknown as { markedAt: Date }).markedAt).toBeInstanceOf(Date);
+    await expect(CardServiceModel.create({ userId: USER_ID, key: "GASCO" })).rejects.toThrow();
+  });
+
   it("la cadencia de una suscripción acepta bimestral o anual, una por clave", async () => {
     await SubscriptionCadenceModel.init();
     await SubscriptionCadenceModel.create({ userId: USER_ID, key: "CAFE ROSITA", cadencia: "bimestral" });
@@ -209,9 +217,9 @@ describe("modelos nuevos", () => {
 });
 
 describe("colecciones por usuario", () => {
-  it("son exactamente las 14 del diseño", () => {
+  it("son exactamente las 15 del diseño", () => {
     expect([...USER_SCOPED_MODEL_NAMES].sort()).toEqual([
-      "AutoCoupon", "Budget", "CategoryRule", "FixedService", "HiddenSubscription", "MailAttachment", "MailSyncRun",
+      "AutoCoupon", "Budget", "CardService", "CategoryRule", "FixedService", "HiddenSubscription", "MailAttachment", "MailSyncRun",
       "ManualAsset", "ManualSubscription", "MortgageCoupon", "Payslip", "Statement", "SubscriptionCadence", "Transaction",
     ]);
   });
@@ -252,6 +260,7 @@ describe("unicidad por usuario", () => {
       ManualSubscription: ["userId", "key"],
       SubscriptionCadence: ["userId", "key"],
       Budget: ["userId", "category"],
+      CardService: ["userId", "key"],
       MailAttachment: ["userId", "source", "messageId", "partId"],
     };
     for (const [name, keys] of Object.entries(expected)) {

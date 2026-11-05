@@ -191,6 +191,11 @@ const manualSubscriptionSchema = new Schema(
   { timestamps: { createdAt: "markedAt", updatedAt: false } },
 );
 
+const cardServiceSchema = new Schema(
+  { userId: userIdPath, key: { type: String, required: true } },
+  { timestamps: { createdAt: "markedAt", updatedAt: false } },
+);
+
 const subscriptionCadenceSchema = new Schema(
   {
     userId: userIdPath,
@@ -273,6 +278,7 @@ statementSchema.index({ userId: 1, sourceHash: 1 }, { unique: true });
 hiddenSubscriptionSchema.index({ userId: 1, key: 1 }, { unique: true });
 manualSubscriptionSchema.index({ userId: 1, key: 1 }, { unique: true });
 subscriptionCadenceSchema.index({ userId: 1, key: 1 }, { unique: true });
+cardServiceSchema.index({ userId: 1, key: 1 }, { unique: true });
 budgetSchema.index({ userId: 1, category: 1 }, { unique: true });
 
 [
@@ -295,6 +301,7 @@ export type ManualSubscriptionDoc = InferSchemaType<typeof manualSubscriptionSch
 export type SubscriptionCadenceDoc = InferSchemaType<typeof subscriptionCadenceSchema>;
 export type ManualAssetDoc = InferSchemaType<typeof manualAssetSchema>;
 export type FixedServiceDoc = InferSchemaType<typeof fixedServiceSchema>;
+export type CardServiceDoc = InferSchemaType<typeof cardServiceSchema>;
 export type BudgetDoc = InferSchemaType<typeof budgetSchema>;
 export type MailSyncRunDoc = InferSchemaType<typeof mailSyncRunSchema>;
 export type MailAttachmentDoc = InferSchemaType<typeof mailAttachmentSchema>;
@@ -327,6 +334,8 @@ export const ManualAssetModel: Model<ManualAssetDoc> =
   mongoose.models.ManualAsset ?? mongoose.model("ManualAsset", manualAssetSchema);
 export const FixedServiceModel: Model<FixedServiceDoc> =
   mongoose.models.FixedService ?? mongoose.model("FixedService", fixedServiceSchema);
+export const CardServiceModel: Model<CardServiceDoc> =
+  mongoose.models.CardService ?? mongoose.model("CardService", cardServiceSchema);
 export const BudgetModel: Model<BudgetDoc> =
   mongoose.models.Budget ?? mongoose.model("Budget", budgetSchema);
 export const MailSyncRunModel: Model<MailSyncRunDoc> =
@@ -336,5 +345,5 @@ export const MailAttachmentModel: Model<MailAttachmentDoc> =
 
 export const USER_SCOPED_MODEL_NAMES = [
   "Statement", "Transaction", "CategoryRule", "MortgageCoupon", "AutoCoupon", "Payslip", "HiddenSubscription",
-  "ManualSubscription", "SubscriptionCadence", "ManualAsset", "FixedService", "Budget", "MailSyncRun", "MailAttachment",
+  "ManualSubscription", "SubscriptionCadence", "ManualAsset", "FixedService", "CardService", "Budget", "MailSyncRun", "MailAttachment",
 ] as const;
