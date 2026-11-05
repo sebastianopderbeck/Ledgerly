@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Alert, CircularProgress, Snackbar, Typography } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
 import {
-  useDeleteTransactions, useMarkSubscription, usePatchTransaction, useTransactions, type TxFilters,
+  useDeleteTransactions, useMarkCardService, useMarkSubscription, usePatchTransaction, useTransactions, type TxFilters,
 } from "../api/hooks.js";
 import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { snackbarAboveNavSx } from "../components/snackbarSx.js";
@@ -21,6 +21,8 @@ const TRANSACTION_FIELDS: FilterField[] = ["year", "currency", "card", "month", 
 const SNACKBAR_ANCHOR = { vertical: "bottom", horizontal: "center" } as const;
 const MARKED: MarkFeedback = { severity: "success", message: "Agregado a Suscripciones" };
 const MARK_FAILED: MarkFeedback = { severity: "error", message: "No pudimos marcarlo como suscripción" };
+const MARKED_SERVICE: MarkFeedback = { severity: "success", message: "Agregado a Servicios" };
+const MARK_SERVICE_FAILED: MarkFeedback = { severity: "error", message: "No pudimos marcarlo como servicio" };
 
 export const TransactionsPage = () => {
   const [params] = useSearchParams();
@@ -29,6 +31,7 @@ export const TransactionsPage = () => {
   const { mutate: patchTransaction } = usePatchTransaction();
   const { mutate: deleteTransactions } = useDeleteTransactions();
   const { mutate: markSubscription } = useMarkSubscription();
+  const { mutate: markService } = useMarkCardService();
   const [feedback, setFeedback] = useState<MarkFeedback | null>(null);
   const filters: TxFilters = {
     currency: params.get("currency") === null ? undefined : currency,
@@ -52,6 +55,10 @@ export const TransactionsPage = () => {
     onSuccess: () => setFeedback(MARKED),
     onError: () => setFeedback(MARK_FAILED),
   }), [markSubscription]);
+  const markAsService = useCallback((transactionId: string) => markService(transactionId, {
+    onSuccess: () => setFeedback(MARKED_SERVICE),
+    onError: () => setFeedback(MARK_SERVICE_FAILED),
+  }), [markService]);
   const dismissFeedback = useCallback(() => setFeedback(null), []);
 
   if (isLoading) return <CircularProgress />;
@@ -68,6 +75,7 @@ export const TransactionsPage = () => {
         onCategoryChange={changeCategory}
         onDelete={deleteRows}
         onMarkSubscription={markAsSubscription}
+        onMarkService={markAsService}
       />
       <Snackbar
         open={feedback !== null}

@@ -4,6 +4,7 @@ import type { SxProps, Theme } from "@mui/material/styles";
 import type { TransactionDTO } from "@ledgerly/shared";
 import { useCategories } from "../api/hooks.js";
 import { formatMoney } from "../format.js";
+import { canMarkAsService } from "../cardServices.js";
 import { canMarkAsSubscription } from "../subscriptions.js";
 import { installmentLabel } from "../transactionInstallment.js";
 import { BottomSheet } from "./BottomSheet.js";
@@ -17,6 +18,7 @@ interface TransactionSheetProps {
   onSave: (id: string, category: string) => void;
   onDelete: (transaction: TransactionDTO) => void;
   onMarkSubscription: (transactionId: string) => void;
+  onMarkService: (transactionId: string) => void;
 }
 
 interface TransactionFormProps {
@@ -25,15 +27,16 @@ interface TransactionFormProps {
   onSave: (id: string, category: string) => void;
   onDelete: (transaction: TransactionDTO) => void;
   onMarkSubscription: (transactionId: string) => void;
+  onMarkService: (transactionId: string) => void;
 }
 
 const NO_CATEGORIES: string[] = [];
 
-const markSubscriptionSx: SxProps<Theme> = { minHeight: MIN_TAP_SIZE, mt: 2 };
+const markButtonSx: SxProps<Theme> = { minHeight: MIN_TAP_SIZE, mt: 2 };
 
 const renderCategoryInput = (params: AutocompleteRenderInputParams) => <TextField {...params} label="Categoría" />;
 
-const TransactionForm = ({ transaction, onClose, onSave, onDelete, onMarkSubscription }: TransactionFormProps) => {
+const TransactionForm = ({ transaction, onClose, onSave, onDelete, onMarkSubscription, onMarkService }: TransactionFormProps) => {
   const { data: categories = NO_CATEGORIES } = useCategories();
   const [category, setCategory] = useState(transaction.category);
   const nextCategory = category.trim();
@@ -61,8 +64,17 @@ const TransactionForm = ({ transaction, onClose, onSave, onDelete, onMarkSubscri
     onClose();
   };
 
+  const markService = () => {
+    onMarkService(transaction.id);
+    onClose();
+  };
+
   const subscriptionButton = canMarkAsSubscription(transaction) && (
-    <Button fullWidth variant="outlined" onClick={markSubscription} sx={markSubscriptionSx}>Es una suscripción</Button>
+    <Button fullWidth variant="outlined" onClick={markSubscription} sx={markButtonSx}>Es una suscripción</Button>
+  );
+
+  const serviceButton = canMarkAsService(transaction) && (
+    <Button fullWidth variant="outlined" onClick={markService} sx={markButtonSx}>Es un servicio</Button>
   );
 
   return (
@@ -77,6 +89,7 @@ const TransactionForm = ({ transaction, onClose, onSave, onDelete, onMarkSubscri
         sx={{ mt: 2.5 }}
       />
       {subscriptionButton}
+      {serviceButton}
       <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
         <Button fullWidth color="error" onClick={remove} sx={tapTargetSx}>Borrar</Button>
         <Button fullWidth variant="contained" disabled={!changed} onClick={save} sx={tapTargetSx}>Guardar</Button>
@@ -85,7 +98,9 @@ const TransactionForm = ({ transaction, onClose, onSave, onDelete, onMarkSubscri
   );
 };
 
-export const TransactionSheet = ({ transaction, open, onClose, onSave, onDelete, onMarkSubscription }: TransactionSheetProps) => (
+export const TransactionSheet = ({
+  transaction, open, onClose, onSave, onDelete, onMarkSubscription, onMarkService,
+}: TransactionSheetProps) => (
   <BottomSheet open={open} onClose={onClose} title={transaction?.merchant ?? "Movimiento"}>
     {transaction && (
       <TransactionForm
@@ -95,6 +110,7 @@ export const TransactionSheet = ({ transaction, open, onClose, onSave, onDelete,
         onSave={onSave}
         onDelete={onDelete}
         onMarkSubscription={onMarkSubscription}
+        onMarkService={onMarkService}
       />
     )}
   </BottomSheet>
