@@ -25,10 +25,17 @@ afterEach(cleanup);
 const setup = () => {
   const onDelete = vi.fn();
   const onMarkSubscription = vi.fn();
+  const onMarkService = vi.fn();
   renderWithProviders(
-    <TransactionsTable rows={rows} onCategoryChange={() => undefined} onDelete={onDelete} onMarkSubscription={onMarkSubscription} />,
+    <TransactionsTable
+      rows={rows}
+      onCategoryChange={() => undefined}
+      onDelete={onDelete}
+      onMarkSubscription={onMarkSubscription}
+      onMarkService={onMarkService}
+    />,
   );
-  return { onDelete, onMarkSubscription };
+  return { onDelete, onMarkSubscription, onMarkService };
 };
 
 describe("TransactionsTable borrado", () => {

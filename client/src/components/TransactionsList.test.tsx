@@ -36,7 +36,7 @@ const setup = (items: TransactionDTO[] = rows) => {
   const onCategoryChange = vi.fn();
   const onDelete = vi.fn();
   renderWithProviders(
-    <TransactionsList rows={items} onCategoryChange={onCategoryChange} onDelete={onDelete} onMarkSubscription={vi.fn()} />,
+    <TransactionsList rows={items} onCategoryChange={onCategoryChange} onDelete={onDelete} onMarkSubscription={vi.fn()} onMarkService={vi.fn()} />,
   );
   return { onCategoryChange, onDelete };
 };
@@ -47,7 +47,7 @@ const FilterHarness = ({ onDelete }: { onDelete: (ids: string[]) => void }) => {
   return (
     <>
       <button onClick={() => setFiltered(true)}>filtrar</button>
-      <TransactionsList rows={shown} onCategoryChange={vi.fn()} onDelete={onDelete} onMarkSubscription={vi.fn()} />
+      <TransactionsList rows={shown} onCategoryChange={vi.fn()} onDelete={onDelete} onMarkSubscription={vi.fn()} onMarkService={vi.fn()} />
     </>
   );
 };
@@ -60,7 +60,7 @@ const PushPastPageHarness = ({ onDelete }: { onDelete: (ids: string[]) => void }
   return (
     <>
       <button onClick={() => setPushed(true)}>filtrar</button>
-      <TransactionsList rows={shown} onCategoryChange={vi.fn()} onDelete={onDelete} onMarkSubscription={vi.fn()} />
+      <TransactionsList rows={shown} onCategoryChange={vi.fn()} onDelete={onDelete} onMarkSubscription={vi.fn()} onMarkService={vi.fn()} />
     </>
   );
 };
