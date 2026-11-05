@@ -9,7 +9,7 @@ import {
   type SubscriptionsReportDTO,
   type TxType,
 } from "@ledgerly/shared";
-import { canonicalMerchantKeys, merchantDisplayName, merchantKey, merchantSearchTerm } from "./merchantKey.js";
+import { canonicalMerchantKeys, groupHasMark, merchantDisplayName, merchantKey, merchantSearchTerm } from "./merchantKey.js";
 import { addDays, addMonths, addMonthsClamped, daysBetween, monthOf } from "./months.js";
 
 export { addMonthsClamped };
@@ -257,9 +257,6 @@ const monthlyArs = ({ amount, currency }: Charge, meses: number, cotizacion: num
 const previousCurrency = (run: Charge[], last: Charge): Currency | null =>
   run.find(({ currency }) => currency !== last.currency)?.currency ?? null;
 
-const hasMark = (key: string, rawKeys: ReadonlySet<string>, marks: ReadonlySet<string>): boolean =>
-  marks.has(key) || [...rawKeys].some((rawKey) => marks.has(rawKey));
-
 const markedCadence = (key: string, rawKeys: ReadonlySet<string>, cadencias: ReadonlyMap<string, Cadencia>): Cadencia =>
   [key, ...rawKeys].map((candidate) => cadencias.get(candidate)).find((cadencia) => cadencia !== undefined) ?? "mensual";
 
@@ -381,7 +378,7 @@ export function detectSubscriptionRuns(txs: SubscriptionTx[], ctx: SubscriptionC
   return [...groupBy(debits, ({ key }) => key)]
     .flatMap(([key, charges]) => {
       const rawKeys = new Set((rowsByGroup.get(key) ?? []).map(({ rawKey }) => rawKey));
-      const marked: Marked = (marks) => hasMark(key, rawKeys, marks);
+      const marked: Marked = (marks) => groupHasMark(key, rawKeys, marks);
       const cadencia = markedCadence(key, rawKeys, ctx.cadencias);
       const marcados = markedChargesOf(key, rawKeys, ctx.cobrosMarcados);
       const detected = subscriptionOf(charges, cadencia, marked, marcados, ctx);

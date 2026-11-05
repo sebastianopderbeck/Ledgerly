@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   canonicalMerchantKeys,
+  groupHasMark,
+  groupOf,
+  markedRawKeys,
+  merchantGroups,
   merchantDisplayName,
   merchantKey,
   merchantMatchKey,
@@ -110,5 +114,44 @@ describe("merchantSearchTerm", () => {
 
   it("sin comercios devuelve vacío", () => {
     expect(merchantSearchTerm([])).toBe("");
+  });
+});
+
+describe("merchantGroups", () => {
+  it("junta las variantes truncadas bajo la clave más corta", () => {
+    expect(merchantGroups(["CAFE SERVICIO", "CAFE SERVIC", "GASCO", ""])).toEqual(new Map([
+      ["CAFE SERVIC", new Set(["CAFE SERVIC", "CAFE SERVICIO"])],
+      ["GASCO", new Set(["GASCO"])],
+    ]));
+  });
+});
+
+describe("groupHasMark", () => {
+  it("vale la marca en la clave del grupo o en cualquiera de sus variantes", () => {
+    const variantes = new Set(["CAFE SERVIC", "CAFE SERVICIO"]);
+    expect(groupHasMark("CAFE SERVIC", variantes, new Set(["CAFE SERVICIO"]))).toBe(true);
+    expect(groupHasMark("CAFE SERVIC", variantes, new Set(["CAFE SERVIC"]))).toBe(true);
+    expect(groupHasMark("CAFE SERVIC", variantes, new Set(["GASCO"]))).toBe(false);
+  });
+});
+
+describe("markedRawKeys", () => {
+  it("una marca en una variante marca todo el grupo", () => {
+    expect(markedRawKeys(["CAFE SERVIC", "CAFE SERVICIO", "GASCO"], new Set(["CAFE SERVICIO"])))
+      .toEqual(new Set(["CAFE SERVIC", "CAFE SERVICIO"]));
+  });
+
+  it("sin marcas no devuelve nada", () => {
+    expect(markedRawKeys(["GASCO"], new Set())).toEqual(new Set());
+  });
+});
+
+describe("groupOf", () => {
+  it("devuelve la canónica y las variantes del grupo de la clave", () => {
+    expect(groupOf("CAFE SERVICIO", ["CAFE SERVIC", "GASCO"])).toEqual(new Set(["CAFE SERVIC", "CAFE SERVICIO"]));
+  });
+
+  it("una clave sin movimientos es su propio grupo", () => {
+    expect(groupOf("OTRO", [])).toEqual(new Set(["OTRO"]));
   });
 });
