@@ -16,6 +16,7 @@ interface TransactionsListProps {
   onCategoryChange: (id: string, category: string) => void;
   onDelete: (ids: string[]) => void;
   onMarkSubscription: (transactionId: string) => void;
+  onMarkService: (transactionId: string) => void;
 }
 
 interface TransactionRowProps {
@@ -83,7 +84,7 @@ const TransactionRow = ({ row, selecting, selected, onOpen, onToggle }: Transact
   );
 };
 
-export const TransactionsList = ({ rows, onCategoryChange, onDelete, onMarkSubscription }: TransactionsListProps) => {
+export const TransactionsList = ({ rows, onCategoryChange, onDelete, onMarkSubscription, onMarkService }: TransactionsListProps) => {
   const [visibleCount, setVisibleCount] = useState(TRANSACTIONS_PAGE_SIZE);
   const { target, open, show, close } = useSheetTarget<TransactionDTO>();
   const visibleRows = useMemo(() => rows.slice(0, visibleCount), [rows, visibleCount]);
@@ -147,6 +148,7 @@ export const TransactionsList = ({ rows, onCategoryChange, onDelete, onMarkSubsc
         onSave={onCategoryChange}
         onDelete={askDeleteOne}
         onMarkSubscription={onMarkSubscription}
+        onMarkService={onMarkService}
       />
       <ConfirmDialog
         open={pendingIds !== null}

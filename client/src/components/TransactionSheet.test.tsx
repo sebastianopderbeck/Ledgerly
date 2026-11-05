@@ -32,6 +32,7 @@ const setup = (transaction: TransactionDTO = notebook) => {
   const onDelete = vi.fn();
   const onClose = vi.fn();
   const onMarkSubscription = vi.fn();
+  const onMarkService = vi.fn();
   renderWithProviders(
     <TransactionSheet
       transaction={transaction}
@@ -40,11 +41,12 @@ const setup = (transaction: TransactionDTO = notebook) => {
       onSave={onSave}
       onDelete={onDelete}
       onMarkSubscription={onMarkSubscription}
+      onMarkService={onMarkService}
     />,
   );
   const sheet = screen.getByRole("dialog", { name: transaction.merchant });
   return {
-    onSave, onDelete, onClose, onMarkSubscription, sheet,
+    onSave, onDelete, onClose, onMarkSubscription, onMarkService, sheet,
     category: within(sheet).getByRole("combobox", { name: "Categoría" }),
   };
 };
@@ -88,9 +90,23 @@ describe("TransactionSheet", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("un consumo en cuotas no ofrece marcarlo como suscripción", () => {
+  it("un consumo en cuotas no ofrece marcarlo como suscripción ni como servicio", () => {
     const { sheet } = setup();
     expect(within(sheet).queryByRole("button", { name: "Es una suscripción" })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole("button", { name: "Es un servicio" })).not.toBeInTheDocument();
+  });
+
+  it("un consumo en dólares no ofrece marcarlo como servicio", () => {
+    const { sheet } = setup({ ...musicapp, currency: "USD" });
+    expect(within(sheet).queryByRole("button", { name: "Es un servicio" })).not.toBeInTheDocument();
+  });
+
+  it("«Es un servicio» manda el movimiento y cierra la hoja", async () => {
+    const { sheet, onMarkService, onMarkSubscription, onClose } = setup(musicapp);
+    await userEvent.click(within(sheet).getByRole("button", { name: "Es un servicio" }));
+    expect(onMarkService).toHaveBeenCalledWith("4");
+    expect(onMarkSubscription).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("«Es una suscripción» manda el movimiento y cierra la hoja", async () => {

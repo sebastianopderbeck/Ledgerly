@@ -4,6 +4,8 @@ import { fixedServiceCadenciaSchema, type SubscriptionDTO } from "@ledgerly/shar
 import { asyncHandler } from "../errors.js";
 import { userIdOf } from "../../auth/requireUser.js";
 import { loadSubscriptionInputs } from "../loadSubscriptions.js";
+import { loadCardServiceGroups } from "../loadCardServices.js";
+import { toCardServiceDTO, type CardServiceGroup } from "../../stats/cardServices.js";
 import {
   AutoCouponModel, FixedServiceModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel, PayslipModel, StatementModel,
   TransactionModel,
@@ -15,8 +17,8 @@ import { autoMonthlyGrowth, mortgageMonthlyGrowth } from "../../stats/planGrowth
 import type { RatePoint } from "../../stats/rateOnDate.js";
 import { expectedMonthlyInflation, type MonthlyInflation, type SalaryInflation } from "../../stats/salaryRaise.js";
 import {
-  buildCashFlow, subscriptionsByStatement, toCashFlowCard, SIN_SUSCRIPCIONES,
-  type CashFlowCard, type CashFlowCoupon, type CashFlowPayslip, type CashFlowService, type CashFlowStatement,
+  buildCashFlow, servicesByStatement, subscriptionsByStatement, toCashFlowCard, SIN_SUSCRIPCIONES,
+  type CashFlowCard, type CashFlowCardService, type CashFlowCoupon, type CashFlowPayslip, type CashFlowService, type CashFlowStatement,
   type CashFlowSubscription, type InstallmentTxInput, type StatementSubscriptions,
 } from "../../stats/cashFlow.js";
 import { detectSubscriptionRuns, isCounted, type DetectedSubscription } from "../../stats/subscriptions.js";
@@ -72,6 +74,7 @@ const toRecency = (statement: StatementRow): StatementRecency<Types.ObjectId> =>
 const toFlowStatement = (
   statement: StatementRow,
   suscripciones: StatementSubscriptions = SIN_SUSCRIPCIONES,
+  serviciosArs = 0,
 ): CashFlowStatement => ({
   issuer: statement.issuer,
   cardLabel: statement.cardLabel,
@@ -80,6 +83,7 @@ const toFlowStatement = (
   saldoArs: statement.totals?.saldoActual?.ars ?? 0,
   saldoUsd: statement.totals?.saldoActual?.usd ?? 0,
   ...suscripciones,
+  serviciosArs,
   uploadedAt: uploadedAtOf(statement).toISOString(),
 });
 
@@ -118,6 +122,11 @@ const toFlowService = ({ monto, cadencia, desde, hasta, montoDesde }: FixedServi
 const toFlowSubscription = ({ issuer, moneda, montoActual, cadencia, proximoCobro }: SubscriptionDTO): CashFlowSubscription =>
   ({ issuer, moneda, monto: montoActual, cadencia, proximoCobro });
 
+const toFlowCardService = (group: CardServiceGroup): CashFlowCardService => {
+  const { issuer, ultimoMonto, ultimoCargo } = toCardServiceDTO(group);
+  return { issuer, monto: ultimoMonto, ultimoCargo };
+};
+
 const statementSubscriptions = (detected: DetectedSubscription[]): Map<string, StatementSubscriptions> =>
   subscriptionsByStatement(detected.filter(({ subscription }) => !subscription.oculta).flatMap(({ run }) => run));
 
@@ -151,6 +160,7 @@ cashFlowRouter.get("/", asyncHandler(async (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
   const [
     payslips, statements, mortgageCoupons, autoCoupons, usdPoints, uvaPoints, inflationRows, lastRem, fixedServices, subscriptionInputs,
+    cardServiceGroups,
   ] = await Promise.all([
     PayslipModel.find({ userId }).lean(),
     StatementModel.find({ userId }).lean(),
@@ -162,6 +172,7 @@ cashFlowRouter.get("/", asyncHandler(async (req, res) => {
     MacroSeriesModel.findOne({ serie: "rem_12m" }).sort({ fecha: -1 }).lean(),
     FixedServiceModel.find({ userId }).lean(),
     loadSubscriptionInputs(today, userId),
+    loadCardServiceGroups(userId),
   ]);
   const latestIds = latestStatementIdsPerIssuer(statements.map(toRecency));
   const installmentTxs = await TransactionModel.find({
@@ -171,10 +182,14 @@ cashFlowRouter.get("/", asyncHandler(async (req, res) => {
   const detected = detectSubscriptionRuns(subscriptionInputs.txs, { ...subscriptionInputs.ctx, cotizacion: null });
   const subscriptions = detected.map(({ subscription }) => subscription).filter(isCounted).map(toFlowSubscription);
   const porResumen = statementSubscriptions(detected);
+  const serviciosPorResumen = servicesByStatement(cardServiceGroups.flatMap(({ charges }) => charges));
   res.json(buildCashFlow({
     today,
     payslips: payslips.map(toFlowPayslip),
-    statements: statements.map((statement) => toFlowStatement(statement, porResumen.get(String(statement._id)))),
+    statements: statements.map((statement) => {
+      const id = String(statement._id);
+      return toFlowStatement(statement, porResumen.get(id), serviciosPorResumen.get(id));
+    }),
     cards: latestCards(statements, latestIds, installmentTxs),
     mortgage: {
       coupons: mortgageCoupons.map((coupon) => toFlowCoupon(coupon.fechaDebito, coupon.cuotaNro, coupon.totalDebitado)),
@@ -193,5 +208,6 @@ cashFlowRouter.get("/", asyncHandler(async (req, res) => {
     inflacion: salaryInflation(inflationRows, lastRem?.valor ?? null),
     services: fixedServices.map(toFlowService),
     subscriptions,
+    cardServices: cardServiceGroups.map(toFlowCardService),
   }));
 }));

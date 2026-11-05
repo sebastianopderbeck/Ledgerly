@@ -5,7 +5,7 @@ import { withDb } from "../../testing/withDb.js";
 import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import {
-  HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, SubscriptionCadenceModel, TransactionModel,
+  CardServiceModel, HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, SubscriptionCadenceModel, TransactionModel,
 } from "../../db/models.js";
 import { fetchOficialRate } from "../../fx/dollarRate.js";
 import { ownedBy } from "../../testing/ownedBy.js";
@@ -317,5 +317,28 @@ describe("cambiar la cadencia de una suscripción", () => {
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: "Cadencia inválida" });
     expect(await SubscriptionCadenceModel.countDocuments({ userId: auth.userId })).toBe(0);
+  });
+});
+
+describe("suscripciones y servicios de tarjeta", () => {
+  const keys = async (): Promise<string[]> =>
+    subscriptionsReportDtoSchema.parse((await auth.api.get("/api/subscriptions")).body).items.map(({ key }) => key);
+
+  it("un comercio marcado como servicio no aparece como suscripción aunque tenga marca manual", async () => {
+    await seedVisa(streamflixAndNoise());
+    await ManualSubscriptionModel.create({ userId: auth.userId, key: "STREAMFLIX COM", cobros: [] });
+    await CardServiceModel.create({ userId: auth.userId, key: "STREAMFLIX COM" });
+    expect(await keys()).not.toContain("STREAMFLIX COM");
+    await CardServiceModel.deleteMany({ userId: auth.userId });
+    expect(await keys()).toContain("STREAMFLIX COM");
+  });
+
+  it("marcar como suscripción quita la marca de servicio del grupo", async () => {
+    await seedVisa(cafeRosita());
+    await CardServiceModel.create({ userId: auth.userId, key: "CAFE ROSITA" });
+    const res = await markTransaction({ transactionId: await idOf("CAFE ROSITA 4471", "2026-08-15") });
+    expect(res.status).toBe(204);
+    expect(await CardServiceModel.countDocuments({ userId: auth.userId })).toBe(0);
+    expect(await keys()).toContain("CAFE ROSITA");
   });
 });

@@ -13,6 +13,7 @@ import { fetchOficialRate } from "../../fx/dollarRate.js";
 import { merchantKey } from "../../stats/merchantKey.js";
 import { detectSubscriptions, summarizeSubscriptions } from "../../stats/subscriptions.js";
 import { loadSubscriptionInputs } from "../loadSubscriptions.js";
+import { unmarkCardServiceGroup } from "../loadCardServices.js";
 import { userIdOf } from "../../auth/requireUser.js";
 
 const MAX_CLAVE = 60;
@@ -64,6 +65,7 @@ subscriptionsRouter.post("/manual", asyncHandler(async (req, res) => {
   await Promise.all([
     ManualSubscriptionModel.updateOne({ userId, key }, { $setOnInsert: { key }, $addToSet: { cobros: cobro } }, { upsert: true }),
     HiddenSubscriptionModel.deleteOne({ userId, key }),
+    unmarkCardServiceGroup(userId, key),
   ]);
   res.status(204).end();
 }));

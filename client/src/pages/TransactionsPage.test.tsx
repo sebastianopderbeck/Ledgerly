@@ -16,9 +16,10 @@ const json = (body: unknown, status = 200): Response =>
 
 const accepted = (): Response => new Response(null, { status: 204 });
 
-const stubApi = (markResponse: () => Response = accepted): void => {
+const stubApi = (markResponse: () => Response = accepted, markServiceResponse: () => Response = accepted): void => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     if (url.includes("/subscriptions/manual")) return markResponse();
+    if (url.includes("/card-services")) return markServiceResponse();
     const body = url.includes("/stats/monthly") ? [{ month: "2025-11", total: 1, count: 1 }, { month: "2026-05", total: 1, count: 1 }]
       : url.includes("/transactions/categories") ? ["Compras", "Salud"]
       : url.includes("/transactions") ? { items: [tx], total: 1, page: 1, pageSize: 50 }
@@ -114,6 +115,27 @@ describe("TransactionsPage", () => {
   });
 });
 
+describe("TransactionsPage: servicios de tarjeta", () => {
+  it("marcar un consumo como servicio manda el POST con el movimiento y avisa", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    await userEvent.click(await screen.findByRole("button", { name: "Marcar MERCADOLIBRE como servicio" }));
+    expect(await screen.findByText("Agregado a Servicios")).toBeInTheDocument();
+    const call = vi.mocked(fetch).mock.calls.find((c) => String(c[0]).includes("/card-services"));
+    expect((call?.[1] as RequestInit | undefined)?.method).toBe("POST");
+    expect(JSON.parse(String((call?.[1] as RequestInit | undefined)?.body))).toEqual({ transactionId: "1" });
+  });
+
+  it("si el server no acepta el servicio avisa que no pudo marcarlo", async () => {
+    stubApi(accepted, () => json({ error: "Movimiento inválido" }, 400));
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    await userEvent.click(await screen.findByRole("button", { name: "Marcar MERCADOLIBRE como servicio" }));
+    expect(await screen.findByText("No pudimos marcarlo como servicio")).toBeInTheDocument();
+    expect(screen.queryByText("Agregado a Servicios")).not.toBeInTheDocument();
+  });
+});
+
 describe("TransactionsPage en mobile", () => {
   beforeEach(() => emulateMobile());
 
@@ -164,6 +186,16 @@ describe("TransactionsPage en mobile", () => {
     await userEvent.click(within(sheet).getByRole("button", { name: "Es una suscripción" }));
     expect(await screen.findByText("Agregado a Suscripciones")).toBeInTheDocument();
     const call = vi.mocked(fetch).mock.calls.find((c) => String(c[0]).includes("/subscriptions/manual"));
+    expect(JSON.parse(String((call?.[1] as RequestInit | undefined)?.body))).toEqual({ transactionId: "1" });
+  });
+
+  it("«Es un servicio» desde la hoja manda el POST y avisa", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    renderWithProviders(<TransactionsPage />, { route: "/transactions" });
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Es un servicio" }));
+    expect(await screen.findByText("Agregado a Servicios")).toBeInTheDocument();
+    const call = vi.mocked(fetch).mock.calls.find((c) => String(c[0]).includes("/card-services"));
     expect(JSON.parse(String((call?.[1] as RequestInit | undefined)?.body))).toEqual({ transactionId: "1" });
   });
 });

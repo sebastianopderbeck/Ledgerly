@@ -75,6 +75,7 @@ describe("CashFlowPage", () => {
     expect(screen.getByText(/después, las cuotas que ya compraste; suscripciones con el último cobro de cada una, en el mes en que vence su resumen;/))
       .toBeInTheDocument();
     expect(screen.getByText(/servicios con el último monto más la inflación esperada del REM/)).toBeInTheDocument();
+    expect(screen.getByText(/\(los de la tarjeta, en el mes en que vence su resumen\)/)).toBeInTheDocument();
     expect(screen.getByText(/gastos que no cargaste en Servicios\./)).toBeInTheDocument();
     expect(screen.getByText(/Los meses incompletos se ven atenuados y sin margen: Sep 2026/)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Detalle del flujo de caja" });

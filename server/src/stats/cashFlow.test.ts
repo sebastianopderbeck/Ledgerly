@@ -4,8 +4,8 @@ import {
   buildCashFlow, incomeByMonth, installmentFloor, projectPlanPayment, projectServiceAmount, servicePays, statementAmountArs,
   statementSubscriptionsArs, subscriptionsByStatement, toCashFlowCard, ESTIMADO_SAC, ESTIMADO_SUELDO, ESTIMADO_SUSCRIPCIONES,
   FALTA_AUTO, FALTA_COTIZACION, FALTA_HIPOTECA, FALTA_RECIBO, FALTA_SAC, estimadoAuto, estimadoHipoteca, estimadoServicios,
-  estimadoTarjeta, faltaResumen, subscriptionPaymentMonths,
-  type CashFlowCard, type CashFlowInput, type CashFlowPayslip, type CashFlowPlan, type CashFlowService, type CashFlowStatement,
+  estimadoTarjeta, faltaResumen, subscriptionPaymentMonths, cardServicePayments, servicesByStatement, statementServicesArs,
+  type CashFlowCard, type CashFlowCardService, type CashFlowInput, type CashFlowPayslip, type CashFlowPlan, type CashFlowService, type CashFlowStatement,
   type CashFlowSubscription,
 } from "./cashFlow.js";
 
@@ -18,6 +18,7 @@ const statement = (overrides: Partial<CashFlowStatement> = {}): CashFlowStatemen
   saldoUsd: 0,
   suscripcionesArs: 0,
   suscripcionesUsd: 0,
+  serviciosArs: 0,
   uploadedAt: "2026-09-05T10:00:00.000Z",
   ...overrides,
 });
@@ -815,5 +816,98 @@ describe("buildCashFlow: suscripciones de los resúmenes", () => {
       tarjetas: (antes?.tarjetas ?? 0) - 6_000, suscripciones: 6_000, egresos: antes?.egresos,
     });
     expect(mesDe(flow, "2026-10")?.estimados).not.toContain(ESTIMADO_SUSCRIPCIONES);
+  });
+});
+
+describe("servicesByStatement", () => {
+  it("suma los cargos de cada resumen", () => {
+    expect(servicesByStatement([
+      { statementId: "a", amount: 10_000 }, { statementId: "a", amount: 5_000 }, { statementId: "b", amount: 7_000 },
+    ])).toEqual(new Map([["a", 15_000], ["b", 7_000]]));
+  });
+});
+
+describe("statementServicesArs", () => {
+  const base = { saldoArs: 100_000, saldoUsd: 0, suscripcionesArs: 0, suscripcionesUsd: 0, serviciosArs: 20_000 };
+
+  it("separa los servicios del resumen", () => {
+    expect(statementServicesArs(base, null)).toBe(20_000);
+  });
+
+  it("no pasa de lo que queda después de las suscripciones", () => {
+    expect(statementServicesArs({ ...base, saldoArs: 12_000, suscripcionesArs: 5_000, serviciosArs: 10_000 }, null)).toBe(7_000);
+  });
+
+  it("con saldo negativo no separa nada", () => {
+    expect(statementServicesArs({ ...base, saldoArs: -1_000 }, null)).toBe(0);
+  });
+
+  it("no pasa del monto del resumen con dólares negativos", () => {
+    expect(statementServicesArs({ ...base, saldoArs: 30_000, saldoUsd: -10, serviciosArs: 25_000 }, 1_000)).toBe(20_000);
+  });
+});
+
+describe("cardServicePayments", () => {
+  const servicio: CashFlowCardService = { issuer: "visa_signature", monto: 20_000, ultimoCargo: "2026-09-20" };
+
+  it("proyecta un cargo por mes desde el siguiente al último, con la inflación compuesta", () => {
+    expect(cardServicePayments(visaCard, servicio, "2027-01", 0.02)).toEqual([
+      { mes: "2026-11", monto: 20_000 * 1.02 },
+      { mes: "2026-12", monto: 20_000 * 1.02 ** 2 },
+      { mes: "2027-01", monto: 20_000 * 1.02 ** 3 },
+    ]);
+  });
+
+  it("con un último cargo viejo arranca después del cierre y cuenta los meses desde el cargo", () => {
+    const pagos = cardServicePayments(visaCard, { ...servicio, ultimoCargo: "2026-06-20" }, "2026-12", 0.02);
+    expect(pagos.map(({ mes }) => mes)).toEqual(["2026-11", "2026-12"]);
+    expect(pagos[0].monto).toBeCloseTo(20_000 * 1.02 ** 4);
+  });
+});
+
+describe("buildCashFlow: servicios de tarjeta", () => {
+  const sinServicios = buildCashFlow(ejemplo());
+  const conResumen = (closingDate: string, cambios: Partial<CashFlowStatement>): CashFlowInput => {
+    const base = ejemplo();
+    return {
+      ...base,
+      statements: base.statements.map((item) => (
+        item.issuer === "visa_signature" && item.closingDate === closingDate ? { ...item, ...cambios } : item
+      )),
+    };
+  };
+  const gasco: CashFlowCardService = { issuer: "visa_signature", monto: 20_000, ultimoCargo: "2026-09-20" };
+
+  it("un mes cerrado pasa el cargo de Tarjetas a Servicios y los egresos no cambian", () => {
+    const flow = buildCashFlow(conResumen("2026-09-03", { serviciosArs: 20_000 }));
+    const antes = mesDe(sinServicios, "2026-09");
+    expect(mesDe(flow, "2026-09")).toMatchObject({
+      tarjetas: (antes?.tarjetas ?? 0) - 20_000, servicios: (antes?.servicios ?? 0) + 20_000, egresos: antes?.egresos,
+    });
+  });
+
+  it("con suscripciones y servicios en el mismo resumen la parte de Tarjetas no queda negativa", () => {
+    const flow = buildCashFlow(conResumen("2026-09-03", {
+      saldoArs: 10_000, saldoUsd: 0, suscripcionesArs: 6_000, serviciosArs: 8_000,
+    }));
+    expect(mesDe(flow, "2026-09")).toMatchObject({ tarjetas: 100_000, suscripciones: 6_000, servicios: 4_000 });
+  });
+
+  it("un mes estimado proyecta el servicio en su tarjeta y suma la nota", () => {
+    const flow = buildCashFlow({ ...ejemplo(), cardServices: [gasco] });
+    expect(mesDe(flow, "2026-11")?.servicios).toBe((mesDe(sinServicios, "2026-11")?.servicios ?? 0) + 20_000);
+    expect(mesDe(flow, "2026-11")?.tarjetas).toBe(mesDe(sinServicios, "2026-11")?.tarjetas);
+    expect(mesDe(flow, "2026-11")?.estimados).toContain(estimadoServicios(0));
+  });
+
+  it("no suma la proyección en el mes que ya tiene el resumen real de esa tarjeta", () => {
+    const flow = buildCashFlow({ ...ejemplo(), cardServices: [gasco] });
+    expect(mesDe(flow, "2026-10")).toEqual(mesDe(sinServicios, "2026-10"));
+  });
+
+  it("con solo la parte de un resumen real no aparece la nota de servicios", () => {
+    const flow = buildCashFlow(conResumen("2026-10-02", { serviciosArs: 6_000 }));
+    expect(mesDe(flow, "2026-10")?.servicios).toBe(6_000);
+    expect(mesDe(flow, "2026-10")?.estimados).not.toContain(estimadoServicios(0));
   });
 });

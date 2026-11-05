@@ -20,6 +20,7 @@ import { netWorthRouter } from "./routes/netWorth.js";
 import { mailRouter } from "./routes/mail.js";
 import { budgetsRouter } from "./routes/budgets.js";
 import { fixedServicesRouter } from "./routes/fixedServices.js";
+import { cardServicesRouter } from "./routes/cardServices.js";
 import { createCronRouter } from "./routes/cron.js";
 import type { AuthConfig } from "../auth/authConfig.js";
 import { createAuthRouter } from "../auth/authRouter.js";
@@ -65,6 +66,7 @@ export function createApp(
   app.use("/api/mail", requireOwner, mailRouter);
   app.use("/api/budgets", budgetsRouter);
   app.use("/api/fixed-services", fixedServicesRouter);
+  app.use("/api/card-services", cardServicesRouter);
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "No encontrado")));
   app.use(errorMiddleware);

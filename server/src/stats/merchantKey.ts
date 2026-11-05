@@ -52,6 +52,31 @@ export function canonicalMerchantKeys(keys: string[]): Map<string, string> {
   return mapping;
 }
 
+export function merchantGroups(rawKeys: string[]): Map<string, Set<string>> {
+  const nonEmpty = rawKeys.filter((key) => key !== "");
+  const canonical = canonicalMerchantKeys(nonEmpty);
+  const groups = new Map<string, Set<string>>();
+  for (const key of nonEmpty) {
+    const group = canonical.get(key) ?? key;
+    groups.set(group, (groups.get(group) ?? new Set<string>()).add(key));
+  }
+  return groups;
+}
+
+export const groupHasMark = (canonical: string, rawKeys: ReadonlySet<string>, marks: ReadonlySet<string>): boolean =>
+  marks.has(canonical) || [...rawKeys].some((rawKey) => marks.has(rawKey));
+
+export function markedRawKeys(rawKeys: string[], marks: ReadonlySet<string>): Set<string> {
+  const marked = [...merchantGroups(rawKeys)].filter(([canonical, variants]) => groupHasMark(canonical, variants, marks));
+  return new Set(marked.flatMap(([, variants]) => [...variants]));
+}
+
+export function groupOf(key: string, rawKeys: string[]): Set<string> {
+  const [canonical, variants] = [...merchantGroups([...rawKeys, key])]
+    .find(([group, members]) => group === key || members.has(key)) ?? [key, new Set<string>()];
+  return new Set([canonical, ...variants]);
+}
+
 export function merchantDisplayName(merchant: string): string {
   const words = merchant.split(/\s+/).filter((word) => word !== "" && !HAS_DIGIT.test(word));
   return words.length > 0 ? words.join(" ") : merchant;

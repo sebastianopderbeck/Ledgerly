@@ -511,6 +511,17 @@ export const fixedServiceUpdateSchema = z.object({
 export const isActiveFixedService = ({ hasta }: Pick<FixedServiceDTO, "hasta">, mes: string): boolean =>
   hasta === null || hasta >= mes;
 
+export const cardServiceDtoSchema = z.object({
+  key: z.string(),
+  nombre: z.string(),
+  issuer: issuerSchema,
+  cardLabel: z.string(),
+  ultimoMonto: z.number(),
+  ultimoCargo: z.string(),
+});
+
+export const cardServiceInputSchema = z.object({ transactionId: z.string().trim().min(1) }).strict();
+
 export const netWorthItemDtoSchema = z.object({
   id: z.string(),
   lado: z.enum(["activo", "pasivo"]),
@@ -703,6 +714,8 @@ export type FixedServiceCadencia = z.infer<typeof fixedServiceCadenciaSchema>;
 export type FixedServiceDTO = z.infer<typeof fixedServiceDtoSchema>;
 export type FixedServiceCreateDTO = z.infer<typeof fixedServiceCreateSchema>;
 export type FixedServiceUpdateDTO = z.infer<typeof fixedServiceUpdateSchema>;
+export type CardServiceDTO = z.infer<typeof cardServiceDtoSchema>;
+export type CardServiceInput = z.infer<typeof cardServiceInputSchema>;
 export type NetWorthItemDTO = z.infer<typeof netWorthItemDtoSchema>;
 export type NetWorthTotals = z.infer<typeof netWorthTotalsSchema>;
 export type NetWorthMonthDTO = z.infer<typeof netWorthMonthDtoSchema>;

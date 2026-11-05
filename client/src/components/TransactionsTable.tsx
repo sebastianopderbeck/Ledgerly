@@ -2,6 +2,7 @@ import { useMemo, useState, type MouseEvent } from "react";
 import { motion } from "framer-motion";
 import { Box, Button, Chip, IconButton } from "@mui/material";
 import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
+import ElectricalServicesOutlinedIcon from "@mui/icons-material/ElectricalServicesOutlined";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
   DataGrid,
@@ -9,6 +10,7 @@ import {
 } from "@mui/x-data-grid";
 import type { TransactionDTO } from "@ledgerly/shared";
 import { formatMoney } from "../format.js";
+import { canMarkAsService } from "../cardServices.js";
 import { canMarkAsSubscription } from "../subscriptions.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 
@@ -17,14 +19,21 @@ interface TransactionsTableProps {
   onCategoryChange: (id: string, category: string) => void;
   onDelete: (ids: string[]) => void;
   onMarkSubscription: (transactionId: string) => void;
+  onMarkService: (transactionId: string) => void;
 }
 
-interface MarkSubscriptionButtonProps {
+interface MarkButtonProps {
   transaction: TransactionDTO;
   onMark: (transactionId: string) => void;
 }
 
-const MarkSubscriptionButton = ({ transaction: { id, merchant }, onMark }: MarkSubscriptionButtonProps) => {
+interface MarkCellProps {
+  transaction: TransactionDTO;
+  onMarkSubscription: (transactionId: string) => void;
+  onMarkService: (transactionId: string) => void;
+}
+
+const MarkSubscriptionButton = ({ transaction: { id, merchant }, onMark }: MarkButtonProps) => {
   const mark = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onMark(id);
@@ -37,7 +46,35 @@ const MarkSubscriptionButton = ({ transaction: { id, merchant }, onMark }: MarkS
   );
 };
 
-export const TransactionsTable = ({ rows, onCategoryChange, onDelete, onMarkSubscription }: TransactionsTableProps) => {
+const MarkServiceButton = ({ transaction: { id, merchant }, onMark }: MarkButtonProps) => {
+  const mark = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onMark(id);
+  };
+
+  return (
+    <IconButton size="small" aria-label={`Marcar ${merchant} como servicio`} onClick={mark}>
+      <ElectricalServicesOutlinedIcon fontSize="small" />
+    </IconButton>
+  );
+};
+
+const MarkCell = ({ transaction, onMarkSubscription, onMarkService }: MarkCellProps) => {
+  const subscriptionButton = canMarkAsSubscription(transaction)
+    && <MarkSubscriptionButton transaction={transaction} onMark={onMarkSubscription} />;
+  const serviceButton = canMarkAsService(transaction) && <MarkServiceButton transaction={transaction} onMark={onMarkService} />;
+
+  return (
+    <>
+      {subscriptionButton}
+      {serviceButton}
+    </>
+  );
+};
+
+export const TransactionsTable = ({
+  rows, onCategoryChange, onDelete, onMarkSubscription, onMarkService,
+}: TransactionsTableProps) => {
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
   const [pendingIds, setPendingIds] = useState<string[] | null>(null);
 
@@ -63,11 +100,11 @@ export const TransactionsTable = ({ rows, onCategoryChange, onDelete, onMarkSubs
       },
     },
     {
-      field: "subscription", headerName: "", width: 64, sortable: false, filterable: false, disableColumnMenu: true,
+      field: "marks", headerName: "", width: 96, sortable: false, filterable: false, disableColumnMenu: true,
       renderCell: ({ row }: GridRenderCellParams<TransactionDTO>) =>
-        (canMarkAsSubscription(row) ? <MarkSubscriptionButton transaction={row} onMark={onMarkSubscription} /> : null),
+        <MarkCell transaction={row} onMarkSubscription={onMarkSubscription} onMarkService={onMarkService} />,
     },
-  ], [onMarkSubscription]);
+  ], [onMarkSubscription, onMarkService]);
 
   const processRowUpdate = (next: GridRowModel<TransactionDTO>, prev: GridRowModel<TransactionDTO>) => {
     if (next.category !== prev.category) onCategoryChange(next.id, next.category);

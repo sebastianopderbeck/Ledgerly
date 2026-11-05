@@ -1,8 +1,9 @@
 import type { Currency, Direction, Issuer, TxType } from "@ledgerly/shared";
 import type { Types } from "mongoose";
 import {
-  HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, SubscriptionCadenceModel, TransactionModel,
+  CardServiceModel, HiddenSubscriptionModel, ManualSubscriptionModel, StatementModel, SubscriptionCadenceModel, TransactionModel,
 } from "../db/models.js";
+import { markedRawKeys, merchantKey } from "../stats/merchantKey.js";
 import { latestClosingByIssuer, type SubscriptionContext, type SubscriptionTx } from "../stats/subscriptions.js";
 
 export interface SubscriptionInputs {
@@ -13,13 +14,16 @@ export interface SubscriptionInputs {
 const isoDay = (date: Date): string => date.toISOString().slice(0, 10);
 
 export async function loadSubscriptionInputs(hoy: string, userId: Types.ObjectId): Promise<SubscriptionInputs> {
-  const [transactions, statements, hidden, manual, cadences] = await Promise.all([
+  const [allTransactions, statements, hidden, manual, cadences, services] = await Promise.all([
     TransactionModel.find({ userId, isInstallment: false, type: { $in: ["purchase", "refund"] } }).lean(),
     StatementModel.find({ userId }, { issuer: 1, closingDate: 1 }).lean(),
     HiddenSubscriptionModel.find({ userId }).lean(),
     ManualSubscriptionModel.find({ userId }).lean(),
     SubscriptionCadenceModel.find({ userId }),
+    CardServiceModel.find({ userId }).lean(),
   ]);
+  const serviceKeys = markedRawKeys(allTransactions.map((t) => merchantKey(t.merchant)), new Set(services.map(({ key }) => key)));
+  const transactions = allTransactions.filter((t) => !serviceKeys.has(merchantKey(t.merchant)));
   const txs: SubscriptionTx[] = transactions.map((t) => ({
     date: isoDay(t.date),
     merchant: t.merchant,

@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type {
-  AutoCouponDTO, AutoSummaryDTO, BudgetDTO, BudgetInput, BudgetPatch, BudgetSpendingDTO, CashFlowDTO, CategoryRuleDTO, CategoryStat,
+  AutoCouponDTO, AutoSummaryDTO, BudgetDTO, BudgetInput, BudgetPatch, BudgetSpendingDTO, CardServiceDTO, CashFlowDTO, CategoryRuleDTO, CategoryStat,
   CreditSummaryDTO, FixedServiceCreateDTO, FixedServiceDTO, FixedServiceUpdateDTO, FutureInstallmentStat, FutureInstallmentMonth, MailNoticeDTO, MailSource, MailSourceStatusDTO, MailSyncRunDTO, ImportResultUnionDTO,
   ImportedFileDTO, InboxRuleResultDTO, InflationRateDTO, InstallmentPurchaseDTO, MacroRefreshDTO, MacroSeriesDTO,
   ManualAssetCreateDTO, ManualAssetDTO, ManualAssetUpdateDTO, MerchantStat, MonthlyStat, MonthlyUsdStat, MortgageCouponDTO,
@@ -258,12 +258,39 @@ export function useSetSubscriptionCadence() {
   });
 }
 
+const invalidateMarks = (qc: QueryClient) => Promise.all([
+  qc.invalidateQueries({ queryKey: ["card-services"] }),
+  qc.invalidateQueries({ queryKey: ["subscriptions"] }),
+  qc.invalidateQueries({ queryKey: ["cash-flow"] }),
+]);
+
 export function useMarkSubscription() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (transactionId: string) =>
       apiFetch<void>("/subscriptions/manual", { method: "POST", body: JSON.stringify({ transactionId }) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
+    onSuccess: () => invalidateMarks(qc),
+  });
+}
+
+export function useCardServices() {
+  return useQuery({ queryKey: ["card-services"], queryFn: () => apiFetch<CardServiceDTO[]>("/card-services") });
+}
+
+export function useMarkCardService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (transactionId: string) =>
+      apiFetch<void>("/card-services", { method: "POST", body: JSON.stringify({ transactionId }) }),
+    onSuccess: () => invalidateMarks(qc),
+  });
+}
+
+export function useUnmarkCardService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => apiFetch<void>(`/card-services/${encodeURIComponent(key)}`, { method: "DELETE" }),
+    onSuccess: () => invalidateMarks(qc),
   });
 }
 

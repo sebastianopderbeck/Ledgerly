@@ -5,8 +5,8 @@ import { withDb } from "../../testing/withDb.js";
 import { TEST_AUTH_CONFIG, withAuthedApi } from "../../testing/auth.js";
 import { createApp } from "../app.js";
 import {
-  AutoCouponModel, FixedServiceModel, HiddenSubscriptionModel, InflationRateModel, MacroSeriesModel, MortgageCouponModel,
-  PayslipModel, StatementModel, TransactionModel,
+  AutoCouponModel, CardServiceModel, FixedServiceModel, HiddenSubscriptionModel, InflationRateModel, MacroSeriesModel,
+  MortgageCouponModel, PayslipModel, StatementModel, TransactionModel,
 } from "../../db/models.js";
 import { merchantKey } from "../../stats/merchantKey.js";
 import { ownedBy } from "../../testing/ownedBy.js";
@@ -156,6 +156,28 @@ describe("GET /api/cash-flow", () => {
     const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
     expect(mesDe(flow, "2026-08")).toMatchObject({ tarjetas: 395_000, suscripciones: 5_000 });
     expect(mesDe(flow, "2026-11")).toMatchObject({ tarjetas: 30_000, suscripciones: 0 });
+  });
+
+  const gascoVisa = async (cobros: [string, unknown][]) => {
+    await TransactionModel.insertMany(ownedBy(auth.userId, cobros.map(([fecha, statementId], index) => ({
+      statementId, issuer: "visa_signature", cardLabel: "Visa Signature", date: new Date(fecha),
+      descriptionRaw: "GASCO", merchant: "GASCO", category: "Servicios", categorySource: "rule",
+      amount: 20_000, currency: "ARS", direction: "debit", type: "purchase", isInstallment: false,
+      installmentCurrent: null, installmentTotal: null, comprobante: null, fingerprint: `gasco-${index}`,
+    }))));
+  };
+
+  it("pasa los cargos de un servicio de tarjeta a Servicios y lo proyecta", async () => {
+    const statements = await seed();
+    await gascoVisa([["2026-08-20", statements[1]._id], ["2026-09-20", statements[2]._id]]);
+    const sinMarca = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
+    for (const mes of ["2026-09", "2026-10", "2026-11"]) expect(mesDe(sinMarca, mes)?.servicios).toBe(0);
+    await CardServiceModel.create({ userId: auth.userId, key: "GASCO" });
+    const flow = cashFlowDtoSchema.parse((await auth.api.get("/api/cash-flow")).body);
+    expect(mesDe(flow, "2026-09")).toMatchObject({ tarjetas: 458_000, servicios: 20_000, egresos: mesDe(sinMarca, "2026-09")?.egresos });
+    expect(mesDe(flow, "2026-10")).toMatchObject({ tarjetas: 480_000, servicios: 20_000, egresos: mesDe(sinMarca, "2026-10")?.egresos });
+    expect(mesDe(flow, "2026-11")).toMatchObject({ tarjetas: 30_000, servicios: 20_000 });
+    expect(mesDe(flow, "2026-11")?.estimados).toContain("Servicios (último monto)");
   });
 
   it("con la base vacía no hay flujo", async () => {

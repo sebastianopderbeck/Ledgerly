@@ -523,3 +523,26 @@ describe("mailNoticeDtoSchema", () => {
     expect(mailNoticeDtoSchema.safeParse({}).success).toBe(false);
   });
 });
+
+import { cardServiceDtoSchema, cardServiceInputSchema } from "./dtos.js";
+
+describe("cardServiceDtoSchema", () => {
+  const gasco = {
+    key: "GASCO", nombre: "GASCO", issuer: "visa_signature", cardLabel: "Visa", ultimoMonto: 20000, ultimoCargo: "2026-09-20",
+  };
+
+  it("acepta un servicio de tarjeta", () => {
+    expect(cardServiceDtoSchema.parse(gasco)).toEqual(gasco);
+  });
+
+  it("rechaza un emisor desconocido", () => {
+    expect(cardServiceDtoSchema.safeParse({ ...gasco, issuer: "otra" }).success).toBe(false);
+  });
+});
+
+describe("cardServiceInputSchema", () => {
+  it("pide solo el movimiento", () => {
+    expect(cardServiceInputSchema.parse({ transactionId: "abc" })).toEqual({ transactionId: "abc" });
+    expect(cardServiceInputSchema.safeParse({ transactionId: "abc", key: "GASCO" }).success).toBe(false);
+  });
+});
