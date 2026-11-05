@@ -520,7 +520,7 @@ export const cardServiceDtoSchema = z.object({
   ultimoCargo: z.string(),
 });
 
-export const cardServiceInputSchema = z.object({ transactionId: z.string() }).strict();
+export const cardServiceInputSchema = z.object({ transactionId: z.string().trim().min(1) }).strict();
 
 export const netWorthItemDtoSchema = z.object({
   id: z.string(),
