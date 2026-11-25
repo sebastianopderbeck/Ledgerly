@@ -1,5 +1,5 @@
 import type { PayslipDTO } from "@ledgerly/shared";
-import { formatMoney } from "./format.js";
+import { formatMoney, formatMonthLabel } from "./format.js";
 import {
   CODIGO_AJUSTE_ANIO_ANTERIOR,
   CODIGOS_APORTES_DEDUCIBLES,
@@ -69,6 +69,14 @@ const VEREDICTO_LABEL: Record<VeredictoRetencion, string> = {
   de_menos: "Te retienen de menos",
 };
 
+export type ColorVeredicto = "success" | "warning" | "error";
+
+const VEREDICTO_COLOR: Record<VeredictoRetencion, ColorVeredicto> = {
+  coincide: "success",
+  de_mas: "warning",
+  de_menos: "error",
+};
+
 export const mesDeCobro = ({ periodo, tipo }: Pick<PayslipDTO, "periodo" | "tipo">): MesDeCobro => {
   const anio = Number(periodo.slice(0, 4));
   const mes = Number(periodo.slice(5, 7));
@@ -90,7 +98,11 @@ export const veredictoRetencion = (diferencia: number, esperado: number): Veredi
 
 export const veredictoRetencionLabel = (veredicto: VeredictoRetencion): string => VEREDICTO_LABEL[veredicto];
 
+export const veredictoRetencionColor = (veredicto: VeredictoRetencion): ColorVeredicto => VEREDICTO_COLOR[veredicto];
+
 const periodoDe = (anio: number, mes: number): string => `${anio}-${String(mes).padStart(2, "0")}`;
+
+export const mesDeCobroLabel = (anio: number, mes: number): string => formatMonthLabel(periodoDe(anio, mes));
 
 const periodoMensualCobradoEn = (anio: number, mes: number): string =>
   mes === 1 ? periodoDe(anio - 1, MESES_DEL_ANIO) : periodoDe(anio, mes - 1);

@@ -7,8 +7,10 @@ import {
   avisoRetencionTexto,
   impuestoSegunEscala,
   mesDeCobro,
+  mesDeCobroLabel,
   retencionGanancias,
   veredictoRetencion,
+  veredictoRetencionColor,
   type ResultadoRetencion,
 } from "./gananciasRetencion.js";
 
@@ -113,6 +115,19 @@ describe("veredictoRetencion", () => {
   it("sin impuesto esperado, solo coincide si no se retuvo nada", () => {
     expect(veredictoRetencion(0, 0)).toBe("coincide");
     expect(veredictoRetencion(50, 0)).toBe("de_mas");
+  });
+
+  it("cada veredicto tiene su color", () => {
+    expect(veredictoRetencionColor("coincide")).toBe("success");
+    expect(veredictoRetencionColor("de_mas")).toBe("warning");
+    expect(veredictoRetencionColor("de_menos")).toBe("error");
+  });
+});
+
+describe("mesDeCobroLabel", () => {
+  it("nombra el mes de cobro con su año", () => {
+    expect(mesDeCobroLabel(2026, 1)).toBe("Enero de 2026");
+    expect(mesDeCobroLabel(2026, 12)).toBe("Diciembre de 2026");
   });
 });
 
