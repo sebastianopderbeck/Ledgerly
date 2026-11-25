@@ -179,6 +179,20 @@ describe("retencionGanancias", () => {
     expect(resultado.avisos).toEqual([{ tipo: "falta_recibo", periodo: "2026-06", sac: true, hastaMes: 5 }]);
   });
 
+  it("el SAC de junio todavía no cobrado no es hueco", () => {
+    const resultado = calculado(retencionGanancias(mensuales("2025-12", "2026-05"), tablasSinteticas()));
+    expect(resultado.avisos).toEqual([]);
+    expect(resultado.meses).toHaveLength(6);
+    expect(resultado.meses[5].esperado).toBe(6180);
+  });
+
+  it("el SAC de diciembre todavía no cobrado no es hueco", () => {
+    const resultado = calculado(retencionGanancias([...mensuales("2025-12", "2026-11"), sacJunio()], tablasSinteticas()));
+    expect(resultado.avisos).toEqual([]);
+    expect(resultado.meses).toHaveLength(12);
+    expect(resultado.meses[11].esperado).toBe(12360);
+  });
+
   it("hueco en enero: ningún mes calculable", () => {
     const resultado = calculado(retencionGanancias(mensuales("2026-01", "2026-03"), tablasSinteticas()));
     expect(resultado.meses).toEqual([]);

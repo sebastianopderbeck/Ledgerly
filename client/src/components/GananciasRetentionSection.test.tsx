@@ -52,6 +52,29 @@ describe("GananciasRetentionSection", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
+  it("el resumen dice hasta qué mes es la cuenta", () => {
+    renderWithProviders(<GananciasRetentionSection resultado={calculado()} />);
+    expect(screen.getByText("Último mes: Febrero de 2026")).toBeInTheDocument();
+  });
+
+  it("si el último mes es de cambio de tablas, el resumen lo avisa", () => {
+    const enero = mes({ mes: 1, cambioDeTablas: true, retenido: 1300, diferencia: 300, veredicto: "de_mas" });
+    renderWithProviders(<GananciasRetentionSection resultado={calculado({ meses: [enero] })} />);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByText("Cambio de tablas")).toBeInTheDocument();
+  });
+
+  it("con avisos el resumen marca la cuenta incompleta", () => {
+    const aviso: AvisoRetencion = { tipo: "falta_recibo", periodo: "2026-02", sac: false, hastaMes: 2 };
+    renderWithProviders(<GananciasRetentionSection resultado={calculado({ avisos: [aviso] })} />);
+    expect(screen.getByText("Cuenta incompleta")).toBeInTheDocument();
+  });
+
+  it("sin avisos el resumen no marca la cuenta incompleta", () => {
+    renderWithProviders(<GananciasRetentionSection resultado={calculado()} />);
+    expect(screen.queryByText("Cuenta incompleta")).not.toBeInTheDocument();
+  });
+
   it("al expandir muestra la tabla con el cambio de tablas en enero", async () => {
     renderWithProviders(<GananciasRetentionSection resultado={calculado()} />);
     await expandir();

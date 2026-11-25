@@ -165,7 +165,8 @@ const calcularMeses = (delAnio: ReciboCobrado[], anio: number, tablasAnio: Tabla
   for (let mes = 1; mes <= ultimoCobro; mes += 1) {
     const tablasMes = tablasAnio.meses[mes - 1];
     if (!tablasMes) return { meses, avisos: [{ tipo: "faltan_tablas", desdeMes: mes } as const] };
-    const faltante = recibosRequeridos(anio, mes).find((requerido) => !delAnio.some(({ payslip }) => esElRecibo(payslip, requerido)));
+    const exigibles = recibosRequeridos(anio, mes).filter((requerido) => !(requerido.sac && mes === ultimoCobro));
+    const faltante = exigibles.find((requerido) => !delAnio.some(({ payslip }) => esElRecibo(payslip, requerido)));
     if (faltante) return { meses, avisos: [{ tipo: "falta_recibo", ...faltante, hastaMes: mes - 1 } as const] };
     const cobradosHastaElMes = delAnio.filter((recibo) => recibo.mes <= mes);
     meses.push(mesRetencion(cobradosHastaElMes, mes, tablasMes, tablasAnio.topeHipotecarioAnual));

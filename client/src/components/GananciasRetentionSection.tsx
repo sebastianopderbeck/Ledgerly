@@ -1,6 +1,7 @@
 import { useId } from "react";
-import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Stack, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Chip, Stack, Typography } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
@@ -8,11 +9,13 @@ import { formatMoney } from "../format.js";
 import {
   ajusteAnioAnteriorTexto,
   avisoRetencionTexto,
+  mesDeCobroLabel,
   veredictoRetencionColor,
   veredictoRetencionLabel,
   type ResultadoRetencion,
 } from "../gananciasRetencion.js";
 import { useIsMobile } from "../useIsMobile.js";
+import { GananciasCambioDeTablasChip } from "./GananciasCambioDeTablasChip.js";
 import { GananciasRetentionCards } from "./GananciasRetentionCards.js";
 import { GananciasRetentionTable } from "./GananciasRetentionTable.js";
 import { GananciasVeredictoChip } from "./GananciasVeredictoChip.js";
@@ -52,6 +55,16 @@ export const GananciasRetentionSection = ({ resultado }: GananciasRetentionSecti
   const ajuste = ajusteAnioAnterior && (
     <Typography variant="body2" color="text.secondary">{ajusteAnioAnteriorTexto(ajusteAnioAnterior, anio)}</Typography>
   );
+  const resumen = ultimo && (
+    <>
+      <GananciasVeredictoChip veredicto={ultimo.veredicto} />
+      {ultimo.cambioDeTablas && <GananciasCambioDeTablasChip />}
+      <Typography variant="body2" color="text.secondary">{`Último mes: ${mesDeCobroLabel(anio, ultimo.mes)}`}</Typography>
+    </>
+  );
+  const cuentaIncompleta = avisos.length > 0 && (
+    <Chip label="Cuenta incompleta" color="warning" size="small" icon={<WarningAmberIcon />} />
+  );
   const lista = isMobile
     ? <GananciasRetentionCards anio={anio} meses={meses} />
     : <GananciasRetentionTable anio={anio} meses={meses} />;
@@ -78,7 +91,8 @@ export const GananciasRetentionSection = ({ resultado }: GananciasRetentionSecti
       <AccordionSummary expandIcon={<ExpandMoreIcon />} id={`${id}-header`} aria-controls={`${id}-content`}>
         <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
           <Typography variant="h6">{titulo(anio)}</Typography>
-          {ultimo && <GananciasVeredictoChip veredicto={ultimo.veredicto} />}
+          {resumen}
+          {cuentaIncompleta}
         </Box>
       </AccordionSummary>
       <AccordionDetails>
