@@ -5,6 +5,8 @@ import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { PayslipKpiCards } from "../components/PayslipKpiCards.js";
 import { PayslipDetailSection } from "../components/PayslipDetailSection.js";
 import { SalaryRaisesSection } from "../components/SalaryRaisesSection.js";
+import { GananciasRetentionSection } from "../components/GananciasRetentionSection.js";
+import { retencionGanancias } from "../gananciasRetencion.js";
 import { PayslipDescuentoKpis } from "../components/PayslipDescuentoKpis.js";
 import { MotionBox } from "../components/motion/motion.js";
 import { staggerContainer } from "../components/motion/variants.js";
@@ -30,6 +32,7 @@ export const PayslipsPage = () => {
   const inflation = useMemo(() => inflationData ?? [], [inflationData]);
   const payslips = useMemo(() => data ?? [], [data]);
   const raises = useMemo(() => salaryRaises(payslips, inflation), [payslips, inflation]);
+  const retencion = useMemo(() => retencionGanancias(payslips), [payslips]);
   const years = useMemo(() => payslipYears(payslips), [payslips]);
   const inYears = useMemo(
     () => payslips.filter((payslip) => matchesYears(payslip.periodo, yearSelection)),
@@ -92,6 +95,7 @@ export const PayslipsPage = () => {
 
       <PayslipDetailSection payslips={inYears} />
       <SalaryRaisesSection raises={raisesInYears} />
+      <GananciasRetentionSection resultado={retencion} />
     </>
   );
 };
