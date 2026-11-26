@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Badge, Box, Button, Typography } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import TuneIcon from "@mui/icons-material/Tune";
-import { filtersButtonLabel, filtersSummary, hiddenFilterCount, type FilterField } from "../../filters/activeFilters.js";
+import { filtersButtonLabel, filtersSummary, hasSearchFilter, hiddenFilterCount, type FilterField } from "../../filters/activeFilters.js";
 import { FiltersSheet } from "./FiltersSheet.js";
 import { SearchFilter } from "./SearchFilter.js";
 
@@ -23,7 +23,7 @@ export const MobileFiltersBar = ({ fields, yearOptions }: MobileFiltersBarProps)
   const closeSheet = useCallback(() => setOpen(false), []);
   const count = hiddenFilterCount(params, fields);
   const summary = filtersSummary(params, fields);
-  const showsSearch = fields.includes("transaction");
+  const showsSearch = hasSearchFilter(fields);
 
   return (
     <Box sx={{ mb: 3 }}>

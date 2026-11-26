@@ -13,6 +13,15 @@ const renderBar = (search?: ReactNode, count = 2) => renderWithProviders(
 
 const filtersButton = () => screen.getByRole("button", { name: /^Filtros/ });
 
+const cssFor = (element: Element): string => {
+  const classes = Array.from(element.classList).filter((name) => name.startsWith("css-"));
+  const rules = Array.from(document.querySelectorAll("style"))
+    .map((style) => style.textContent ?? "")
+    .join("\n")
+    .split("}");
+  return rules.filter((rule) => classes.some((name) => rule.includes(`.${name}`))).join("}");
+};
+
 afterEach(cleanup);
 
 describe("CollapsibleFiltersBar", () => {
@@ -37,6 +46,11 @@ describe("CollapsibleFiltersBar", () => {
     expect(within(screen.getByRole("group", { name: "Más filtros" })).getByRole("textbox", { name: "Moneda" })).toBeInTheDocument();
     await userEvent.click(filtersButton());
     await waitFor(() => expect(screen.queryByRole("group", { name: "Más filtros" })).not.toBeInTheDocument());
+  });
+
+  it("el botón Filtros es un blanco táctil de 44 px en el celular", () => {
+    renderBar();
+    expect(cssFor(filtersButton())).toMatch(/min-height:\s*44px/);
   });
 
   it("sin filtros activos el botón se llama solo Filtros", () => {

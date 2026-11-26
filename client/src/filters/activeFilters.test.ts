@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  activeFilterCount, filtersButtonLabel, filtersSummary, hiddenFilterCount, isCompactFilters, type FilterField,
+  activeFilterCount, filtersButtonLabel, filtersSummary, hasSearchFilter, hiddenFilterCount, isCompactFilters, type FilterField,
 } from "./activeFilters.js";
 
 const DASHBOARD: FilterField[] = ["year", "currency", "card", "month"];
@@ -95,6 +95,14 @@ describe("filtersButtonLabel", () => {
     expect(filtersButtonLabel(0)).toBe("Filtros");
     expect(filtersButtonLabel(1)).toBe("Filtros, 1 activo");
     expect(filtersButtonLabel(3)).toBe("Filtros, 3 activos");
+  });
+});
+
+describe("hasSearchFilter", () => {
+  it("solo las secciones con filtros de movimientos tienen buscador", () => {
+    expect(hasSearchFilter(["year", "currency", "card", "month", "transaction"])).toBe(true);
+    expect(hasSearchFilter(["year", "currency", "card", "month"])).toBe(false);
+    expect(hasSearchFilter(["year"])).toBe(false);
   });
 });
 

@@ -174,6 +174,14 @@ describe("FiltersBar", () => {
     expect(screen.getByText("2025 · USD")).toBeInTheDocument();
   });
 
+  it("en compu, con solo la búsqueda escrita, el botón dice Filtros sin número", async () => {
+    emulateDesktop();
+    renderBar(["year", "currency", "transaction"], "/transactions");
+    await userEvent.type(screen.getByRole("textbox", { name: "Buscar comercio" }), "uber");
+    expect(currentParams().get("search")).toBe("uber");
+    expect(screen.getByRole("button", { name: "Filtros" })).toBeInTheDocument();
+  });
+
   it("en compu el número de Filtros no cuenta la búsqueda", () => {
     emulateDesktop();
     renderBar(["transaction"], "/transactions?search=uber&category=Compras");
@@ -186,6 +194,7 @@ describe("FiltersBar", () => {
     await openFilters();
     const year = await openSelect(/año/i);
     await userEvent.click(within(year).getByRole("option", { name: "2025" }));
+    expect(currentParams().getAll("year")).toEqual(["2025", "2026"]);
     await userEvent.keyboard("{Escape}");
     const installments = await openSelect(/cuotas/i);
     await userEvent.click(within(installments).getByRole("option", { name: "Solo cuotas" }));

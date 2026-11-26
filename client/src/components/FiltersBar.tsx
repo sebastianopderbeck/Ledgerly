@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { Box } from "@mui/material";
-import { filtersSummary, hiddenFilterCount, isCompactFilters, type FilterField } from "../filters/activeFilters.js";
+import { filtersSummary, hasSearchFilter, hiddenFilterCount, isCompactFilters, type FilterField } from "../filters/activeFilters.js";
 import { useIsMobile } from "../useIsMobile.js";
 import { CollapsibleFiltersBar } from "./filters/CollapsibleFiltersBar.js";
 import { FilterFields } from "./filters/FilterFields.js";
@@ -25,7 +25,7 @@ export const FiltersBar = ({ fields, yearOptions }: FiltersBarProps) => {
     );
   }
 
-  const search = fields.includes("transaction") ? <SearchFilter fullWidth /> : undefined;
+  const search = hasSearchFilter(fields) ? <SearchFilter fullWidth /> : undefined;
 
   return (
     <CollapsibleFiltersBar search={search} count={hiddenFilterCount(params, fields)} summary={filtersSummary(params, fields)}>

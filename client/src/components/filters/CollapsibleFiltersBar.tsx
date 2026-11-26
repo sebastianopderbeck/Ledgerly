@@ -19,6 +19,8 @@ const summarySx: SxProps<Theme> = { minWidth: 0, flex: "0 1 auto" };
 
 const panelSx: SxProps<Theme> = { display: "flex", gap: 2, flexWrap: "wrap", pt: 2 };
 
+const buttonSx: SxProps<Theme> = { minHeight: { xs: 44, md: 40 } };
+
 export const CollapsibleFiltersBar = ({ search, count, summary, children }: CollapsibleFiltersBarProps) => {
   const panelId = useId();
   const [open, setOpen] = useState(false);
@@ -30,7 +32,7 @@ export const CollapsibleFiltersBar = ({ search, count, summary, children }: Coll
         {search && <Box sx={searchSx}>{search}</Box>}
         <Badge badgeContent={count} color="primary" slotProps={{ badge: { "aria-hidden": true } }} sx={{ flexShrink: 0 }}>
           <Button
-            variant="outlined" startIcon={<TuneIcon />} onClick={togglePanel}
+            variant="outlined" startIcon={<TuneIcon />} onClick={togglePanel} sx={buttonSx}
             aria-expanded={open} aria-controls={panelId} aria-label={filtersButtonLabel(count)}
           >
             Filtros
