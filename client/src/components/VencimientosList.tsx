@@ -15,7 +15,7 @@ interface VencimientoRowProps { item: Vencimiento; hoy: string; }
 interface FichaFechaProps { fecha: string; hoy: string; confirmado: boolean; }
 interface EstadoChipProps { confirmado: boolean; }
 
-const listSx: SxProps<Theme> = { display: "grid", gap: 2, maxWidth: 840 };
+const listSx: SxProps<Theme> = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 2, maxWidth: 840 };
 
 const headerSx: SxProps<Theme> = { px: 2, pt: 1.5, pb: 1, borderBottom: 1, borderColor: "divider" };
 
