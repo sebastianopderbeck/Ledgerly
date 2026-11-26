@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import type { ImportedFileDTO } from "@ledgerly/shared";
 import {
-  EMPTY_IMPORTED_FILES_FILTERS, filterImportedFiles, importedFileDeleteMessage, importedFileYears, type ImportedFilesFilters,
+  EMPTY_IMPORTED_FILES_FILTERS, filterImportedFiles, importedFileDeleteMessage, importedFilesHiddenCount, importedFilesSummary,
+  importedFileYears, type ImportedFilesFilters,
 } from "./importedFiles.js";
 
 const file = (overrides: Partial<ImportedFileDTO>): ImportedFileDTO => ({
@@ -77,5 +78,22 @@ describe("importedFileDeleteMessage", () => {
 
   it("sin archivo pendiente no hay mensaje", () => {
     expect(importedFileDeleteMessage(null)).toBe("");
+  });
+});
+
+describe("importedFilesHiddenCount e importedFilesSummary", () => {
+  it("sin nada elegido no cuenta ni resume", () => {
+    expect(importedFilesHiddenCount(EMPTY_IMPORTED_FILES_FILTERS)).toBe(0);
+    expect(importedFilesSummary(EMPTY_IMPORTED_FILES_FILTERS)).toBe("");
+  });
+
+  it("cuenta y resume tipo, año y solo a revisar, nunca la búsqueda", () => {
+    const filters = { kinds: ["payslip"], year: "2025", search: "recibo", onlyNeedsReview: true } satisfies ImportedFilesFilters;
+    expect(importedFilesHiddenCount(filters)).toBe(3);
+    expect(importedFilesSummary(filters)).toBe("Sueldo · 2025 · Solo a revisar");
+  });
+
+  it("con varios tipos los cuenta", () => {
+    expect(importedFilesSummary({ ...EMPTY_IMPORTED_FILES_FILTERS, kinds: ["statement", "coupon"] })).toBe("2 tipos");
   });
 });

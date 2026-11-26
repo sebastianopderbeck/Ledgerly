@@ -49,6 +49,21 @@ export const filterImportedFiles = (
 export const importedFileYears = (files: ImportedFileDTO[]): string[] =>
   [...new Set(files.map(yearOf))].sort().reverse();
 
+const SUMMARY_SEPARATOR = " · ";
+
+const kindsLabel = (kinds: ImportedFileKind[]): string | undefined => {
+  if (kinds.length === 0) return undefined;
+  return kinds.length === 1 ? IMPORTED_FILE_KIND_LABELS[kinds[0]] : `${kinds.length} tipos`;
+};
+
+export const importedFilesHiddenCount = ({ kinds, year, onlyNeedsReview }: ImportedFilesFilters): number =>
+  [kinds.length > 0, Boolean(year), onlyNeedsReview].filter(Boolean).length;
+
+export const importedFilesSummary = ({ kinds, year, onlyNeedsReview }: ImportedFilesFilters): string =>
+  [kindsLabel(kinds), year, onlyNeedsReview ? "Solo a revisar" : undefined]
+    .filter((part): part is string => Boolean(part))
+    .join(SUMMARY_SEPARATOR);
+
 export const importedFileDeleteMessage = (file: ImportedFileDTO | null): string => {
   if (!file) return "";
   const cascade = file.kind === "statement" ? " También se borran sus movimientos." : "";

@@ -62,6 +62,13 @@ const periodLabel = (params: URLSearchParams, fields: FilterField[]): string | u
 export const activeFilterCount = (params: URLSearchParams, fields: FilterField[]): number =>
   fields.reduce((total, field) => total + ACTIVE_BY_FIELD[field](params), 0);
 
+const showsSearch = (fields: FilterField[]): boolean => fields.includes("transaction");
+
+export const isCompactFilters = (fields: FilterField[]): boolean => showsSearch(fields) || fields.length > 1;
+
+export const hiddenFilterCount = (params: URLSearchParams, fields: FilterField[]): number =>
+  activeFilterCount(params, fields) - countActive(showsSearch(fields) && Boolean(params.get("search")));
+
 export const filtersSummary = (params: URLSearchParams, fields: FilterField[]): string => {
   const details = fields.filter(isDetailField).flatMap((field) => DETAILS_BY_FIELD[field](params));
   return [periodLabel(params, fields), ...details]
