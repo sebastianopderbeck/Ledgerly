@@ -29,7 +29,23 @@ afterEach(() => {
   cleanup();
 });
 
+const cssFor = (element: Element): string => {
+  const classes = Array.from(element.classList).filter((name) => name.startsWith("css-"));
+  const rules = Array.from(document.querySelectorAll("style"))
+    .map((style) => style.textContent ?? "")
+    .join("\n")
+    .split("}");
+  return rules.filter((rule) => classes.some((name) => rule.includes(`.${name}`))).join("}");
+};
+
 describe("VencimientosList", () => {
+  it("la columna de grupos se achica al ancho de la pantalla aunque un título no entre", () => {
+    renderList();
+    const grilla = screen.getByRole("region", { name: "Esta semana" }).parentElement?.parentElement;
+    expect(grilla).toBeDefined();
+    expect(cssFor(grilla!)).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  });
+
   it("muestra un encabezado h2 por grupo con su resumen", () => {
     const grupos = renderList();
     const titulos = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
