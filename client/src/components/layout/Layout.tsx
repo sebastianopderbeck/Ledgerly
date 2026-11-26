@@ -8,7 +8,6 @@ import { MOBILE_NAV_HEIGHT, MobileBottomNav } from "./MobileBottomNav.js";
 import { sectionOf } from "./navItems.js";
 import { SectionHeader } from "./SectionHeader.js";
 import { TopActionsPill } from "./TopActionsPill.js";
-import { useSidebarCollapsed } from "./useSidebarCollapsed.js";
 
 interface LayoutProps { children: ReactNode; }
 
@@ -29,12 +28,11 @@ const statusBarScrimSx: SxProps<Theme> = {
 
 export const Layout = ({ children }: LayoutProps) => {
   const isMobile = useIsMobile();
-  const { collapsed, toggleCollapsed } = useSidebarCollapsed();
   const section = sectionOf(useLocation().pathname);
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      {!isMobile && <DesktopSidebar collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />}
+      {!isMobile && <DesktopSidebar />}
       {isMobile && <Box aria-hidden sx={statusBarScrimSx} />}
       <TopActionsPill />
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
