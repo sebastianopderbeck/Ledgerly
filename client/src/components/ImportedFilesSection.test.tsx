@@ -44,6 +44,16 @@ const pickOption = async (label: RegExp, option: string) => {
   await userEvent.keyboard("{Escape}");
 };
 
+const filtersButton = () => screen.getByRole("button", { name: /^Filtros/ });
+
+const openFilters = () => userEvent.click(filtersButton());
+
+const filtersRow = (): HTMLElement => {
+  const row = filtersButton().closest(".MuiBadge-root")?.parentElement;
+  if (!row) throw new Error("No se encontró la fila del botón Filtros");
+  return row;
+};
+
 describe("ImportedFilesSection", () => {
   it("muestra todos los archivos importados", async () => {
     renderWithProviders(<ImportedFilesSection />);
@@ -54,6 +64,7 @@ describe("ImportedFilesSection", () => {
   it("filtra por tipo", async () => {
     renderWithProviders(<ImportedFilesSection />);
     await screen.findByText("visa-julio.pdf");
+    await openFilters();
     await pickOption(/tipo/i, "Sueldo");
     expect(visibleFiles()).toEqual(["recibo-junio.pdf"]);
   });
@@ -61,6 +72,7 @@ describe("ImportedFilesSection", () => {
   it("filtra por año del documento", async () => {
     renderWithProviders(<ImportedFilesSection />);
     await screen.findByText("visa-julio.pdf");
+    await openFilters();
     await pickOption(/año/i, "2025");
     expect(visibleFiles()).toEqual(["cupon-1.pdf"]);
   });
@@ -75,7 +87,33 @@ describe("ImportedFilesSection", () => {
   it("muestra solo los que hay que revisar", async () => {
     renderWithProviders(<ImportedFilesSection />);
     await screen.findByText("visa-julio.pdf");
+    await openFilters();
     await userEvent.click(screen.getByRole("checkbox", { name: /solo a revisar/i }));
+    expect(visibleFiles()).toEqual(["visa-julio.pdf"]);
+  });
+
+  it("la búsqueda queda a la vista y el botón cuenta y resume lo elegido, sin la búsqueda", async () => {
+    renderWithProviders(<ImportedFilesSection />);
+    await screen.findByText("visa-julio.pdf");
+    expect(screen.queryByRole("combobox", { name: /tipo/i })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole("textbox", { name: /buscar/i }), "recibo");
+    await openFilters();
+    await pickOption(/tipo/i, "Sueldo");
+    expect(screen.getByRole("button", { name: "Filtros, 1 activo" })).toBeInTheDocument();
+    expect(within(filtersRow()).getByText("Sueldo")).toBeInTheDocument();
+  });
+
+  it("con el panel cerrado, el resumen dice qué tipo, año y «Solo a revisar» están aplicados", async () => {
+    renderWithProviders(<ImportedFilesSection />);
+    await screen.findByText("visa-julio.pdf");
+    await openFilters();
+    await pickOption(/tipo/i, "Tarjeta");
+    await pickOption(/año/i, "2026");
+    await userEvent.click(screen.getByRole("checkbox", { name: /solo a revisar/i }));
+    await openFilters();
+    await waitFor(() => expect(screen.queryByRole("group", { name: "Más filtros" })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Filtros, 3 activos" })).toBeInTheDocument();
+    expect(within(filtersRow()).getByText("Tarjeta · 2026 · Solo a revisar")).toBeInTheDocument();
     expect(visibleFiles()).toEqual(["visa-julio.pdf"]);
   });
 
