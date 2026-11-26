@@ -40,6 +40,10 @@ const openSelect = async (name: RegExp) => {
   return screen.findByRole("listbox");
 };
 
+const openFilters = () => userEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
+
+const labelsIn = (container: HTMLElement) => Array.from(container.querySelectorAll("label"), (label) => label.textContent);
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-02T12:00:00"));
@@ -69,6 +73,7 @@ describe("FiltersBar", () => {
 
   it("ofrece un filtro de tarjeta con las tarjetas importadas", async () => {
     renderBar(["currency", "card"]);
+    await openFilters();
     const listbox = await openSelect(/tarjeta/i);
     expect(await within(listbox).findByText("ICBC")).toBeInTheDocument();
     expect(within(listbox).getByText("Visa Signature ****8883")).toBeInTheDocument();
@@ -76,6 +81,7 @@ describe("FiltersBar", () => {
 
   it("permite filtrar por varias categorías", async () => {
     renderBar(["transaction"], "/transactions");
+    await openFilters();
     const listbox = await openSelect(/categorías/i);
     await userEvent.click(await within(listbox).findByRole("option", { name: "Compras" }));
     await userEvent.click(within(listbox).getByRole("option", { name: "Transporte" }));
@@ -84,6 +90,7 @@ describe("FiltersBar", () => {
 
   it("ofrece un filtro de cuotas con opciones todas/solo/sin", async () => {
     renderBar(["transaction"], "/transactions");
+    await openFilters();
     const listbox = await openSelect(/cuotas/i);
     expect(within(listbox).getByRole("option", { name: "Solo cuotas" })).toBeInTheDocument();
     expect(within(listbox).getByRole("option", { name: "Sin cuotas" })).toBeInTheDocument();
@@ -119,6 +126,7 @@ describe("FiltersBar", () => {
 
   it("el Mes lista solo meses de los años elegidos", async () => {
     renderBar(["year", "month"], "/?year=2026");
+    await openFilters();
     const listbox = await openSelect(/^mes/i);
     expect(await within(listbox).findByRole("option", { name: /febrero/i })).toBeInTheDocument();
     expect(within(listbox).getByRole("option", { name: /enero/i })).toBeInTheDocument();
@@ -127,16 +135,20 @@ describe("FiltersBar", () => {
 
   it("sacar el año del Mes elegido limpia el Mes", async () => {
     renderBar(["year", "month"], "/?year=2025&year=2026&from=2025-11-01&to=2025-11-30");
+    await openFilters();
     const listbox = await openSelect(/año/i);
     await userEvent.click(within(listbox).getByRole("option", { name: "2025" }));
     expect(currentParams().getAll("year")).toEqual(["2026"]);
     expect(currentParams().get("from")).toBeNull();
   });
 
-  it("en compu muestra los campos en línea, en el orden de siempre", () => {
+  it("en compu deja la búsqueda a la vista y el resto detrás de Filtros, en el orden de siempre", async () => {
+    emulateDesktop();
     const { container } = renderBar(["year", "currency", "card", "month", "transaction"], "/transactions");
-    const labels = Array.from(container.querySelectorAll("label"), (label) => label.textContent);
-    expect(labels).toEqual(["Año", "Moneda", "Tarjeta", "Mes", "Categorías", "Cuotas", "Buscar comercio"]);
+    expect(screen.getByRole("textbox", { name: "Buscar comercio" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /año/i })).not.toBeInTheDocument();
+    await openFilters();
+    expect(labelsIn(container)).toEqual(["Buscar comercio", "Año", "Moneda", "Tarjeta", "Mes", "Categorías", "Cuotas"]);
   });
 
   it("en compu el buscador no lleva las pistas de teclado del celular", () => {
@@ -148,11 +160,37 @@ describe("FiltersBar", () => {
     }
   });
 
-  it("en compu sigue mostrando los campos en línea, sin botón Filtros", () => {
+  it("en compu, con solo Año, el selector sigue a la vista y no hay botón Filtros", () => {
     emulateDesktop();
-    renderBar(["year", "currency"]);
+    renderBar(["year"]);
     expect(screen.getByRole("combobox", { name: /año/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^filtros/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Filtros/ })).not.toBeInTheDocument();
+  });
+
+  it("en compu, con varios campos y sin búsqueda, muestra el botón y el resumen", () => {
+    emulateDesktop();
+    renderBar(["year", "currency"], "/?year=2025&currency=USD");
+    expect(screen.getByRole("button", { name: "Filtros, 2 activos" })).toBeInTheDocument();
+    expect(screen.getByText("2025 · USD")).toBeInTheDocument();
+  });
+
+  it("en compu el número de Filtros no cuenta la búsqueda", () => {
+    emulateDesktop();
+    renderBar(["transaction"], "/transactions?search=uber&category=Compras");
+    expect(screen.getByRole("button", { name: "Filtros, 1 activo" })).toBeInTheDocument();
+  });
+
+  it("en compu el panel queda abierto mientras se cambian varios filtros", async () => {
+    emulateDesktop();
+    renderBar(["year", "currency", "transaction"], "/transactions?year=2026");
+    await openFilters();
+    const year = await openSelect(/año/i);
+    await userEvent.click(within(year).getByRole("option", { name: "2025" }));
+    await userEvent.keyboard("{Escape}");
+    const installments = await openSelect(/cuotas/i);
+    await userEvent.click(within(installments).getByRole("option", { name: "Solo cuotas" }));
+    expect(screen.getByRole("group", { name: "Más filtros" })).toBeInTheDocument();
+    expect(currentParams().get("installment")).toBe("true");
   });
 });
 
@@ -241,7 +279,7 @@ describe("FiltersBar en mobile", () => {
     renderBar(TRANSACTIONS, "/transactions");
     await userEvent.type(screen.getByRole("textbox", { name: "Buscar comercio" }), "ub");
     expect(screen.getByTestId("navigation-type")).toHaveTextContent("REPLACE");
-    await userEvent.click(filtersButton("Filtros, 1 activo"));
+    await userEvent.click(filtersButton("Filtros"));
     await chooseInSheet(/moneda/i, "USD");
     expect(currentParams().get("currency")).toBe("USD");
     expect(screen.getByTestId("navigation-type")).toHaveTextContent("REPLACE");
@@ -274,35 +312,45 @@ describe("FiltersBar en mobile", () => {
     expect(within(screen.getByRole("dialog", { name: "Filtros" })).getByRole("button", { name: "Listo" })).toBeInTheDocument();
   });
 
-  it("en Movimientos el buscador queda a la vista debajo del botón y fuera de la hoja", async () => {
+  it("en el celular la búsqueda va arriba del botón Filtros", () => {
+    renderBar(TRANSACTIONS, "/transactions");
+    const search = screen.getByRole("textbox", { name: "Buscar comercio" });
+    expect(search.compareDocumentPosition(screen.getByRole("button", { name: /^Filtros/ })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("en el celular el número de Filtros no cuenta la búsqueda", () => {
+    renderBar(TRANSACTIONS, "/transactions?search=uber");
+    expect(screen.getByRole("button", { name: "Filtros" })).toBeInTheDocument();
+  });
+
+  it("en Movimientos el buscador queda a la vista fuera de la hoja", async () => {
     renderBar(TRANSACTIONS, "/transactions");
     const button = filtersButton("Filtros");
-    const search = screen.getByRole("textbox", { name: "Buscar comercio" });
-    expect(button.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     await userEvent.click(button);
     const sheet = screen.getByRole("dialog", { name: "Filtros" });
     expect(within(sheet).getByRole("combobox", { name: /categorías/i })).toBeInTheDocument();
     expect(within(sheet).queryByRole("textbox", { name: "Buscar comercio" })).not.toBeInTheDocument();
   });
 
-  it("escribir en el buscador mantiene el foco, filtra al momento y suma al contador sin repetirse en el resumen", async () => {
+  it("escribir en el buscador mantiene el foco, filtra al momento y no suma al contador ni se repite en el resumen", async () => {
     renderBar(TRANSACTIONS, "/transactions");
     const search = screen.getByRole("textbox", { name: "Buscar comercio" });
     await userEvent.type(search, "uber");
     expect(search).toHaveValue("uber");
     expect(search).toHaveFocus();
     expect(currentParams().get("search")).toBe("uber");
-    expect(filtersButton("Filtros, 1 activo")).toBeInTheDocument();
+    expect(filtersButton("Filtros")).toBeInTheDocument();
     expect(screen.getByText("2026 · ARS")).toBeInTheDocument();
   });
 
-  it("si la pantalla pasa a tamaño compu con la hoja abierta, quedan los campos en línea y nada tapando", async () => {
+  it("si la pantalla pasa a tamaño compu con la hoja abierta, queda la barra de compu y nada tapando", async () => {
     renderBar(DASHBOARD);
     await userEvent.click(filtersButton("Filtros"));
     emulateDesktop();
     await waitFor(() => expect(filtersSheet()).not.toBeInTheDocument());
     expect(document.querySelector(".MuiBackdrop-root")).not.toBeInTheDocument();
     expect(document.body.style.overflow).not.toBe("hidden");
-    expect(screen.getByRole("combobox", { name: /año/i })).toBeInTheDocument();
+    await openFilters();
+    expect(within(screen.getByRole("group", { name: "Más filtros" })).getByRole("combobox", { name: /año/i })).toBeInTheDocument();
   });
 });
