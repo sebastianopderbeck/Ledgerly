@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Box, ButtonBase } from "@mui/material";
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import type { NavSection } from "./navItems.js";
+import { scrollToReveal } from "./scrollToReveal.js";
 import { useNavSearch } from "./useNavSearch.js";
 
 interface SectionTabsProps {
@@ -10,6 +11,7 @@ interface SectionTabsProps {
 }
 
 const stripSx: SxProps<Theme> = {
+  position: "relative",
   display: "inline-flex",
   maxWidth: "100%",
   gap: 0.5,
@@ -46,10 +48,17 @@ const tabSx: SxProps<Theme> = {
 export const SectionTabs = ({ section }: SectionTabsProps) => {
   const search = useNavSearch();
   const { pathname } = useLocation();
+  const stripRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
-    activeTabRef.current?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    const strip = stripRef.current;
+    const tab = activeTabRef.current;
+    if (!strip || !tab) return;
+    strip.scrollLeft = scrollToReveal(
+      { scrollLeft: strip.scrollLeft, width: strip.clientWidth },
+      { left: tab.offsetLeft, width: tab.offsetWidth },
+    );
   }, [pathname]);
 
   const tabs = section.tabs.map(({ to, label, icon: Icon }) => (
@@ -68,7 +77,7 @@ export const SectionTabs = ({ section }: SectionTabsProps) => {
 
   return (
     <Box component="nav" aria-label={`secciones de ${section.label}`} sx={{ mb: 3, display: "flex" }}>
-      <Box sx={stripSx}>{tabs}</Box>
+      <Box ref={stripRef} sx={stripSx}>{tabs}</Box>
     </Box>
   );
 };

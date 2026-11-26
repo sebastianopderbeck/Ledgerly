@@ -28,7 +28,7 @@ Las de la conversación:
   | Ingresos | Sueldo · Flujo |
   | Deudas | Créditos · Auto |
   | Patrimonio | Patrimonio · Contexto |
-  | Datos (al pie del menú, encima de «Colapsar») | Importar · Reglas |
+  | Datos (al pie del menú) | Importar · Reglas |
 
 - **Solapas con estilo de pastilla**, como en el mockup.
 - **La sidebar pasa a ser un riel:** una pastilla angosta que flota separada del borde, con el ícono de cada

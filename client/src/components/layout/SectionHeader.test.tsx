@@ -5,9 +5,12 @@ import { SectionHeader } from "./SectionHeader.js";
 import { sectionOf, type NavSection } from "./navItems.js";
 
 const originalScrollIntoView = Element.prototype.scrollIntoView;
+let restoreLayout = (): void => undefined;
 
 afterEach(() => {
   cleanup();
+  restoreLayout();
+  restoreLayout = () => undefined;
   Element.prototype.scrollIntoView = originalScrollIntoView;
 });
 
@@ -18,6 +21,40 @@ const sectionAt = (pathname: string): NavSection => {
 };
 
 const pills = (name: string) => screen.getByRole("navigation", { name: `secciones de ${name}` });
+
+const PILL_WIDTH = 120;
+const STRIP_WIDTH = 200;
+
+const stubPillLayout = (): (() => void) => {
+  const scrolled = new WeakMap<Element, number>();
+  const stubs: PropertyDescriptorMap = {
+    clientWidth: { configurable: true, get: () => STRIP_WIDTH },
+    offsetWidth: { configurable: true, get: () => PILL_WIDTH },
+    offsetLeft: {
+      configurable: true,
+      get(this: HTMLElement) {
+        return Array.from(this.parentElement?.children ?? []).indexOf(this) * PILL_WIDTH;
+      },
+    },
+    scrollLeft: {
+      configurable: true,
+      get(this: HTMLElement) {
+        return scrolled.get(this) ?? 0;
+      },
+      set(this: HTMLElement, value: number) {
+        scrolled.set(this, value);
+      },
+    },
+  };
+  const originals = Object.keys(stubs).map((name) => [name, Object.getOwnPropertyDescriptor(HTMLElement.prototype, name)] as const);
+  Object.defineProperties(HTMLElement.prototype, stubs);
+  return () => {
+    for (const [name, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, name, descriptor);
+      else Reflect.deleteProperty(HTMLElement.prototype, name);
+    }
+  };
+};
 
 describe("SectionHeader", () => {
   it("en Gastos muestra el título y las cuatro solapas en orden", () => {
@@ -41,13 +78,14 @@ describe("SectionHeader", () => {
       .toHaveAttribute("href", "/servicios?year=2025&currency=USD");
   });
 
-  it("lleva a la vista la solapa marcada aunque esté al final de la fila", () => {
+  it("desliza la fila hasta la solapa marcada sin mover la página", () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
+    restoreLayout = stubPillLayout();
     renderWithProviders(<SectionHeader section={sectionAt("/vencimientos")} />, { route: "/vencimientos" });
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" });
-    expect(scrollIntoView.mock.contexts[0]).toBe(within(pills("Gastos")).getByRole("link", { name: "Vencimientos" }));
+    const strip = within(pills("Gastos")).getByRole("link", { name: "Vencimientos" }).parentElement;
+    expect(strip?.scrollLeft).toBe(280);
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
   it("Inicio se titula Dashboard y no tiene solapas", () => {
