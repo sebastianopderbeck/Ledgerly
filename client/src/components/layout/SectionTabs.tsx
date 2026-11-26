@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { Box, ButtonBase } from "@mui/material";
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import type { NavSection } from "./navItems.js";
@@ -44,9 +45,22 @@ const tabSx: SxProps<Theme> = {
 
 export const SectionTabs = ({ section }: SectionTabsProps) => {
   const search = useNavSearch();
+  const { pathname } = useLocation();
+  const activeTabRef = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [pathname]);
 
   const tabs = section.tabs.map(({ to, label, icon: Icon }) => (
-    <ButtonBase key={to} component={NavLink} to={{ pathname: to, search }} end={to === "/"} sx={tabSx}>
+    <ButtonBase
+      key={to}
+      ref={to === pathname ? activeTabRef : undefined}
+      component={NavLink}
+      to={{ pathname: to, search }}
+      end={to === "/"}
+      sx={tabSx}
+    >
       <Icon fontSize="small" />
       {label}
     </ButtonBase>

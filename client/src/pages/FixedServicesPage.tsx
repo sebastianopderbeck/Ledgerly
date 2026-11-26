@@ -14,7 +14,7 @@ import { FixedServiceKpiCards } from "../components/FixedServiceKpiCards.js";
 import { FixedServicesTable } from "../components/FixedServicesTable.js";
 import { useCardServiceRemoval } from "../components/useCardServiceRemoval.js";
 import { useFixedServiceEditor } from "../components/useFixedServiceEditor.js";
-import { tapTargetSx } from "../components/tapTarget.js";
+import { MIN_TAP_SIZE } from "../components/tapTarget.js";
 import { fixedServiceKpis, fixedServiceSections } from "../fixedServices.js";
 import { monthOf, todayIso } from "../isoDate.js";
 import { useIsMobile } from "../useIsMobile.js";
@@ -47,13 +47,15 @@ const headerSx: SxProps<Theme> = {
   mb: 3,
 };
 
+const addButtonSx: SxProps<Theme> = { minHeight: MIN_TAP_SIZE, flexShrink: 0, whiteSpace: "nowrap" };
+
 const deleteMessage = (service: FixedServiceDTO | null): string =>
   (service ? `¿Borrar «${service.nombre}»? Se saca también de los meses pasados del Flujo.` : "");
 
 const FixedServicesHeader = ({ onAdd }: FixedServicesHeaderProps) => (
   <Stack direction={{ xs: "column", md: "row" }} sx={headerSx}>
     <Typography color="text.secondary">{INTRO}</Typography>
-    <Button variant="contained" startIcon={<AddIcon />} onClick={onAdd} sx={tapTargetSx}>Agregar servicio</Button>
+    <Button variant="contained" startIcon={<AddIcon />} onClick={onAdd} sx={addButtonSx}>Agregar servicio</Button>
   </Stack>
 );
 

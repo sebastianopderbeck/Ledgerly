@@ -1,10 +1,15 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { cleanup, screen, within } from "@testing-library/react";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
 import { SectionHeader } from "./SectionHeader.js";
 import { sectionOf, type NavSection } from "./navItems.js";
 
-afterEach(cleanup);
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+
+afterEach(() => {
+  cleanup();
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
 
 const sectionAt = (pathname: string): NavSection => {
   const section = sectionOf(pathname);
@@ -34,6 +39,15 @@ describe("SectionHeader", () => {
     });
     expect(within(pills("Gastos")).getByRole("link", { name: "Servicios" }))
       .toHaveAttribute("href", "/servicios?year=2025&currency=USD");
+  });
+
+  it("lleva a la vista la solapa marcada aunque esté al final de la fila", () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    renderWithProviders(<SectionHeader section={sectionAt("/vencimientos")} />, { route: "/vencimientos" });
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" });
+    expect(scrollIntoView.mock.contexts[0]).toBe(within(pills("Gastos")).getByRole("link", { name: "Vencimientos" }));
   });
 
   it("Inicio se titula Dashboard y no tiene solapas", () => {
