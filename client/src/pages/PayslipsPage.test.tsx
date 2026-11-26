@@ -56,6 +56,11 @@ describe("PayslipsPage", () => {
     expect(screen.queryByRole("group", { name: /filtrar gráficos por año/i })).not.toBeInTheDocument();
   });
 
+  it("muestra la retención de Ganancias del año del último recibo aunque el filtro sea otro año", async () => {
+    renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=2019" });
+    expect(await screen.findByText("Retención de Ganancias 2026")).toBeInTheDocument();
+  });
+
   it("con un año sin recibos no muestra el detalle vacío", async () => {
     renderWithProviders(<PayslipsPage />, { route: "/sueldo?year=2019" });
     await waitFor(() => expect(screen.getByText("Último neto")).toBeInTheDocument());
