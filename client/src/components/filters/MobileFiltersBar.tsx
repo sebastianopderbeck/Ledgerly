@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Badge, Box, Button, Typography } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import TuneIcon from "@mui/icons-material/Tune";
-import { activeFilterCount, filtersButtonLabel, filtersSummary, type FilterField } from "../../filters/activeFilters.js";
+import { filtersButtonLabel, filtersSummary, hasSearchFilter, hiddenFilterCount, type FilterField } from "../../filters/activeFilters.js";
 import { FiltersSheet } from "./FiltersSheet.js";
 import { SearchFilter } from "./SearchFilter.js";
 
@@ -21,12 +21,13 @@ export const MobileFiltersBar = ({ fields, yearOptions }: MobileFiltersBarProps)
   const [open, setOpen] = useState(false);
   const openSheet = useCallback(() => setOpen(true), []);
   const closeSheet = useCallback(() => setOpen(false), []);
-  const count = activeFilterCount(params, fields);
+  const count = hiddenFilterCount(params, fields);
   const summary = filtersSummary(params, fields);
-  const showsSearch = fields.includes("transaction");
+  const showsSearch = hasSearchFilter(fields);
 
   return (
     <Box sx={{ mb: 3 }}>
+      {showsSearch && <Box sx={{ mb: 2 }}><SearchFilter fullWidth touch /></Box>}
       <Box sx={rowSx}>
         <Badge badgeContent={count} color="primary" slotProps={{ badge: { "aria-hidden": true } }} sx={{ flexShrink: 0 }}>
           <Button
@@ -38,7 +39,6 @@ export const MobileFiltersBar = ({ fields, yearOptions }: MobileFiltersBarProps)
         </Badge>
         <Typography variant="body2" color="text.secondary" noWrap sx={summarySx}>{summary}</Typography>
       </Box>
-      {showsSearch && <Box sx={{ mt: 2 }}><SearchFilter fullWidth touch /></Box>}
       <FiltersSheet open={open} onClose={closeSheet} fields={fields} yearOptions={yearOptions} />
     </Box>
   );

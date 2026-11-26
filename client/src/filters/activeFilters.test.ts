@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { activeFilterCount, filtersButtonLabel, filtersSummary, type FilterField } from "./activeFilters.js";
+import {
+  activeFilterCount, filtersButtonLabel, filtersSummary, hasSearchFilter, hiddenFilterCount, isCompactFilters, type FilterField,
+} from "./activeFilters.js";
 
 const DASHBOARD: FilterField[] = ["year", "currency", "card", "month"];
 const INSTALLMENTS: FilterField[] = ["year", "currency", "card"];
@@ -93,5 +95,35 @@ describe("filtersButtonLabel", () => {
     expect(filtersButtonLabel(0)).toBe("Filtros");
     expect(filtersButtonLabel(1)).toBe("Filtros, 1 activo");
     expect(filtersButtonLabel(3)).toBe("Filtros, 3 activos");
+  });
+});
+
+describe("hasSearchFilter", () => {
+  it("solo las secciones con filtros de movimientos tienen buscador", () => {
+    expect(hasSearchFilter(["year", "currency", "card", "month", "transaction"])).toBe(true);
+    expect(hasSearchFilter(["year", "currency", "card", "month"])).toBe(false);
+    expect(hasSearchFilter(["year"])).toBe(false);
+  });
+});
+
+describe("isCompactFilters", () => {
+  it("compacta con búsqueda o con más de un campo", () => {
+    expect(isCompactFilters(["year"])).toBe(false);
+    expect(isCompactFilters(["transaction"])).toBe(true);
+    expect(isCompactFilters(["year", "currency"])).toBe(true);
+    expect(isCompactFilters(DASHBOARD)).toBe(true);
+  });
+});
+
+describe("hiddenFilterCount", () => {
+  it("el conteo de filtros ocultos no cuenta la búsqueda", () => {
+    const withSearch = params("search=uber&category=Compras");
+    expect(activeFilterCount(withSearch, TRANSACTIONS)).toBe(2);
+    expect(hiddenFilterCount(withSearch, TRANSACTIONS)).toBe(1);
+    expect(hiddenFilterCount(params("search=uber"), TRANSACTIONS)).toBe(0);
+  });
+
+  it("sin búsqueda el conteo de ocultos es el mismo", () => {
+    expect(hiddenFilterCount(params("year=2025&currency=USD"), DASHBOARD)).toBe(2);
   });
 });
