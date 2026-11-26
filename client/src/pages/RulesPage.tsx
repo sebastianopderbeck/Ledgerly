@@ -12,7 +12,7 @@ import { staggerContainer } from "../components/motion/variants.js";
 import { useIsMobile } from "../useIsMobile.js";
 
 const headerSx: SxProps<Theme> = {
-  justifyContent: "space-between",
+  justifyContent: "flex-end",
   alignItems: { xs: "stretch", md: "center" },
   gap: { xs: 2, md: 0 },
   mb: 3,
@@ -88,7 +88,6 @@ export const RulesPage = () => {
   return (
     <>
       <Stack direction={{ xs: "column", md: "row" }} sx={headerSx}>
-        <Typography variant="h4">Reglas de categoría</Typography>
         <Button variant="outlined" onClick={requestApply} disabled={apply.isPending}>
           Reaplicar a todo
         </Button>

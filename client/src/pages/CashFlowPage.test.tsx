@@ -56,7 +56,6 @@ describe("CashFlowPage", () => {
     renderWithProviders(<CashFlowPage />, { route: "/flujo?year=all" });
     expect(await screen.findByText("Último mes completo: Agosto de 2026")).toBeInTheDocument();
     expect(screen.getByText("Septiembre de 2026 todavía está incompleto: falta Resumen ICBC.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 4, name: "Flujo de caja" })).toBeInTheDocument();
   });
 
   it("muestra los KPIs, los dos gráficos y la proyección en el detalle", async () => {

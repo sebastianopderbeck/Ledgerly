@@ -52,8 +52,27 @@ describe("Layout", () => {
 
   it("marca como activa solo la sección de la ruta actual", () => {
     renderLayout("/credits");
-    expect(screen.getByRole("link", { name: /créditos/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: /dashboard/i })).not.toHaveAttribute("aria-current");
+    expect(within(mainNavigation()).getByRole("link", { name: /créditos/i })).toHaveAttribute("aria-current", "page");
+    expect(within(mainNavigation()).getByRole("link", { name: /dashboard/i })).not.toHaveAttribute("aria-current");
+  });
+
+  it("arriba de la página muestra la sección de la ruta con sus solapas", () => {
+    renderLayout("/flujo");
+    expect(screen.getByRole("heading", { level: 4, name: "Ingresos" })).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "secciones de Ingresos" })).getByRole("link", { name: "Flujo" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("importar desde la pill abre Datos con Importar marcada", () => {
+    renderLayout("/import");
+    expect(screen.getByRole("heading", { level: 4, name: "Datos" })).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "secciones de Datos" })).getByRole("link", { name: "Importar" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("fuera del menú no muestra encabezado de sección", () => {
+    renderLayout("/installments");
+    expect(screen.queryByRole("heading", { level: 4 })).not.toBeInTheDocument();
   });
 
   it("agrupa importar, actualizar datos y cambiar tema en las acciones rápidas", () => {

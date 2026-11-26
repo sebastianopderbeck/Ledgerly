@@ -103,11 +103,11 @@ describe("FixedServicesPage", () => {
     expect(screen.getByRole("dialog", { name: "Nuevo servicio" })).toBeInTheDocument();
   });
 
-  it("si falla la carga lo dice debajo del título", async () => {
+  it("si falla la carga lo dice y conserva el botón para agregar", async () => {
     listReply = { status: 500, body: { error: "Error interno" } };
     renderPage();
     expect(await screen.findByText("No pudimos cargar los servicios.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 4, name: "Servicios" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agregar servicio" })).toBeInTheDocument();
   });
 
   it("Agregar servicio manda el alta con el monto en formato argentino", async () => {

@@ -63,10 +63,9 @@ afterEach(() => {
 });
 
 describe("SubscriptionsPage", () => {
-  it("muestra el título mientras carga", () => {
+  it("muestra la intro mientras carga", () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
     renderWithProviders(<SubscriptionsPage />, { route: "/suscripciones" });
-    expect(screen.getByRole("heading", { level: 4, name: "Suscripciones" })).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toBeInTheDocument();
     expect(screen.getByText(
       "Cobros que se repiten en tus tarjetas: los que aparecen 3 meses seguidos con montos parecidos, los de la categoría Suscripciones y los que marcaste desde Movimientos. No incluye cuotas ni impuestos.",
@@ -191,7 +190,6 @@ describe("SubscriptionsPage", () => {
     expect(await screen.findByText(
       "No encontramos suscripciones. Aparecen solas con 3 meses seguidos de cobros del mismo comercio, con la categoría Suscripciones o marcándolas desde Movimientos.",
     )).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 4, name: "Suscripciones" })).toBeInTheDocument();
   });
 
   it("si el server falla muestra el error", async () => {

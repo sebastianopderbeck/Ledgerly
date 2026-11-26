@@ -1,4 +1,3 @@
-import { Typography } from "@mui/material";
 import { type StatFilters } from "../api/hooks.js";
 import { FiltersBar, type FilterField } from "../components/FiltersBar.js";
 import { useGlobalFilters } from "../filters/useGlobalFilters.js";
@@ -25,7 +24,6 @@ export const DashboardPage = () => {
 
   return (
     <>
-      <Typography variant="h4" sx={{ mb: 3 }}>Dashboard</Typography>
       <FiltersBar fields={DASHBOARD_FIELDS} yearOptions={yearOptions} />
       <CardCycleSummary />
       <KpiCards {...filters} />

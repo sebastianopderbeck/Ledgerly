@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { Box, Container } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { useIsMobile } from "../../useIsMobile.js";
 import { DesktopSidebar } from "./DesktopSidebar.js";
 import { MOBILE_NAV_HEIGHT, MobileBottomNav } from "./MobileBottomNav.js";
+import { sectionOf } from "./navItems.js";
+import { SectionHeader } from "./SectionHeader.js";
 import { TopActionsPill } from "./TopActionsPill.js";
 import { useSidebarCollapsed } from "./useSidebarCollapsed.js";
 
@@ -27,6 +30,7 @@ const statusBarScrimSx: SxProps<Theme> = {
 export const Layout = ({ children }: LayoutProps) => {
   const isMobile = useIsMobile();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
+  const section = sectionOf(useLocation().pathname);
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
@@ -34,7 +38,10 @@ export const Layout = ({ children }: LayoutProps) => {
       {isMobile && <Box aria-hidden sx={statusBarScrimSx} />}
       <TopActionsPill />
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
-        <Container maxWidth="lg" sx={containerSx}>{children}</Container>
+        <Container maxWidth="lg" sx={containerSx}>
+          {section && <SectionHeader section={section} />}
+          {children}
+        </Container>
       </Box>
       {isMobile && <MobileBottomNav />}
     </Box>

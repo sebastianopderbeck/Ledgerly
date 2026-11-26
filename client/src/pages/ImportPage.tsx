@@ -41,7 +41,6 @@ export const ImportPage = () => {
 
   return (
     <>
-      <Typography variant="h4" sx={{ mb: 3 }}>Importar resumen</Typography>
       <FileDropzone onFile={handleFile} disabled={upload.isPending} />
 
       {upload.isPending && <Box sx={{ display: "flex", gap: 1, mb: 2 }}><CircularProgress size={20} /> Procesando…</Box>}

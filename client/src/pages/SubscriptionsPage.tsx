@@ -15,12 +15,7 @@ import { useIsMobile } from "../useIsMobile.js";
 const INTRO = "Cobros que se repiten en tus tarjetas: los que aparecen 3 meses seguidos con montos parecidos, los de la categoría Suscripciones y los que marcaste desde Movimientos. No incluye cuotas ni impuestos.";
 const EMPTY = "No encontramos suscripciones. Aparecen solas con 3 meses seguidos de cobros del mismo comercio, con la categoría Suscripciones o marcándolas desde Movimientos.";
 
-const Header = () => (
-  <>
-    <Typography variant="h4" sx={{ mb: 1 }}>Suscripciones</Typography>
-    <Typography color="text.secondary" sx={{ mb: 3 }}>{INTRO}</Typography>
-  </>
-);
+const Header = () => <Typography color="text.secondary" sx={{ mb: 3 }}>{INTRO}</Typography>;
 
 export const SubscriptionsPage = () => {
   const { data, isLoading, isError } = useSubscriptions();
