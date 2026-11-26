@@ -1,10 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Box, ButtonBase, Typography } from "@mui/material";
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
-import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import { BAR_ITEMS, isMoreRoute } from "./navItems.js";
-import { MoreSheet } from "./MoreSheet.js";
+import { NAV_SECTIONS, sectionOf, sectionPath } from "./navItems.js";
 import { useNavSearch } from "./useNavSearch.js";
 
 export const MOBILE_NAV_HEIGHT = 64;
@@ -16,7 +13,7 @@ const barSx: SxProps<Theme> = {
   bottom: 0,
   zIndex: (theme) => theme.zIndex.appBar,
   display: "grid",
-  gridTemplateColumns: `repeat(${BAR_ITEMS.length + 1}, minmax(0, 1fr))`,
+  gridTemplateColumns: `repeat(${NAV_SECTIONS.length}, minmax(0, 1fr))`,
   pb: "env(safe-area-inset-bottom)",
   borderTop: 1,
   borderColor: "divider",
@@ -44,38 +41,27 @@ const itemSx: SxProps<Theme> = {
 export const MobileBottomNav = () => {
   const { pathname } = useLocation();
   const search = useNavSearch();
-  const [moreOpen, setMoreOpen] = useState(false);
-  const openMore = useCallback(() => setMoreOpen(true), []);
-  const closeMore = useCallback(() => setMoreOpen(false), []);
-  const moreActive = isMoreRoute(pathname);
+  const activeId = sectionOf(pathname)?.id;
 
-  useEffect(() => {
-    setMoreOpen(false);
-  }, [pathname]);
-
-  const links = BAR_ITEMS.map(({ to, label, shortLabel, icon: Icon }) => (
-    <ButtonBase key={to} component={NavLink} to={{ pathname: to, search }} end={to === "/"} sx={itemSx}>
-      <Icon />
-      <Typography noWrap>{shortLabel ?? label}</Typography>
-    </ButtonBase>
-  ));
+  const links = NAV_SECTIONS.map((section) => {
+    const { id, label, icon: Icon } = section;
+    return (
+      <ButtonBase
+        key={id}
+        component={Link}
+        to={{ pathname: sectionPath(section), search }}
+        aria-current={id === activeId ? "page" : undefined}
+        sx={itemSx}
+      >
+        <Icon />
+        <Typography noWrap>{label}</Typography>
+      </ButtonBase>
+    );
+  });
 
   return (
-    <>
-      <Box component="nav" aria-label="principal" sx={barSx}>
-        {links}
-        <ButtonBase
-          onClick={openMore}
-          aria-haspopup="dialog"
-          aria-expanded={moreOpen}
-          aria-current={moreActive ? "page" : undefined}
-          sx={itemSx}
-        >
-          <MoreHorizIcon />
-          <Typography noWrap>Más</Typography>
-        </ButtonBase>
-      </Box>
-      <MoreSheet open={moreOpen} onClose={closeMore} />
-    </>
+    <Box component="nav" aria-label="principal" sx={barSx}>
+      {links}
+    </Box>
   );
 };

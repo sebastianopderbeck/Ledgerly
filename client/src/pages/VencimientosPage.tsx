@@ -31,8 +31,6 @@ const leyendaSx: SxProps<Theme> = { display: "block", maxWidth: 840, mb: 2 };
 
 const notaSx: SxProps<Theme> = { display: "block", maxWidth: 840, mt: 2 };
 
-const Title = () => <Typography variant="h4" sx={{ mb: 3 }}>Vencimientos</Typography>;
-
 export const VencimientosPage = () => {
   const { isLoading, isError, hasDocuments, hoy, view } = useVencimientos();
   const [agrupacion, setAgrupacion] = useStoredState<Agrupacion>(AGRUPACION_KEY, "semana", isAgrupacion);
@@ -43,31 +41,18 @@ export const VencimientosPage = () => {
   }, [setAgrupacion]);
 
   if (isLoading) {
-    return (
-      <>
-        <Title />
-        <CircularProgress />
-      </>
-    );
+    return <CircularProgress />;
   }
 
   if (isError) {
-    return (
-      <>
-        <Title />
-        <Alert severity="error">No se pudieron cargar los vencimientos. Probá de nuevo en un rato.</Alert>
-      </>
-    );
+    return <Alert severity="error">No se pudieron cargar los vencimientos. Probá de nuevo en un rato.</Alert>;
   }
 
   if (!hasDocuments) {
     return (
-      <>
-        <Title />
-        <Typography color="text.secondary">
-          Todavía no importaste resúmenes, cupones ni recibos. Subilos desde la página Importar.
-        </Typography>
-      </>
+      <Typography color="text.secondary">
+        Todavía no importaste resúmenes, cupones ni recibos. Subilos desde la página Importar.
+      </Typography>
     );
   }
 
@@ -79,7 +64,6 @@ export const VencimientosPage = () => {
 
   return (
     <>
-      <Title />
       <Box sx={headerSx}>
         <Typography variant="body2" color="text.secondary">{`De hoy al ${hasta}.`}</Typography>
         <ToggleButtonGroup

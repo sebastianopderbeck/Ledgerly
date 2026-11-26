@@ -31,8 +31,6 @@ export const CreditsPage = () => {
 
   return (
     <>
-      <Typography variant="h4" sx={{ mb: 3 }}>Créditos</Typography>
-
       {isLoading && <CircularProgress />}
       {!isLoading && coupons.length === 0 && (
         <Typography color="text.secondary">

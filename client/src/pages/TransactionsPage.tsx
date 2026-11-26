@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Alert, CircularProgress, Snackbar, Typography } from "@mui/material";
+import { Alert, CircularProgress, Snackbar } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
 import {
   useDeleteTransactions, useMarkCardService, useMarkSubscription, usePatchTransaction, useTransactions, type TxFilters,
@@ -68,7 +68,6 @@ export const TransactionsPage = () => {
 
   return (
     <>
-      <Typography variant="h4" sx={{ mb: 3 }}>Movimientos</Typography>
       <FiltersBar fields={TRANSACTION_FIELDS} yearOptions={yearOptions} />
       <Rows
         rows={data?.items ?? []}

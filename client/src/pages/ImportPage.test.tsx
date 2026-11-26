@@ -87,9 +87,8 @@ afterEach(() => {
 });
 
 describe("ImportPage", () => {
-  it("muestra el dropzone y el título", async () => {
+  it("muestra el dropzone", async () => {
     renderWithProviders(<ImportPage />);
-    expect(screen.getByText(/importar resumen/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /elegir archivo/i })).toBeInTheDocument();
   });
 

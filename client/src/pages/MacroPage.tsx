@@ -17,8 +17,6 @@ import { TasaRealChart } from "../components/charts/TasaRealChart.js";
 
 const MACRO_FIELDS: FilterField[] = ["year"];
 
-const Title = () => <Typography variant="h4" sx={{ mb: 3 }}>Contexto</Typography>;
-
 export const MacroPage = () => {
   const { data: series, isLoading } = useMacroSeries();
   const { data: credit } = useCreditSummary();
@@ -43,28 +41,19 @@ export const MacroPage = () => {
   );
 
   if (isLoading) {
-    return (
-      <>
-        <Title />
-        <CircularProgress />
-      </>
-    );
+    return <CircularProgress />;
   }
 
   if (!series || series.meses.length === 0 || !view || !assumptions || !charts) {
     return (
-      <>
-        <Title />
-        <Typography color="text.secondary">
-          Todavía no cargaste las series macro. Usá el botón de actualizar de la barra superior para traer dólar, UVA, tasa e inflación.
-        </Typography>
-      </>
+      <Typography color="text.secondary">
+        Todavía no cargaste las series macro. Usá el botón de actualizar de la barra superior para traer dólar, UVA, tasa e inflación.
+      </Typography>
     );
   }
 
   return (
     <>
-      <Title />
       <FiltersBar fields={MACRO_FIELDS} yearOptions={yearOptions} />
       <VerdictCard verdict={view.verdict} />
       <MacroAssumptionsBar assumptions={assumptions} onChange={setOverride} />

@@ -50,28 +50,19 @@ export const PayslipsPage = () => {
   const monthOnly = yearSelection.kind === "years" && yearSelection.years.length === 1;
 
   if (isLoading) {
-    return (
-      <>
-        <Typography variant="h4" sx={{ mb: 3 }}>Sueldo</Typography>
-        <CircularProgress />
-      </>
-    );
+    return <CircularProgress />;
   }
 
   if (payslips.length === 0) {
     return (
-      <>
-        <Typography variant="h4" sx={{ mb: 3 }}>Sueldo</Typography>
-        <Typography color="text.secondary">
-          Todavía no importaste recibos de sueldo. Subilos desde la página Importar.
-        </Typography>
-      </>
+      <Typography color="text.secondary">
+        Todavía no importaste recibos de sueldo. Subilos desde la página Importar.
+      </Typography>
     );
   }
 
   return (
     <>
-      <Typography variant="h4" sx={{ mb: 3 }}>Sueldo</Typography>
       <FiltersBar fields={PAYSLIP_FIELDS} yearOptions={years} />
 
       <PayslipKpiCards />

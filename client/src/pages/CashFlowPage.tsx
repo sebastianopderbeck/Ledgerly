@@ -22,12 +22,9 @@ const PROJECTION_CAPTION =
   "Sueldo con el último neto más los aumentos de enero, mayo y septiembre por el IPC de los 4 meses anteriores (con la inflación esperada del REM del BCRA para los meses sin publicar), y la mitad en junio y diciembre por el SAC; hipoteca y auto con la última cuota más su aumento mensual reciente (la UVA de los últimos 3 meses y el valor del auto de los últimos 6 cupones); tarjetas con los resúmenes ya emitidos y, después, las cuotas que ya compraste; suscripciones con el último cobro de cada una, en el mes en que vence su resumen; y servicios con el último monto más la inflación esperada del REM (los de la tarjeta, en el mes en que vence su resumen). El margen es lo que te queda para consumos nuevos y gastos que no cargaste en Servicios.";
 
 const Header = () => (
-  <>
-    <Typography variant="h4" sx={{ mb: 0.5 }}>Flujo de caja</Typography>
-    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-      Lo que entra por sueldo menos lo que sale sí o sí: tarjetas, hipoteca, auto, servicios y suscripciones.
-    </Typography>
-  </>
+  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+    Lo que entra por sueldo menos lo que sale sí o sí: tarjetas, hipoteca, auto, servicios y suscripciones.
+  </Typography>
 );
 
 const ChartCaption = ({ text }: ChartCaptionProps) => (

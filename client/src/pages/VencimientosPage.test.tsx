@@ -68,7 +68,6 @@ describe("VencimientosPage", () => {
   it("con datos agrupa por semana y marca confirmados y estimados", async () => {
     renderPage();
     expect(await screen.findByRole("heading", { level: 2, name: "La semana que viene" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 4, name: "Vencimientos" })).toBeInTheDocument();
     expect(screen.getByText("De hoy al 31 de diciembre.")).toBeInTheDocument();
     const credito = screen.getByRole("listitem", { name: "Crédito UVA · cuota 25, 5 de octubre, estimado" });
     expect(within(credito).getByText("Estimado")).toBeInTheDocument();
@@ -105,10 +104,9 @@ describe("VencimientosPage", () => {
     expect(within(credito).getByText("Igual a la cuota 24")).toBeInTheDocument();
   });
 
-  it("mientras carga muestra el título y el spinner", () => {
+  it("mientras carga muestra el spinner", () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
     renderPage();
-    expect(screen.getByRole("heading", { level: 4, name: "Vencimientos" })).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toBeInTheDocument();
   });
 

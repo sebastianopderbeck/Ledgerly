@@ -30,8 +30,6 @@ export const AutoPage = () => {
 
   return (
     <>
-      <Typography variant="h4" sx={{ mb: 3 }}>Auto</Typography>
-
       {isLoading && <CircularProgress />}
       {!isLoading && coupons.length === 0 && (
         <Typography color="text.secondary">

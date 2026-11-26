@@ -46,7 +46,7 @@ const EMPTY_ASSETS = "Sin activos: agregá tus ahorros, plazos fijos o inversion
 const EMPTY_LIABILITIES = "Sin deudas registradas.";
 
 const headerSx: SxProps<Theme> = {
-  justifyContent: "space-between",
+  justifyContent: "flex-end",
   alignItems: { xs: "stretch", md: "center" },
   gap: 2,
   mb: 3,
@@ -59,7 +59,6 @@ const deleteMessage = (asset: ManualAssetDTO | null): string =>
 
 const NetWorthHeader = ({ onAdd }: NetWorthHeaderProps) => (
   <Stack direction={{ xs: "column", md: "row" }} sx={headerSx}>
-    <Typography variant="h4">Patrimonio</Typography>
     <Button variant="contained" startIcon={<AddIcon />} onClick={onAdd} sx={tapTargetSx}>Agregar activo</Button>
   </Stack>
 );

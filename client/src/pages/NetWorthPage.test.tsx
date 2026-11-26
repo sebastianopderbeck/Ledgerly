@@ -122,11 +122,11 @@ describe("NetWorthPage", () => {
     expect(screen.getByRole("dialog", { name: "Nuevo activo" })).toBeInTheDocument();
   });
 
-  it("con 503 muestra el mensaje del server debajo del título", async () => {
+  it("con 503 muestra el mensaje del server y conserva el botón para agregar", async () => {
     netWorthReply = { status: 503, body: { error: NO_USD } };
     renderPage();
     expect(await screen.findByText(NO_USD)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 4, name: "Patrimonio" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agregar activo" })).toBeInTheDocument();
   });
 
   it("Agregar activo manda el alta con el valor tipeado en formato argentino", async () => {

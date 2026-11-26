@@ -1,15 +1,8 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { Link } from "react-router-dom";
+import { cleanup, screen, within } from "@testing-library/react";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
 import { emulateDesktop, emulateMobile } from "../../testing/viewport.js";
 import { Layout } from "./Layout.js";
-import { NAV_GROUPS, NAV_ITEMS } from "./navItems.js";
-
-const SECTIONS = [
-  /dashboard/i, /créditos/i, /auto/i, /patrimonio/i, /sueldo/i, /vencimientos/i, /contexto/i, /flujo/i,
-  /movimientos/i, /suscripciones/i, /reglas/i,
-];
 
 const renderLayout = (route = "/") => renderWithProviders(<Layout><div>contenido</div></Layout>, { route });
 
@@ -24,36 +17,49 @@ afterEach(() => {
 });
 
 describe("Layout", () => {
-  it("muestra cada sección como link dentro de la navegación principal", () => {
+  it("el riel muestra cada sección con su nombre y Datos al pie, separado por una línea", () => {
     renderLayout();
-    for (const name of SECTIONS) {
-      expect(within(mainNavigation()).getByRole("link", { name })).toBeInTheDocument();
-    }
+    expect(within(mainNavigation()).getAllByRole("link").map((link) => link.textContent))
+      .toEqual(["Inicio", "Gastos", "Ingresos", "Deudas", "Patrimonio", "Datos"]);
+    expect(within(mainNavigation()).getAllByRole("separator")).toHaveLength(1);
   });
 
-  it("separa los grupos del menú con una línea", () => {
-    renderLayout();
-    expect(within(mainNavigation()).getAllByRole("separator")).toHaveLength(NAV_GROUPS.length - 1);
-  });
-
-  it("con la sidebar colapsada los grupos siguen separados", () => {
-    renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "colapsar menú" }));
-    expect(within(mainNavigation()).getAllByRole("separator")).toHaveLength(NAV_GROUPS.length - 1);
-  });
-
-  it("todos los links conservan los filtros globales y descartan los de Movimientos", () => {
+  it("cada entrada lleva a su primera solapa con los filtros globales", () => {
     renderLayout("/transactions?year=2025&currency=USD&category=Compras&search=uber");
-    for (const { to, label } of NAV_ITEMS) {
-      const link = within(mainNavigation()).getByRole("link", { name: label });
-      expect(link).toHaveAttribute("href", `${to}?year=2025&currency=USD`);
-    }
+    const hrefs = within(mainNavigation()).getAllByRole("link").map((link) => link.getAttribute("href"));
+    expect(hrefs).toEqual(
+      ["/", "/transactions", "/sueldo", "/credits", "/patrimonio", "/import"].map((path) => `${path}?year=2025&currency=USD`),
+    );
   });
 
-  it("marca como activa solo la sección de la ruta actual", () => {
-    renderLayout("/credits");
-    expect(screen.getByRole("link", { name: /créditos/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: /dashboard/i })).not.toHaveAttribute("aria-current");
+  it("marca la sección de la ruta aunque no sea su primera solapa", () => {
+    renderLayout("/auto");
+    expect(within(mainNavigation()).getByRole("link", { name: "Deudas" })).toHaveAttribute("aria-current", "page");
+    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("fuera del menú ninguna entrada del riel queda marcada", () => {
+    renderLayout("/installments");
+    expect(within(mainNavigation()).getAllByRole("link").filter((link) => link.hasAttribute("aria-current"))).toHaveLength(0);
+  });
+
+  it("arriba de la página muestra la sección de la ruta con sus solapas", () => {
+    renderLayout("/flujo");
+    expect(screen.getByRole("heading", { level: 4, name: "Ingresos" })).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "secciones de Ingresos" })).getByRole("link", { name: "Flujo" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("importar desde la pill abre Datos con Importar marcada", () => {
+    renderLayout("/import");
+    expect(screen.getByRole("heading", { level: 4, name: "Datos" })).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "secciones de Datos" })).getByRole("link", { name: "Importar" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("fuera del menú no muestra encabezado de sección", () => {
+    renderLayout("/installments");
+    expect(screen.queryByRole("heading", { level: 4 })).not.toBeInTheDocument();
   });
 
   it("agrupa importar, actualizar datos y cambiar tema en las acciones rápidas", () => {
@@ -75,39 +81,11 @@ describe("Layout", () => {
     expect(importLink).toHaveAttribute("aria-current", "page");
   });
 
-  it("colapsar la sidebar oculta los textos pero mantiene los links accesibles", () => {
-    renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "colapsar menú" }));
-
-    expect(screen.queryByText("Movimientos")).not.toBeInTheDocument();
-    expect(within(mainNavigation()).getByRole("link", { name: /movimientos/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "expandir menú" })).toBeInTheDocument();
-  });
-
-  it("expandir la sidebar vuelve a mostrar los textos", () => {
-    renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "colapsar menú" }));
-    fireEvent.click(screen.getByRole("button", { name: "expandir menú" }));
-
-    expect(screen.getByText("Movimientos")).toBeInTheDocument();
-  });
-
-  it("recuerda la sidebar colapsada al volver a abrir la app", () => {
-    renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "colapsar menú" }));
-    cleanup();
-
-    renderLayout();
-
-    expect(screen.getByRole("button", { name: "expandir menú" })).toBeInTheDocument();
-    expect(screen.queryByText("Movimientos")).not.toBeInTheDocument();
-  });
-
   it("en compu no muestra la barra inferior", () => {
     emulateDesktop();
     renderLayout();
     expect(screen.queryByRole("button", { name: "Más" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "colapsar menú" })).toBeInTheDocument();
+    expect(within(mainNavigation()).getByRole("link", { name: "Datos" })).toBeInTheDocument();
   });
 });
 
@@ -120,18 +98,14 @@ const cssFor = (element: Element): string => {
   return rules.filter((rule) => classes.some((name) => rule.includes(`.${name}`))).join("}");
 };
 
-const moreSheet = () => screen.queryByRole("dialog", { name: "Más secciones" });
-
 describe("Layout en mobile", () => {
   beforeEach(() => emulateMobile());
 
-  const moreButton = () => within(mainNavigation()).getByRole("button", { name: "Más" });
-
-  it("la barra inferior muestra Inicio, Movimientos y Más", () => {
+  it("la barra muestra Inicio, Gastos, Ingresos, Deudas y Patrimonio, sin «Más»", () => {
     renderLayout();
-    const links = within(mainNavigation()).getAllByRole("link").map((link) => link.textContent);
-    expect(links).toEqual(["Inicio", "Movimientos"]);
-    expect(moreButton()).toBeInTheDocument();
+    expect(within(mainNavigation()).getAllByRole("link").map((link) => link.textContent))
+      .toEqual(["Inicio", "Gastos", "Ingresos", "Deudas", "Patrimonio"]);
+    expect(within(mainNavigation()).queryByRole("button", { name: "Más" })).not.toBeInTheDocument();
   });
 
   it("importar sigue a mano en las acciones rápidas", () => {
@@ -141,65 +115,24 @@ describe("Layout en mobile", () => {
 
   it("no monta la sidebar de compu", () => {
     renderLayout();
-    expect(screen.queryByRole("button", { name: "colapsar menú" })).not.toBeInTheDocument();
+    expect(within(mainNavigation()).queryByRole("link", { name: "Datos" })).not.toBeInTheDocument();
     expect(within(quickActions()).queryByLabelText("abrir menú")).not.toBeInTheDocument();
   });
 
-  it("marca la sección actual de la barra y deja «Más» sin marcar", () => {
-    renderLayout("/transactions");
-    expect(within(mainNavigation()).getByRole("link", { name: "Movimientos" })).toHaveAttribute("aria-current", "page");
-    expect(moreButton()).not.toHaveAttribute("aria-current");
+  it("marca la sección de la ruta actual", () => {
+    renderLayout("/suscripciones");
+    expect(within(mainNavigation()).getByRole("link", { name: "Gastos" })).toHaveAttribute("aria-current", "page");
+    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
   });
 
-  it("en una sección de «Más», marca «Más» como actual", () => {
-    renderLayout("/credits");
-    expect(moreButton()).toHaveAttribute("aria-current", "page");
-    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
+  it("en Datos ninguna entrada de la barra queda marcada", () => {
+    renderLayout("/rules");
+    expect(within(mainNavigation()).getAllByRole("link").filter((link) => link.hasAttribute("aria-current"))).toHaveLength(0);
   });
 
   it("los links de la barra conservan los filtros globales y descartan los de Movimientos", () => {
     renderLayout("/transactions?year=2025&currency=USD&category=Compras");
-    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).toHaveAttribute("href", "/?year=2025&currency=USD");
-  });
-
-  it("«Más» abre el resto de las secciones y la hoja se cierra al elegir una", async () => {
-    renderLayout();
-    fireEvent.click(moreButton());
-    const sheet = screen.getByRole("dialog", { name: "Más secciones" });
-    fireEvent.click(within(sheet).getByRole("link", { name: "Sueldo" }));
-    await waitFor(() => expect(moreSheet()).not.toBeInTheDocument());
-    expect(moreButton()).toHaveAttribute("aria-current", "page");
-  });
-
-  it("si la ruta cambia con «Más» abierto (gesto de volver), la hoja se cierra", async () => {
-    renderWithProviders(<Layout><Link to="/auto">ir a auto</Link></Layout>);
-    fireEvent.click(moreButton());
-    expect(moreSheet()).toBeInTheDocument();
-    fireEvent.click(screen.getByText("ir a auto"));
-    await waitFor(() => expect(moreSheet()).not.toBeInTheDocument());
-  });
-
-  it("con teclado, «Más» indica si está abierto y el foco vuelve a él al cerrar con Escape", async () => {
-    renderLayout();
-    const more = moreButton();
-    expect(more).toHaveAttribute("aria-haspopup", "dialog");
-    expect(more).toHaveAttribute("aria-expanded", "false");
-    more.focus();
-    fireEvent.click(more);
-    expect(more).toHaveAttribute("aria-expanded", "true");
-    fireEvent.keyDown(screen.getByRole("dialog", { name: "Más secciones" }), { key: "Escape" });
-    await waitFor(() => expect(more).toHaveFocus());
-    expect(more).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("si la pantalla pasa a tamaño compu con «Más» abierto, no queda nada tapando la app", async () => {
-    renderLayout();
-    fireEvent.click(moreButton());
-    emulateDesktop();
-    await waitFor(() => expect(moreSheet()).not.toBeInTheDocument());
-    expect(document.querySelector(".MuiBackdrop-root")).not.toBeInTheDocument();
-    expect(document.body.style.overflow).not.toBe("hidden");
-    expect(screen.getByRole("button", { name: "colapsar menú" })).toBeInTheDocument();
+    expect(within(mainNavigation()).getByRole("link", { name: "Gastos" })).toHaveAttribute("href", "/transactions?year=2025&currency=USD");
   });
 
   it("la barra, el contenido y la pill reservan la zona segura del iPhone", () => {
