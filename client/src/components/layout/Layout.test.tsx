@@ -1,6 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { Link } from "react-router-dom";
+import { cleanup, screen, within } from "@testing-library/react";
 import { renderWithProviders } from "../../testing/renderWithProviders.js";
 import { emulateDesktop, emulateMobile } from "../../testing/viewport.js";
 import { Layout } from "./Layout.js";
@@ -99,18 +98,14 @@ const cssFor = (element: Element): string => {
   return rules.filter((rule) => classes.some((name) => rule.includes(`.${name}`))).join("}");
 };
 
-const moreSheet = () => screen.queryByRole("dialog", { name: "Más secciones" });
-
 describe("Layout en mobile", () => {
   beforeEach(() => emulateMobile());
 
-  const moreButton = () => within(mainNavigation()).getByRole("button", { name: "Más" });
-
-  it("la barra inferior muestra Inicio, Movimientos y Más", () => {
+  it("la barra muestra Inicio, Gastos, Ingresos, Deudas y Patrimonio, sin «Más»", () => {
     renderLayout();
-    const links = within(mainNavigation()).getAllByRole("link").map((link) => link.textContent);
-    expect(links).toEqual(["Inicio", "Movimientos"]);
-    expect(moreButton()).toBeInTheDocument();
+    expect(within(mainNavigation()).getAllByRole("link").map((link) => link.textContent))
+      .toEqual(["Inicio", "Gastos", "Ingresos", "Deudas", "Patrimonio"]);
+    expect(within(mainNavigation()).queryByRole("button", { name: "Más" })).not.toBeInTheDocument();
   });
 
   it("importar sigue a mano en las acciones rápidas", () => {
@@ -124,61 +119,20 @@ describe("Layout en mobile", () => {
     expect(within(quickActions()).queryByLabelText("abrir menú")).not.toBeInTheDocument();
   });
 
-  it("marca la sección actual de la barra y deja «Más» sin marcar", () => {
-    renderLayout("/transactions");
-    expect(within(mainNavigation()).getByRole("link", { name: "Movimientos" })).toHaveAttribute("aria-current", "page");
-    expect(moreButton()).not.toHaveAttribute("aria-current");
+  it("marca la sección de la ruta actual", () => {
+    renderLayout("/suscripciones");
+    expect(within(mainNavigation()).getByRole("link", { name: "Gastos" })).toHaveAttribute("aria-current", "page");
+    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
   });
 
-  it("en una sección de «Más», marca «Más» como actual", () => {
-    renderLayout("/credits");
-    expect(moreButton()).toHaveAttribute("aria-current", "page");
-    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
+  it("en Datos ninguna entrada de la barra queda marcada", () => {
+    renderLayout("/rules");
+    expect(within(mainNavigation()).getAllByRole("link").filter((link) => link.hasAttribute("aria-current"))).toHaveLength(0);
   });
 
   it("los links de la barra conservan los filtros globales y descartan los de Movimientos", () => {
     renderLayout("/transactions?year=2025&currency=USD&category=Compras");
-    expect(within(mainNavigation()).getByRole("link", { name: "Inicio" })).toHaveAttribute("href", "/?year=2025&currency=USD");
-  });
-
-  it("«Más» abre el resto de las secciones y la hoja se cierra al elegir una", async () => {
-    renderLayout();
-    fireEvent.click(moreButton());
-    const sheet = screen.getByRole("dialog", { name: "Más secciones" });
-    fireEvent.click(within(sheet).getByRole("link", { name: "Sueldo" }));
-    await waitFor(() => expect(moreSheet()).not.toBeInTheDocument());
-    expect(moreButton()).toHaveAttribute("aria-current", "page");
-  });
-
-  it("si la ruta cambia con «Más» abierto (gesto de volver), la hoja se cierra", async () => {
-    renderWithProviders(<Layout><Link to="/auto">ir a auto</Link></Layout>);
-    fireEvent.click(moreButton());
-    expect(moreSheet()).toBeInTheDocument();
-    fireEvent.click(screen.getByText("ir a auto"));
-    await waitFor(() => expect(moreSheet()).not.toBeInTheDocument());
-  });
-
-  it("con teclado, «Más» indica si está abierto y el foco vuelve a él al cerrar con Escape", async () => {
-    renderLayout();
-    const more = moreButton();
-    expect(more).toHaveAttribute("aria-haspopup", "dialog");
-    expect(more).toHaveAttribute("aria-expanded", "false");
-    more.focus();
-    fireEvent.click(more);
-    expect(more).toHaveAttribute("aria-expanded", "true");
-    fireEvent.keyDown(screen.getByRole("dialog", { name: "Más secciones" }), { key: "Escape" });
-    await waitFor(() => expect(more).toHaveFocus());
-    expect(more).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("si la pantalla pasa a tamaño compu con «Más» abierto, no queda nada tapando la app", async () => {
-    renderLayout();
-    fireEvent.click(moreButton());
-    emulateDesktop();
-    await waitFor(() => expect(moreSheet()).not.toBeInTheDocument());
-    expect(document.querySelector(".MuiBackdrop-root")).not.toBeInTheDocument();
-    expect(document.body.style.overflow).not.toBe("hidden");
-    expect(screen.getByRole("link", { name: "Datos" })).toBeInTheDocument();
+    expect(within(mainNavigation()).getByRole("link", { name: "Gastos" })).toHaveAttribute("href", "/transactions?year=2025&currency=USD");
   });
 
   it("la barra, el contenido y la pill reservan la zona segura del iPhone", () => {
